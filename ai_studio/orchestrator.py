@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 from datetime import datetime, timedelta, timezone
 
-from . import backup, commerce, notify
+from . import backup, commerce, notify, security
 from .db import iso, now
 from .llm import BudgetExceeded, BudgetGuard, LLMError
 from .runner import run_task
@@ -34,6 +34,16 @@ class Studio:
 
     def schedule_reviews(self) -> int:
         created = 0
+        today = now().strftime("%Y-%m-%d")
+        if self.cfg.get("security", "daily_review", default=True) and self.db.kv_get("security_review_day") != today:
+            self.db.kv_set("security_review_day", today)
+            self.db.add_task("Revue de sécurité quotidienne", "securite",
+                             "Lance security_audit, puis analyse les constats et les anomalies. Pour chaque point critique "
+                             "ou anomalie réelle : security_alert avec une consigne claire pour le propriétaire (quoi faire, "
+                             "où, en combien de minutes). Ne signale pas ce qui est déjà connu et sans changement depuis hier "
+                             "(recall). Termine par un résumé court ; mémorise (remember) seulement les nouveaux constats.",
+                             priority=3, created_by="systeme")
+            created += 1
         every = timedelta(minutes=int(self.cfg["runtime"]["ceo_review_minutes"]))
         for o in self.db.active_objectives():
             busy = self.db.one("SELECT COUNT(*) FROM tasks WHERE agent='pdg' AND objective_id=? AND status IN ('pending','running')", (o["id"],))[0]
@@ -51,6 +61,10 @@ class Studio:
     def cycle(self) -> dict:
         backup.daily(self.cfg, self.db)
         commerce.sync_all(self.cfg, self.db)        # ventes Stripe et emails reçus (sans coût d'API)
+        try:
+            security.check(self.cfg, self.db)       # alertes de configuration critiques (sans coût d'API)
+        except Exception as e:
+            self.db.log("systeme", "securite", f"Contrôle de sécurité impossible : {e}")
         stats = self._cycle()
         try:
             notify.check(self.cfg, self.db, stats)

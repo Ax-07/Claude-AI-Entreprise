@@ -6,6 +6,13 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Activités de l'entreprise (modèle divisionnel avec services partagés). Les tâches sans activité sont « transverses ».
+DEFAULT_ACTIVITIES = [
+    ("services", "Services numériques", "Diagnostic SEO local et services sur mesure aux entreprises.", "active"),
+    ("video", "Studio vidéo", "Chaîne YouTube internationale (vidéos originales, publication validée par le propriétaire).", "preparation"),
+    ("ecommerce", "E-commerce", "Vente en dropshipping à l'international (fournisseurs, boutique, logistique).", "preparation"),
+]
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS objectives (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -104,6 +111,13 @@ CREATE TABLE IF NOT EXISTS inbox (
     recorded_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_inbox_msgid ON inbox(message_id);
+CREATE TABLE IF NOT EXISTS activities (
+    id TEXT PRIMARY KEY,                             -- identifiant court : services, video, ecommerce…
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'active',           -- active | preparation | pause
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS offers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
@@ -157,7 +171,12 @@ class DB:
         ("sales", "stage_note", "TEXT"),
         ("sales", "owner_notes", "TEXT"),
         ("approvals", "review", "TEXT"),                  # avis de l'agent juridique
-        ("approvals", "review_task", "INTEGER"),          # tâche de relecture (0 = pas de relecture)                  # consignes du propriétaire sur la commande (font foi)
+        ("approvals", "review_task", "INTEGER"),          # tâche de relecture (0 = pas de relecture)
+        # activité de l'entreprise (services, vidéo, e-commerce…) : coûts et revenus mesurés par activité
+        ("objectives", "activity", "TEXT"),
+        ("tasks", "activity", "TEXT"),
+        ("costs", "activity", "TEXT"),
+        ("offers", "activity", "TEXT"),                  # consignes du propriétaire sur la commande (font foi)
     )
 
     def _migrate(self):
@@ -166,6 +185,14 @@ class DB:
             if col not in cols:
                 self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
         # Ventes antérieures au suivi des commandes : celles qui avaient une tâche de livraison restent à livrer.
+        for aid, name, desc, status in DEFAULT_ACTIVITIES:
+            self.conn.execute("INSERT OR IGNORE INTO activities(id, name, description, status, created_at) VALUES (?,?,?,?,?)",
+                              (aid, name, desc, status, iso()))
+        # tout ce qui touche aux commandes et aux offres existantes relève des services numériques (seule activité jusqu'ici)
+        self.conn.execute("UPDATE offers SET activity='services' WHERE activity IS NULL")
+        self.conn.execute("UPDATE tasks SET activity='services' WHERE activity IS NULL AND order_ref IS NOT NULL")
+        self.conn.execute("UPDATE costs SET activity=(SELECT t.activity FROM tasks t WHERE t.id=costs.task_id) "
+                          "WHERE activity IS NULL AND task_id IS NOT NULL")
         self.conn.execute("UPDATE sales SET stage = CASE WHEN task_id IS NULL THEN 'historique' ELSE 'a_livrer' END WHERE stage IS NULL")
         self.conn.execute("UPDATE tasks SET order_ref = (SELECT s.rowid FROM sales s WHERE s.task_id = tasks.id) "
                           "WHERE order_ref IS NULL AND id IN (SELECT task_id FROM sales WHERE task_id IS NOT NULL)")
@@ -196,8 +223,8 @@ class DB:
                  (iso(), agent, kind, message[:2000], task_id))
 
     # ---------- objectifs ----------
-    def add_objective(self, text: str) -> int:
-        return self.run("INSERT INTO objectives(text, created_at) VALUES (?,?)", (text, iso()))
+    def add_objective(self, text: str, activity: str | None = None) -> int:
+        return self.run("INSERT INTO objectives(text, created_at, activity) VALUES (?,?,?)", (text, iso(), activity))
 
     def active_objectives(self):
         return self.q("SELECT * FROM objectives WHERE status='active' ORDER BY id")
@@ -207,13 +234,21 @@ class DB:
                  parent_id: int | None = None, objective_id: int | None = None,
                  created_by: str = "owner", depth: int = 0, order_ref: int | None = None) -> int:
         t = iso()
-        if order_ref is None and parent_id is not None:          # une sous-tâche reste rattachée à la même commande
-            p = self.one("SELECT order_ref FROM tasks WHERE id=?", (parent_id,))
-            order_ref = p[0] if p else None
+        activity = None
+        if parent_id is not None:          # une sous-tâche reste rattachée à la même commande et à la même activité
+            p = self.one("SELECT order_ref, activity FROM tasks WHERE id=?", (parent_id,))
+            if p:
+                order_ref = order_ref if order_ref is not None else p[0]
+                activity = p[1]
+        if activity is None and objective_id is not None:
+            o = self.one("SELECT activity FROM objectives WHERE id=?", (objective_id,))
+            activity = o[0] if o else None
+        if activity is None and order_ref is not None:
+            activity = "services"
         return self.run(
-            "INSERT INTO tasks(title, description, agent, priority, parent_id, objective_id, created_by, depth, created_at, updated_at, order_ref)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            (title, description, agent, max(1, min(5, int(priority))), parent_id, objective_id, created_by, depth, t, t, order_ref))
+            "INSERT INTO tasks(title, description, agent, priority, parent_id, objective_id, created_by, depth, created_at, updated_at, order_ref, activity)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (title, description, agent, max(1, min(5, int(priority))), parent_id, objective_id, created_by, depth, t, t, order_ref, activity))
 
     def task(self, task_id: int):
         return self.one("SELECT * FROM tasks WHERE id=?", (task_id,))
@@ -251,9 +286,13 @@ class DB:
     # ---------- coûts ----------
     def add_cost(self, agent: str, task_id, model: str, inp: int, out: int, searches: int, usd: float) -> None:
         n = now()
-        self.run("INSERT INTO costs(ts, day, month, agent, task_id, model, input_tokens, output_tokens, web_searches, usd)"
-                 " VALUES (?,?,?,?,?,?,?,?,?,?)",
-                 (iso(n), n.strftime("%Y-%m-%d"), n.strftime("%Y-%m"), agent, task_id, model, inp, out, searches, usd))
+        act = None
+        if task_id is not None:
+            r = self.one("SELECT activity FROM tasks WHERE id=?", (task_id,))
+            act = r[0] if r else None
+        self.run("INSERT INTO costs(ts, day, month, agent, task_id, model, input_tokens, output_tokens, web_searches, usd, activity)"
+                 " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                 (iso(n), n.strftime("%Y-%m-%d"), n.strftime("%Y-%m"), agent, task_id, model, inp, out, searches, usd, act))
 
     def spent(self, period: str = "day") -> float:
         n = now()

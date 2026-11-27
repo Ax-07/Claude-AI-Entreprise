@@ -27,6 +27,7 @@ class Base(unittest.TestCase):
     def make(self, cfg: dict | None = None):
         (self.dir / "config.json").write_text(json.dumps(cfg or {}))
         self.cfg = load_config(self.dir)
+        self.cfg.data["security"]["daily_review"] = False   # revue quotidienne testée à part
         self.db = DB(self.cfg.db_path)
         self.addCleanup(self.db.conn.close)
         self.guard = BudgetGuard(self.cfg, self.db)

@@ -91,6 +91,13 @@ _Mis à jour le 27/11/2026_
 - carte.json : `agents_of_pole` (liste d'agents par bâtiment) ; un pôle regroupé propose tous les bâtiments de ses anciens pôles (commercial A–I, production A–F, administration A–F, data A–F, hq A–C). /api/map n'accepte que ces 5 pôles.
 - Page : état, pastille et robots d'un bâtiment agrègent ses agents ; la fiche du pôle liste ses agents et leurs dernières tâches. 106 tests.
 
+## Multi-activités et Cybersécurité (27/11/2026)
+- Décisions du propriétaire : deux nouvelles activités à venir, **Studio vidéo (YouTube, international)** et **E-commerce (dropshipping, international)** ; budget augmenté au fur et à mesure, sur la base des coûts réels par activité ; agent de cybersécurité.
+- Modèle retenu : divisionnel avec services partagés (Direction ; services partagés Trésorerie, Juridique, Cybersécurité, Support, Labo ; une division par activité).
+- Table `activities` (services active ; video et ecommerce « en préparation ») ; colonne `activity` sur objectifs, tâches (héritée du parent / de l'objectif / de la commande), coûts (prise sur la tâche) et offres. `activities.report` : coûts mois/total, revenus (selon l'offre vendue), tâches. CLI `activites`, `objectif "…" -a video` ; API /api/activities ; Analyses du tableau de bord par activité ; choix de l'activité à la création d'un objectif ; activité rappelée dans le briefing des tâches.
+- Agent `securite` (pôle Administration, rebaptisé services partagés ; modèle économique) : `security.config_audit` (Git, clés Stripe/GitHub trop puissantes, mot de passe Gmail, sauvegardes, secrets recopiés dans les livrables ou la mémoire — jamais la valeur d'un secret), `anomalies` (dépenses, échecs, envois, emails suspects), `suspicious_text` (emails piégés : signalés dans la tâche de réponse) ; alerte automatique sans coût sur tout constat critique (une fois) ; revue quotidienne par l'agent ; outils `security_audit`, `security_alert` (3 par jour). 116 tests.
+- Points d'attention relevés : YouTube ne monétise pas le contenu produit en masse (politique « inauthentic content », clarifiée en juillet 2026) → vidéos originales, peu nombreuses, publication validée ; dropshipping = vendeur pleinement responsable (garanties, rétractation 14 jours, GPSR, fournisseurs UE à privilégier), international = TVA/douane à traiter par le Juridique.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

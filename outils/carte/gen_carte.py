@@ -56,7 +56,7 @@ from bld import S, POLES, frange as _fr, office, OFFICE_KIND, mixw, mix
 MEMBERS = {"hq": ["hq"], "data": ["data"], "commercial": ["marketing", "sales", "support"],
            "production": ["atelier", "research"], "administration": ["finance", "legal"]}
 AGENTS = {"hq": ["pdg"], "data": ["data"], "commercial": ["marketing", "ventes", "support"],
-          "production": ["atelier", "recherche"], "administration": ["finance", "juridique"]}
+          "production": ["atelier", "recherche"], "administration": ["finance", "juridique", "securite"]}
 XY = {"hq": (500, 150), "data": (500, 330), "commercial": (238, 330), "production": (762, 330), "administration": (500, 494)}
 D = [
  dict(id="hq", name="Command HQ", col="#818CF8", ag=1),
@@ -186,7 +186,7 @@ desc = {
  "atelier": ("Production", "Fabrique les livrables vendus aux clients, selon la fiche d’offre, avec une méthode de qualité.", ["Rapports clients", "Contrôle qualité"]),
  "commercial": ("Division commerciale", "Marketing, ventes et support réunis : attirer les clients, leur vendre, puis s’en occuper.", []),
  "production": ("Division production", "L’Atelier fabrique ce qui est vendu ; le Labo Recherche trouve les nouvelles offres et méthodes.", []),
- "administration": ("Contrôle", "Trésorerie et Juridique : l’argent, le droit et les factures de l’entreprise.", []),
+ "administration": ("Services partagés", "Trésorerie, Juridique et Cybersécurité : l’argent, le droit et la protection de toute l’entreprise.", []),
 }
 desc["hq"] = ("Direction", desc["hq"][1], [])
 desc["data"] = ("Direction · cœur de l’entreprise", desc["data"][1], [])

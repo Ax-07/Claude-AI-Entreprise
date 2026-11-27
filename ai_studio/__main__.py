@@ -2,7 +2,8 @@
 
 Commandes principales :
   init                         crée config.json et .env à partir des modèles
-  objectif "texte"             fixe un objectif à l'entreprise (le PDG s'en charge)
+  objectif "texte" [-a ACT]    nouvel objectif, rattaché à une activité (services, video, ecommerce)
+  activites                    coûts d'API, revenus et tâches par activité
   tache "titre" -a agent       confie directement une tâche à un agent (option -d description, -p priorité)
   run                          démarre le moteur en continu (24 h/24)
   run --once                   exécute un seul cycle puis s'arrête (pour tester)
@@ -64,7 +65,10 @@ def cmd_init(cfg, db, a):
 
 
 def cmd_objectif(cfg, db, a):
-    oid = db.add_objective(a.texte)
+    from .activities import exists
+    if a.activite and not exists(db, a.activite):
+        _out("Activité inconnue. Liste : python -m ai_studio activites"); return
+    oid = db.add_objective(a.texte, a.activite)
     db.log("proprietaire", "objective", f"Nouvel objectif #{oid} : {a.texte}")
     _out(f"Objectif #{oid} enregistré. Le PDG le prendra en charge au prochain cycle.")
 
@@ -179,12 +183,21 @@ def cmd_relancer(cfg, db, a):
     _out(f"{n} tâche(s) remise(s) en attente.")
 
 
+def cmd_activites(cfg, db, a):
+    from .activities import report
+    _out(f"{'Activité':<22}{'État':<13}{'API mois':>10}{'API total':>11}{'Revenus mois':>14}{'Tâches':>8}")
+    for r in report(db):
+        _out(f"{(r['name'] + (' (' + r['id'] + ')' if r['id'] else ''))[:21]:<22}{r['status']:<13}{r['cost_month']:>9.4f}${r['cost_total']:>10.4f}$"
+             f"{r['revenue_month']:>13.2f}€{r['tasks_done']:>5}/{r['tasks_open']}")
+    _out("\nTâches : terminées/en cours. Un objectif se rattache à une activité : objectif \"texte\" -a video")
+
+
 def cmd_objectifs(cfg, db, a):
     rows = db.q("SELECT * FROM objectives ORDER BY id")
     if not rows:
         _out("Aucun objectif."); return
     for o in rows:
-        _out(f"#{o['id']} [{o['status']}] {o['text']}")
+        _out(f"#{o['id']} [{o['status']}]{' [' + o['activity'] + ']' if o['activity'] else ''} {o['text']}")
     _out("\nMettre en pause : python -m ai_studio archiver ID   (les tâches de revue en attente sont annulées)")
 
 
@@ -378,6 +391,8 @@ def main(argv=None):
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("init")
     s = sub.add_parser("objectif"); s.add_argument("texte")
+    s.add_argument("-a", "--activite", help="services, video, ecommerce… (vide = transverse)")
+    sub.add_parser("activites")
     s = sub.add_parser("tache"); s.add_argument("titre"); s.add_argument("-a", "--agent", required=True)
     s.add_argument("-d", "--description"); s.add_argument("-p", "--priorite", type=int, default=3)
     s = sub.add_parser("run"); s.add_argument("--once", action="store_true")
@@ -409,7 +424,7 @@ def main(argv=None):
     db = DB(cfg.db_path)
     handlers = {"init": cmd_init, "objectif": cmd_objectif, "tache": cmd_tache, "run": cmd_run, "status": cmd_status,
                 "validations": cmd_validations, "taches": cmd_taches, "voir": cmd_voir, "journal": cmd_journal,
-                "couts": cmd_couts, "agents": cmd_agents, "relancer": cmd_relancer, "objectifs": cmd_objectifs,
+                "couts": cmd_couts, "agents": cmd_agents, "relancer": cmd_relancer, "objectifs": cmd_objectifs, "activites": cmd_activites,
                 "archiver": cmd_archiver, "serveur": cmd_serveur, "notifier-test": cmd_notifier_test,
                 "offres": cmd_offres, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne,
                 "memoire": cmd_memoire, "oublier": cmd_oublier, "retenir": cmd_retenir,

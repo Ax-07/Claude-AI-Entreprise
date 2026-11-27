@@ -86,11 +86,16 @@ def propose_page(ctx: ToolContext, file: str, page_path: str, title: str, reason
        "deliverable": {"type": "string", "description": "ce que reçoit concrètement le client (format, contenu)"},
        "delay_hours": {"type": "integer", "description": "délai de livraison promis après paiement, en heures"},
        "required_info": {"type": "string", "description": "informations à obtenir du client pour livrer (vide si aucune)"},
-       "producer": {"type": "string", "description": "agent qui produit le livrable : atelier (par défaut, production client)"}},
+       "producer": {"type": "string", "description": "agent qui produit le livrable : atelier (par défaut, production client)"},
+       "activity": {"type": "string", "description": "activité de l'offre (services, video, ecommerce) ; par défaut celle de ta tâche"}},
       ["name", "price_eur", "summary", "deliverable", "delay_hours"])
 def save_offer(ctx: ToolContext, name: str, price_eur: float, summary: str, deliverable: str, delay_hours: int,
-               producer: str = "atelier", required_info: str = "") -> str:
+               producer: str = "atelier", required_info: str = "", activity: str = "") -> str:
+    from ..activities import exists
     from ..db import iso
+    activity = activity.strip() or (ctx.task["activity"] if ctx.task is not None and ctx.task["activity"] else "services")
+    if not exists(ctx.db, activity):
+        return "Activité inconnue (list_activities)."
     producer = producer.strip().lower()
     if producer not in ctx.agent_names:
         return f"Agent inconnu pour la production. Choix : {', '.join(ctx.agent_names)}"
@@ -100,11 +105,11 @@ def save_offer(ctx: ToolContext, name: str, price_eur: float, summary: str, deli
     vals = (float(price_eur), summary[:1000], deliverable[:1000], int(delay_hours), required_info[:600], producer, iso())
     if old:
         ctx.db.run("UPDATE offers SET price_eur=?, summary=?, deliverable=?, delay_hours=?, required_info=?, producer=?, "
-                   "updated_at=?, status='active' WHERE id=?", (*vals, old["id"]))
+                   "updated_at=?, status='active', activity=? WHERE id=?", (*vals, activity, old["id"]))
         ctx.db.log(ctx.agent, "offre", f"Offre mise à jour : {name}")
         return f"Offre « {name} » mise à jour (#{old['id']})."
     oid = ctx.db.run("INSERT INTO offers(name, price_eur, summary, deliverable, delay_hours, required_info, producer, updated_at, "
-                     "created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)", (name.strip()[:120], *vals, ctx.agent, iso()))
+                     "created_by, created_at, activity) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (name.strip()[:120], *vals, ctx.agent, iso(), activity))
     ctx.db.log(ctx.agent, "offre", f"Nouvelle offre au catalogue : {name}")
     return f"Offre « {name} » ajoutée au catalogue (#{oid}). Pour la vendre : propose_payment_link avec offer=\"{name}\"."
 
@@ -213,3 +218,38 @@ def legal_review(ctx: ToolContext, approval_id: int, verdict: str, notes: str) -
     ctx.db.set_approval(int(approval_id), review=f"{VERDICTS[verdict]} — {notes.strip()[:1200]}")
     ctx.db.log(ctx.agent, "juridique", f"Avis sur la demande #{approval_id} : {VERDICTS[verdict]}")
     return "Avis enregistré : il s'affiche sur la demande de validation."
+
+
+@tool("list_activities", "Activités de l'entreprise (services, vidéo, e-commerce…) avec leurs coûts d'API, revenus et tâches.", {})
+def list_activities(ctx: ToolContext) -> str:
+    from ..activities import report
+    return "\n".join(f"- {r['id'] or 'transverse'} — {r['name']} [{r['status']}] : {r['description']} | API ce mois {r['cost_month']:.4f} $, "
+                     f"total {r['cost_total']:.4f} $ | revenus ce mois {r['revenue_month']:.2f} € | tâches {r['tasks_done']} terminées, "
+                     f"{r['tasks_open']} en cours" for r in report(ctx.db))
+
+
+# ============================================================================ Cybersécurité
+@tool("security_audit", "Contrôles de sécurité : configuration (clés, Git, sauvegardes, secrets recopiés) et anomalies "
+      "(dépenses, échecs, envois, emails suspects). N'affiche jamais la valeur d'un secret.", {})
+def security_audit(ctx: ToolContext) -> str:
+    from ..security import anomalies, config_audit
+    lines = ["Configuration :"] + [f"- [{lvl}] {msg}" for lvl, msg in config_audit(ctx.cfg, ctx.db)]
+    lines += ["Anomalies (24 h / 7 jours) :"] + [f"- {a}" for a in anomalies(ctx.db)]
+    return "\n".join(lines)
+
+
+@tool("security_alert", "Alerte le propriétaire (notification Windows + journal) pour un problème de sécurité réel. "
+      "Message court avec l'action à faire. 3 alertes par jour au maximum.",
+      {"level": {"type": "string", "description": "critique ou attention"}, "message": {"type": "string"}}, ["level", "message"])
+def security_alert(ctx: ToolContext, level: str, message: str) -> str:
+    from .. import notify
+    from ..db import now
+    day = now().strftime("%Y-%m-%d")
+    n = int(ctx.db.kv_get(f"sec_agent_alerts_{day}") or 0)
+    if n >= 3:
+        return "Plafond de 3 alertes par jour atteint : mets les autres points dans le résultat de ta tâche."
+    ctx.db.kv_set(f"sec_agent_alerts_{day}", str(n + 1))
+    level = "critique" if level.strip().lower().startswith("crit") else "attention"
+    ctx.db.log(ctx.agent, "alerte", f"[{level}] {message[:500]}")
+    notify.send(ctx.cfg, ctx.db, "Sécurité : " + ("alerte critique" if level == "critique" else "point d'attention"), message[:300])
+    return "Alerte envoyée au propriétaire."

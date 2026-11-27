@@ -31,7 +31,8 @@
   ],
   "administration": [
    "finance",
-   "juridique"
+   "juridique",
+   "securite"
   ]
  },
  "divisions": [],
@@ -215,8 +216,8 @@
    "left": "50.00%",
    "top": "90.97%",
    "division": "administration",
-   "role": "Contrôle",
-   "desc": "Trésorerie et Juridique : l’argent, le droit et les factures de l’entreprise.",
+   "role": "Services partagés",
+   "desc": "Trésorerie, Juridique et Cybersécurité : l’argent, le droit et la protection de toute l’entreprise.",
    "variants": [
     {
      "L": "A",

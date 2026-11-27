@@ -73,6 +73,11 @@ def _briefing(db, task) -> str:
         p = db.task(task["parent_id"])
         if p:
             parts += ["", f"Contexte — tâche parente #{p['id']} ({p['agent']}) : {p['title']}"]
+    if task["activity"]:
+        a = db.one("SELECT name, description, status FROM activities WHERE id=?", (task["activity"],))
+        if a:
+            parts += ["", f"Activité concernée : {a['name']} — {a['description']}"
+                      + (" (en préparation : rien n'est encore vendu ni publié)" if a["status"] == "preparation" else "")]
     if task["objective_id"]:
         o = db.one("SELECT text FROM objectives WHERE id=?", (task["objective_id"],))
         if o:

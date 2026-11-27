@@ -147,7 +147,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:rgba(255,255,255,.03)}
 "use strict";
 const ICONS = __ICONS__;
 const $ = s => document.querySelector(s);
-const C = {pdg:"#818CF8",recherche:"#34D399",marketing:"#60A5FA",ventes:"#A78BFA",support:"#FBBF24",data:"#22D3EE",finance:"#F472B6",atelier:"#FB923C",juridique:"#CBD5E1",proprietaire:"#FDE68A",systeme:"#94A3B8"};
+const C = {pdg:"#818CF8",recherche:"#34D399",marketing:"#60A5FA",ventes:"#A78BFA",support:"#FBBF24",data:"#22D3EE",finance:"#F472B6",atelier:"#FB923C",juridique:"#CBD5E1",securite:"#F87171",proprietaire:"#FDE68A",systeme:"#94A3B8"};
 const STATUS = {pending:"En attente",running:"En cours",done:"Terminée",failed:"En échec",blocked:"Bloquée"};
 const STATE = {running:["En cours","#34D399"],waiting:["En attente","#FBBF24"],idle:["Disponible","#9AA4C7"]};
 const LEVELS = ["Start-up naissante","Entreprise émergente","Entreprise structurée","Entreprise en croissance","Groupe établi","Empire autonome"];
@@ -374,16 +374,23 @@ async function openTask(id){
     h("span",{class:"lab"},"Journal"), h("div",{class:"pre"}, t.events.map(e => `${hhmm(e.ts)} ${e.kind} — ${e.message}`).join("\n") || "—")));
 }
 async function openObjectives(){
-  const list = await api("GET","/api/objectives"), LBL = {active:"Actif",paused:"En pause",done:"Atteint"};
+  const [list, acts] = await Promise.all([api("GET","/api/objectives"), api("GET","/api/activities")]), LBL = {active:"Actif",paused:"En pause",done:"Atteint"};
+  const sel = h("select",{"aria-label":"Activité"}, acts.map(a => h("option",{value:a.id||""}, a.id ? a.name : "Transverse")));
+  const actName = id => (acts.find(a => a.id === id)||{name:"Transverse"}).name;
   const input = h("input",{type:"text",placeholder:"Nouvel objectif pour l’équipe…",style:{flex:"1 1 300px"},"aria-label":"Nouvel objectif"});
-  const form = h("form",{style:{display:"flex",gap:"8px",flexWrap:"wrap",marginBottom:"14px"},onsubmit:async e=>{ e.preventDefault(); if(!input.value.trim()) return; try{ await api("POST","/api/objectives",{text:input.value}); toast("Objectif ajouté : le PDG le prendra en charge au prochain cycle"); openObjectives(); refresh(); }catch(err){ toast(err.message,false); } }}, input, h("button",{class:"btn pri",type:"submit"},"Ajouter"));
+  const form = h("form",{style:{display:"flex",gap:"8px",flexWrap:"wrap",marginBottom:"14px"},onsubmit:async e=>{ e.preventDefault(); if(!input.value.trim()) return; try{ await api("POST","/api/objectives",{text:input.value, activity: sel.value || null}); toast("Objectif ajouté : le PDG le prendra en charge au prochain cycle"); openObjectives(); refresh(); }catch(err){ toast(err.message,false); } }}, input, sel, h("button",{class:"btn pri",type:"submit"},"Ajouter"));
   const set = async (id, status) => { try{ await api("POST",`/api/objectives/${id}`,{status}); toast("Objectif mis à jour"); openObjectives(); refresh(); }catch(e){ toast(e.message,false); } };
-  modal("Objectifs", h("div",{}, form, list.length ? list.map(o => h("div",{class:"box",style:{marginBottom:"10px"}}, h("div",{style:{display:"flex",justifyContent:"space-between",gap:"8px"}}, h("b",{}, `#${o.id} · ${LBL[o.status]||o.status}`), o.status==="active" ? h("button",{class:"btn",onclick:()=>set(o.id,"paused")},"Mettre en pause") : h("button",{class:"btn",onclick:()=>set(o.id,"active")},"Réactiver")),
+  modal("Objectifs", h("div",{}, form, list.length ? list.map(o => h("div",{class:"box",style:{marginBottom:"10px"}}, h("div",{style:{display:"flex",justifyContent:"space-between",gap:"8px"}}, h("b",{}, `#${o.id} · ${LBL[o.status]||o.status} · ${actName(o.activity)}`), o.status==="active" ? h("button",{class:"btn",onclick:()=>set(o.id,"paused")},"Mettre en pause") : h("button",{class:"btn",onclick:()=>set(o.id,"active")},"Réactiver")),
     h("span",{}, o.text), h("span",{class:"bar"}, h("i",{style:{width:pct(o.tasks_done,o.tasks_total)+"%",background:"linear-gradient(90deg,#6366F1,#22D3EE)"}})), h("span",{class:"small muted"}, `${o.tasks_done} / ${o.tasks_total} tâches terminées`))) : h("div",{class:"empty"},"Aucun objectif.")));
 }
 async function openCosts(){
-  const c = await api("GET","/api/costs"), max = Math.max(0.0001, ...c.days.map(d=>d.usd));
-  modal("Analyses — coûts API", h("div",{}, h("div",{style:{display:"flex",alignItems:"flex-end",gap:"6px",height:"140px",marginBottom:"8px"}}, c.days.length ? c.days.map(d => h("div",{title:`${d.day} : ${money4(d.usd)} · ${d.searches} recherche(s)`,style:{flex:"1",minWidth:"10px",height:Math.max(3,100*d.usd/max)+"%",background:"linear-gradient(180deg,#22D3EE,#6366F1)",borderRadius:"4px 4px 0 0"}})) : h("span",{class:"empty"},"Pas encore de dépense")),
+  const [c, acts] = await Promise.all([api("GET","/api/costs"), api("GET","/api/activities")]), max = Math.max(0.0001, ...c.days.map(d=>d.usd));
+  const ST = {active:"Active", preparation:"En préparation", pause:"En pause"};
+  const actTable = h("div",{style:{marginBottom:"18px"}}, h("span",{class:"lab"},"Par activité — pour ajuster le budget sur les coûts réels"),
+    h("table",{style:{marginTop:"6px"}}, h("thead",{}, h("tr",{}, ["Activité","État","API (mois)","API (total)","Revenus (mois)","Tâches"].map(x=>h("th",{},x)))),
+      h("tbody",{}, acts.map(a => h("tr",{}, h("td",{}, h("b",{}, a.name), h("div",{class:"small muted"}, a.description)), h("td",{class:"muted"}, ST[a.status]||a.status),
+        h("td",{}, money4(a.cost_month)), h("td",{class:"muted"}, money4(a.cost_total)), h("td",{}, a.id ? eur(a.revenue_month) : "—"), h("td",{class:"muted"}, `${a.tasks_done} / ${a.tasks_open} en cours`))))));
+  modal("Analyses — coûts API", h("div",{}, actTable, h("div",{style:{display:"flex",alignItems:"flex-end",gap:"6px",height:"140px",marginBottom:"8px"}}, c.days.length ? c.days.map(d => h("div",{title:`${d.day} : ${money4(d.usd)} · ${d.searches} recherche(s)`,style:{flex:"1",minWidth:"10px",height:Math.max(3,100*d.usd/max)+"%",background:"linear-gradient(180deg,#22D3EE,#6366F1)",borderRadius:"4px 4px 0 0"}})) : h("span",{class:"empty"},"Pas encore de dépense")),
     h("div",{class:"small muted",style:{marginBottom:"14px"}},"14 derniers jours (survole une barre pour le détail)"),
     h("table",{}, h("thead",{}, h("tr",{}, ["Agent","Tokens entrée / sortie (mois)","Coût (mois)"].map(x=>h("th",{},x)))), h("tbody",{}, c.by_agent.map(a => h("tr",{}, h("td",{},a.agent), h("td",{class:"muted"}, `${Math.round((a.input_tokens||0)/1000)}k / ${Math.round((a.output_tokens||0)/1000)}k`), h("td",{}, money4(a.usd))))))));
 }
