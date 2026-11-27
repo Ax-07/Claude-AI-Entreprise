@@ -238,17 +238,26 @@ Le tableau de bord Command HQ, déjà maquetté, sera branché sur le moteur via
 | Succès, niveau du HQ, XP | calculés à partir des tâches terminées et des revenus |
 | Bouton Valider / Refuser | approvals |
 
-**API locale (à développer)** : un serveur HTTP Python standard sur `http://127.0.0.1:8765`, accessible uniquement depuis le PC.
+**API locale (en place depuis la phase 3)** : un serveur HTTP Python standard sur `http://127.0.0.1:8765` (`ai_studio/server.py`), qui sert aussi la page du tableau de bord (`ai_studio/web/index.html`). Lancement : `python -m ai_studio serveur`, ou `run --tableau` pour le moteur et le tableau de bord ensemble.
+
+Sécurité : écoute sur 127.0.0.1 uniquement ; en-tête Host limité à 127.0.0.1 ou localhost (contre le DNS rebinding) ; toute requête POST exige l'en-tête `X-AI-Studio: 1`, qu'un autre site ne peut pas envoyer (contre les requêtes forgées) ; en-têtes CSP et anti-iframe ; textes des agents affichés sans jamais être interprétés comme du HTML ; fichiers limités à l'espace de travail.
 
 | Méthode et chemin | Rôle |
 | --- | --- |
-| GET /api/status | Indicateurs, budget, état du moteur |
+| GET / | Page du tableau de bord |
+| GET /api/status | Indicateurs, budget, état du moteur (dernier cycle), niveau, XP, succès, objectif en cours |
 | GET /api/agents | Agents, statut, tâche en cours |
-| GET /api/tasks?status= | Liste des tâches |
+| GET /api/tasks?status=&agent= | Liste des tâches |
+| GET /api/tasks/{id} | Détail : consigne, résultat, journal, tâches créées |
+| POST /api/tasks/{id}/retry | Relancer une tâche en échec ou bloquée |
 | GET /api/events?since= | Fil d'activité |
 | GET /api/approvals | Validations en attente |
 | POST /api/approvals/{id} | Valider ou refuser, avec une note |
+| GET /api/objectives | Objectifs et avancement |
 | POST /api/objectives | Ajouter un objectif |
+| POST /api/objectives/{id} | Mettre en pause, réactiver, marquer atteint |
+| GET /api/costs | Dépenses par jour et par agent |
+| GET /api/files, GET /api/file?path= | Livrables de l'espace de travail |
 
 **Ligne de commande** : `python -m ai_studio` avec init, objectif, tache, run, status, validations, valider, refuser, taches, voir, journal, couts, agents.
 
