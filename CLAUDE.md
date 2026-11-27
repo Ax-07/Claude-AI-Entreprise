@@ -16,5 +16,5 @@ Le propriétaire parle français : réponds en français et tutoie-le.
 ## Repères
 - Ajouter un agent : `ai_studio/agents.py` (ROLES).
 - Ajouter un outil : décorateur `@tool` dans `ai_studio/tools/core.py` ou `business.py`, puis l'ajouter aux rôles concernés.
-- Documentation de conception : https://claude.ai/artifact/5HJkzTKdme1Dr48Cui2UPh
+- Documentation de conception : [docs/CONCEPTION.md](docs/CONCEPTION.md) (version en ligne : https://claude.ai/artifact/5HJkzTKdme1Dr48Cui2UPh)
 - Maquette du tableau de bord : https://claude.ai/artifact/CvRpS2tPDf75zQ9GG3chXB

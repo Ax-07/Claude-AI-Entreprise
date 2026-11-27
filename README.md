@@ -4,7 +4,7 @@ Une équipe de 7 agents IA qui travaillent pour ton entreprise, 24 h/24, sur ton
 Tu fixes des objectifs, l'agent PDG les découpe en missions et les confie aux autres agents.
 Tout ce qui engage l'entreprise vers l'extérieur (envoyer un email, créer un lien de paiement) attend ta validation.
 
-- Documentation de conception : https://claude.ai/artifact/5HJkzTKdme1Dr48Cui2UPh
+- Documentation de conception : [docs/CONCEPTION.md](docs/CONCEPTION.md) (version en ligne : https://claude.ai/artifact/5HJkzTKdme1Dr48Cui2UPh)
 - Maquette du tableau de bord : https://claude.ai/artifact/CvRpS2tPDf75zQ9GG3chXB
 - Suivi du projet : [docs/CONTINUITE.md](docs/CONTINUITE.md)
 
