@@ -63,16 +63,19 @@ DIVS = {  # division : nom, couleur (bordure lumineuse des îlots)
  "direction": ("Direction", "#818CF8"), "commercial": ("Pôle commercial", "#38BDF8"),
  "production": ("Pôle production", "#FB923C"), "administration": ("Services partagés", "#E879F9")}
 # (i, j) = îlot entre E[i]..E[i+1] en u et E[j]..E[j+1] en v. À l'écran : i croissant = vers la droite et l'avant,
-# j croissant = vers la gauche et l'avant. Le Data Core occupe l'îlot central (2, 2), le PDG l'îlot juste derrière.
+# j croissant = vers la gauche et l'avant. Le Data Core occupe la case centrale (2, 2) ; chaque pôle occupe un coin de
+# 2 × 2 cases (4 emplacements de bâtiment) ; les 8 cases entre les coins sont de petits parcs.
+ZONES = {"direction": (0, 0), "production": (3, 0), "commercial": (0, 3), "administration": (3, 3)}   # coin haut-gauche de chaque zone
 LOTS = {"data": (2, 2, "direction"), "hq": (1, 1, "direction"),
-        "marketing": (1, 2, "commercial"), "sales": (1, 3, "commercial"), "support": (2, 3, "commercial"),
-        "research": (2, 1, "production"), "atelier": (3, 1, "production"),
-        "finance": (3, 2, "administration"), "security": (4, 2, "administration"), "legal": (4, 3, "administration")}
-PLOTS = [dict(id="video", name="Studio vidéo", col="#F43F5E", ij=(0, 2)),
-         dict(id="ecommerce", name="E-commerce", col="#A3E635", ij=(2, 0))]
-PARKS = {(3, 3), (2, 4), (4, 4)}     # parc devant le Data Core (pour le laisser voir) et au premier plan
-used = {(i, j) for (i, j, d) in LOTS.values()} | {a["ij"] for a in PLOTS}
-FILL = {(i, j): ("park" if (i, j) in PARKS else "towers") for i in range(N) for j in range(N) if (i, j) not in used}
+        "marketing": (0, 4, "commercial"), "sales": (1, 3, "commercial"), "support": (1, 4, "commercial"),
+        "research": (3, 0, "production"), "atelier": (3, 1, "production"),
+        "legal": (3, 4, "administration"), "security": (4, 3, "administration"), "finance": (4, 4, "administration")}
+PLOTS = [dict(id="video", name="Studio vidéo", col="#F43F5E", ij=(4, 0)),
+         dict(id="ecommerce", name="E-commerce", col="#A3E635", ij=(4, 1))]
+PARKS = {(i, j) for i in range(N) for j in range(N) if (i == 2) != (j == 2)}   # la croix entre les 4 coins
+used = {(i, j) for (i, j, d) in LOTS.values()} | {a["ij"] for a in PLOTS} | PARKS
+FREE = {(i, j): d for d, (i0, j0) in ZONES.items() for i in (i0, i0 + 1) for j in (j0, j0 + 1) if (i, j) not in used}
+FILL = {ij: "park" for ij in PARKS}
 INFO = {  # nom, couleur, agent, rôle affiché, description, échelle du bâtiment
  "hq": ("Command HQ", "#818CF8", "pdg", "Orchestration", "Le PDG IA répartit les missions, arbitre les budgets et fait remonter les décisions sensibles.", .62),
  "data": ("Data Core", "#22D3EE", "data", "Mémoire et données", "Le cœur de l’entreprise : mémoire partagée, mesures et amélioration des agents.", .6),
@@ -222,27 +225,39 @@ for pid, (i, j, d) in LOTS.items():
 for a in PLOTS:
     ground.append(sidewalk(*a["ij"], a["col"], dashed=True))
 for (i, j), kind in FILL.items():
-    ground.append(sidewalk(i, j, "#475569" if kind == "towers" else "#22c58f"))
+    ground.append(sidewalk(i, j, "#22c58f"))
+for (i, j), d in FREE.items():   # emplacement libre du pôle : contour en pointillés et repère « + »
+    col = DIVS[d][1]
+    ground.append(sidewalk(i, j, col, dashed=True))
+    x0, y0 = p(*lot_center(i, j), TH)
+    ground.append('<g stroke="%s" stroke-opacity=".7" stroke-width="2" stroke-linecap="round"><line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"/><line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"/></g>' % (
+        col, x0 - 7, y0, x0 + 7, y0, x0, y0 - 4, x0, y0 + 4))
 svg.append("".join(ground))
 # chantiers : grue et palissade
 for a in PLOTS:
     u0, u1, v0, v1 = lot_bounds(*a["ij"], pad=12)
-    bx, by = p(u0 + 6, v0 + 6, TH); tx, ty = p(u0 + 6, v0 + 6, 110)
+    bx, by = p(u1 - 4, v0 + 4, TH); tx, ty = p(u1 - 4, v0 + 4, 104)   # grue au coin droit, flèche vers la gauche
     col = a["col"]
     objs.append((by, '<g opacity=".9"><line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="3"/>'
                      '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2.5"/>'
                      '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="1" stroke-dasharray="2 2"/>'
                      '<rect x="%.1f" y="%.1f" width="10" height="8" fill="%s"/><circle cx="%.1f" cy="%.1f" r="2" fill="#F43F5E" class="pulse"/></g>' % (
-        bx, by, tx, ty, col, tx - 16, ty, tx + 74, ty + 5, col, tx + 56, ty + 4, tx + 56, ty + 52, mixw(col, .56), tx + 51, ty + 52, col, tx, ty - 3)))
+        bx, by, tx, ty, col, tx + 14, ty, tx - 64, ty + 5, col, tx - 48, ty + 4, tx - 48, ty + 48, mixw(col, .56), tx - 53, ty + 48, col, tx, ty - 3)))
     cu, cv = lot_center(*a["ij"])
     objs.append((p(cu, cv)[1], ubox(cu - 4, cu + 22, cv - 10, cv + 14, TH, TH + 7, mix(col, .35), mix(col, .22), mix(col, .12), stroke=col)))
 # remplissage : immeubles éclairés et parc
 for (i, j), kind in FILL.items():
     u0, u1, v0, v1 = lot_bounds(i, j, pad=10)
     if kind == "park":
-        for _ in range(14):
-            u, v = rnd.uniform(u0, u1), rnd.uniform(v0, v1); x, y = p(u, v, TH)
-            objs.append((y, tree(x, y, rnd.uniform(.8, 1.2))))
+        # petit parc : allées en croix, bassin au centre et quelques arbres
+        cu, cv = lot_center(i, j)
+        svg.append('<path d="M%.1f %.1f L%.1f %.1f M%.1f %.1f L%.1f %.1f" stroke="#3b4a6b" stroke-width="3" stroke-linecap="round"/>' % (
+            p(u0, cv, TH) + p(u1, cv, TH) + p(cu, v0, TH) + p(cu, v1, TH)))
+        bx, by, rx, ry = G.ell(cu, cv, TH, 9)
+        svg.append('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="#0e7490" stroke="#67E8F9" stroke-opacity=".8"/>' % (bx, by, rx, ry))
+        for (a_, b_) in [(.2, .2), (.8, .2), (.2, .8), (.8, .8), (.5, .15), (.15, .5)]:
+            u, v = u0 + (u1 - u0) * a_, v0 + (v1 - v0) * b_; x, y = p(u, v, TH)
+            objs.append((y, tree(x, y, rnd.uniform(.75, 1))))
         continue
     cy_ = p(*lot_center(i, j))[1]
     hmax = 30 if cy_ > 400 else 44 if cy_ < 160 else 62   # bas au premier plan, pour ne rien masquer
@@ -309,8 +324,8 @@ for pid, (x, y, d) in B.items():
                          left="%.2f%%" % (x / W * 100), top="%.2f%%" % (ly / H * 100),
                          role=DIVS[d][0] + " · " + role, desc=desc,
                          variants=[dict(L=v[0], name=v[1], text=v[2]) for v in VARS[pid]]))
-QLBL = {"direction": (500, 50), "commercial": (165, 440), "production": (900, 250), "administration": (760, 530)}
-quarters_js = [dict(id=q, name=n, color=c, planned=False, poles=[pid for pid in B if B[pid][2] == q],
+QLBL = {"direction": (500, 48), "commercial": (130, 425), "production": (905, 440), "administration": (500, 600)}
+quarters_js = [dict(id=q, name=n, color=c, planned=False, poles=[pid for pid in B if B[pid][2] == q], free=sum(1 for d in FREE.values() if d == q),
                     left="%.2f%%" % (QLBL[q][0] / W * 100), top="%.2f%%" % (QLBL[q][1] / H * 100)) for q, (n, c) in DIVS.items()]
 for a in PLOTS:
     u, v = lot_center(*a["ij"]); x, y = p(u, v, TH)

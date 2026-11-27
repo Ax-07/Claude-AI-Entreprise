@@ -241,7 +241,7 @@ function poleState(ags){ const running = ags.some(a => a.state==="running"), wai
 function renderLabels(){
   if (!META) return;
   // nom de chaque quartier (et des terrains réservés aux futures divisions)
-  const divs = (META.quarters||[]).map(d => h("span",{class:"gro",style:{position:"absolute",left:d.left,top:d.top,transform:"translate(-50%,0)",pointerEvents:"none",fontSize:"10px",fontWeight:"700",letterSpacing:".18em",textTransform:"uppercase",color:d.color,opacity:d.planned?.75:1,textShadow:`0 0 10px ${d.color}AA`,whiteSpace:"nowrap"}}, d.name + (d.planned ? " · bientôt" : "")));
+  const divs = (META.quarters||[]).map(d => h("span",{class:"gro",style:{position:"absolute",left:d.left,top:d.top,transform:"translate(-50%,0)",pointerEvents:"none",fontSize:"10px",fontWeight:"700",letterSpacing:".18em",textTransform:"uppercase",color:d.color,opacity:d.planned?.75:1,textShadow:`0 0 10px ${d.color}AA`,whiteSpace:"nowrap",textAlign:"center",lineHeight:"1.3"}}, d.name, d.planned ? h("span",{style:{display:"block",fontSize:"9px",opacity:.8}},"bientôt") : null));
   // un bâtiment par agent : au repos, un simple voyant d'état (et le nombre de tâches) ; le nom complet s'affiche
   // pour le bâtiment survolé ou sélectionné, pour ne pas masquer la carte
   put($("#labels"), divs, META.poles.map(p => { const ags = agentsOfPole(p.id), on = p.id === HOVER, sel = p.id === SEL, ps = poleState(ags), st = ps.st, n = ps.n;
