@@ -85,6 +85,12 @@ _Mis à jour le 27/11/2026_
 - Carte refaite en trois rangées (outils/carte/gen_carte.py, positions `XY`) : HQ au fond, Data Core au centre (moyeu des routes), Commerciale à gauche, Production à droite (coin droit libre pour un futur pôle), Administration devant ; plateformes de division (contour lumineux à la couleur de la division) et noms des divisions ; étiquettes compactes sur une ligne (état en infobulle, nombre de tâches en pastille).
 - Data Core : 3 nouveaux bâtiments proposés par le propriétaire (D L'Archive circulaire, E Le Prisme neural, F L'Agora en spirale) ; variantes A à F acceptées par /api/map. 106 tests.
 
+## Un bâtiment par pôle (27/11/2026)
+- Précision du propriétaire : « réorganiser par pôle » = un bâtiment par pôle, plusieurs agents dedans. Remplace la carte à 9 bâtiments.
+- 5 bâtiments : Command HQ (pdg) au fond, Data Core (data) au centre, Pôle commercial (marketing, ventes, support) à gauche, Pôle production (atelier, recherche) à droite, Administration (finance, juridique) devant.
+- carte.json : `agents_of_pole` (liste d'agents par bâtiment) ; un pôle regroupé propose tous les bâtiments de ses anciens pôles (commercial A–I, production A–F, administration A–F, data A–F, hq A–C). /api/map n'accepte que ces 5 pôles.
+- Page : état, pastille et robots d'un bâtiment agrègent ses agents ; la fiche du pôle liste ses agents et leurs dernières tâches. 106 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

@@ -223,28 +223,40 @@ function applyMap(){
   document.querySelectorAll("#map .bld").forEach(g => g.style.display = city && g.dataset.variant === variantOf(g.dataset.pole) ? "inline" : "none");
   document.querySelectorAll("#map .office").forEach(g => g.style.display = city ? "none" : "inline");
   const byAgent = Object.fromEntries(AG.map(a => [a.name, a]));
-  document.querySelectorAll("#map .bot").forEach(g => { const a = byAgent[META.agent_of_pole[g.dataset.pole]]; const n = !city ? 0 : (a ? (a.state==="running" ? 4 : a.state==="waiting" ? 2 : 1) : 1); g.style.display = +g.dataset.i < n ? "inline" : "none"; });
+  // robots devant chaque bâtiment : un par agent du pôle, plus ceux qui travaillent (6 au maximum)
+  document.querySelectorAll("#map .bot").forEach(g => { const ags = agentsOfPole(g.dataset.pole);
+    const n = !city ? 0 : Math.min(6, Math.max(1, ags.length) + ags.reduce((s,a) => s + (a.state==="running" ? 2 : a.state==="waiting" ? 1 : 0), 0)); g.style.display = +g.dataset.i < n ? "inline" : "none"; });
   document.querySelectorAll(".seg [data-view]").forEach(b => { const on = b.dataset.view === (MAP.view||"ville"); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
 }
 document.querySelectorAll(".seg [data-view]").forEach(b => b.onclick = async () => { MAP.view = b.dataset.view; applyMap(); renderDetail(); try { MAP = await api("POST","/api/map",{view: MAP.view}); } catch(e){ toast(e.message,false); } });
-function agentOfPole(pole){ return AG.find(a => a.name === META.agent_of_pole[pole]); }
+function agentsOfPole(pole){ const names = (META.agents_of_pole||{})[pole] || [META.agent_of_pole[pole]]; return AG.filter(a => names.includes(a.name)); }
+function poleOfAgent(name){ const e = Object.entries(META ? (META.agents_of_pole||{}) : {}).find(([k,v]) => v.includes(name)); return e ? e[0] : null; }
+function poleState(ags){ const running = ags.some(a => a.state==="running"), waiting = ags.some(a => a.state==="waiting");
+  return {st: running ? STATE.running : waiting ? STATE.waiting : STATE.idle, running, n: ags.reduce((s,a) => s + a.pending + (a.current ? 1 : 0), 0)}; }
 function renderLabels(){
   if (!META) return;
   const divs = (META.divisions||[]).map(d => h("span",{class:"gro",style:{position:"absolute",left:d.left,top:d.top,transform:d.id==="production"||d.id==="administration"?"translate(-50%,0)":"none",pointerEvents:"none",fontSize:"11px",fontWeight:"700",letterSpacing:".18em",textTransform:"uppercase",color:d.color,textShadow:`0 0 10px ${d.color}AA`,whiteSpace:"nowrap"}}, d.name));
-  put($("#labels"), divs, META.poles.map(p => { const a = agentOfPole(p.id), on = p.id === SEL, st = a ? STATE[a.state] : STATE.idle, n = a ? a.pending + (a.current ? 1 : 0) : 0;
+  put($("#labels"), divs, META.poles.map(p => { const ags = agentsOfPole(p.id), on = p.id === SEL, ps = poleState(ags), st = ps.st, n = ps.n;
     // étiquette compacte sur une ligne : l'état détaillé est dans la fiche du pôle et dans l'infobulle
     return h("button",{class:"lbl",title:st[0] + (n ? ` · ${n} tâche${n>1?"s":""}` : ""),style:{left:p.left,top:p.top,flexDirection:"row",alignItems:"center",gap:"7px",padding:"5px 10px",border:`1px solid ${on?p.color:p.color+"66"}`,boxShadow: on?`0 0 22px ${p.color}AA, 0 0 0 1px ${p.color} inset`:`0 0 14px ${p.color}40`},onclick:()=>{ SEL=p.id; renderLabels(); renderDetail(); }},
-      h("span",{class: a&&a.state==="running"?"live":null,style:{width:"7px",height:"7px",borderRadius:"50%",background:st[1],boxShadow:`0 0 6px ${st[1]}`}}),
+      h("span",{class: ps.running?"live":null,style:{width:"7px",height:"7px",borderRadius:"50%",background:st[1],boxShadow:`0 0 6px ${st[1]}`}}),
       h("span",{class:"gro",style:{fontSize:"12px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:"#F4F6FF"}}, p.name),
       n ? h("span",{style:{fontSize:"11px",fontWeight:"700",color:"#0B1029",background:p.color,borderRadius:"999px",padding:"0 6px"}}, String(n)) : null); }));
 }
 function renderDetail(){
   if (!META) return;
-  const p = META.poles.find(x => x.id === SEL) || META.poles[0], a = agentOfPole(p.id), city = MAP.view !== "bureaux";
-  const active = a ? a.pending + (a.current ? 1 : 0) : 0;
+  const p = META.poles.find(x => x.id === SEL) || META.poles[0], ags = agentsOfPole(p.id), city = MAP.view !== "bureaux";
+  const active = poleState(ags).n;
   const tasksBox = h("div",{style:{flex:"1 1 240px",display:"flex",flexDirection:"column",gap:"8px"}});
-  api("GET", "/api/tasks?limit=4&agent=" + encodeURIComponent(a ? a.name : "")).then(list => put(tasksBox, list.length ? list.map(t => h("button",{onclick:()=>openTask(t.id),style:{display:"flex",alignItems:"center",gap:"10px",fontSize:"13px",color:"#EEF1FF",padding:"9px 12px",borderRadius:"10px",background:"rgba(255,255,255,.04)",border:"0",cursor:"pointer",textAlign:"left"}},
-    h("span",{style:{width:"7px",height:"7px",flex:"none",borderRadius:"50%",background:p.color}}), h("span",{style:{flex:"1"}}, t.title), h("span",{class:"small st-"+t.status}, STATUS[t.status]))) : h("span",{class:"empty"},"Aucune tâche pour ce pôle."))).catch(()=>{});
+  Promise.all(ags.map(a => api("GET", "/api/tasks?limit=4&agent=" + encodeURIComponent(a.name)))).then(ls => {
+    const list = ls.flat().sort((x,y) => (y.updated_at||"").localeCompare(x.updated_at||"")).slice(0,4);
+    put(tasksBox, list.length ? list.map(t => h("button",{onclick:()=>openTask(t.id),style:{display:"flex",alignItems:"center",gap:"10px",fontSize:"13px",color:"#EEF1FF",padding:"9px 12px",borderRadius:"10px",background:"rgba(255,255,255,.04)",border:"0",cursor:"pointer",textAlign:"left"}},
+      h("span",{style:{width:"7px",height:"7px",flex:"none",borderRadius:"50%",background:C[t.agent]||p.color}}), h("span",{style:{flex:"1"}}, t.title), h("span",{class:"small muted"}, t.agent), h("span",{class:"small st-"+t.status}, STATUS[t.status]))) : h("span",{class:"empty"},"Aucune tâche pour ce pôle."));
+  }).catch(()=>{});
+  // les agents qui travaillent dans ce bâtiment
+  const team = h("div",{style:{display:"flex",flexWrap:"wrap",gap:"6px",marginTop:"4px"}}, ags.map(a => { const s = STATE[a.state];
+    return h("span",{title:`${a.title} · ${a.model} · ${a.done} tâche(s) terminée(s) · ${money4(a.cost_month)} ce mois`,style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",padding:"4px 10px",borderRadius:"999px",border:`1px solid ${a.color}66`,background:a.color+"14"}},
+      h("span",{class:a.state==="running"?"live":null,style:{width:"6px",height:"6px",borderRadius:"50%",background:s[1]}}), a.title.split(" — ")[0].replace("Agent ",""), h("span",{class:"muted"}, "· " + s[0].toLowerCase())); }));
   const variants = city ? h("div",{style:{flex:"1 1 100%",display:"flex",flexDirection:"column",gap:"10px",paddingTop:"16px",borderTop:"1px solid rgba(130,150,255,.14)"}},
     h("span",{style:{display:"flex",flexWrap:"wrap",justifyContent:"space-between",gap:"8px"}}, h("span",{class:"gro",style:{fontSize:"13px",letterSpacing:".14em",textTransform:"uppercase",color:"#C7CEF0"}},"Bâtiment du pôle"), h("span",{class:"small muted"},"Le changement s’applique aussitôt sur la carte")),
     h("div",{role:"group","aria-label":"Choix du bâtiment",style:{display:"flex",flexWrap:"wrap",gap:"10px"}}, p.variants.map(v => { const on = variantOf(p.id) === v.L;
@@ -253,8 +265,8 @@ function renderDetail(){
         h("span",{style:{fontSize:"12px",lineHeight:"1.4",color:"#B4BCDD"}}, v.text)); }))) : null;
   $("#detail").style.borderColor = p.color + "88";
   put($("#detail"),
-    h("div",{style:{flex:"1 1 280px",display:"flex",flexDirection:"column",gap:"6px"}}, h("span",{style:{fontSize:"11px",letterSpacing:".14em",textTransform:"uppercase",color:p.color}}, ((META.divisions||[]).find(d=>d.id===p.division)||{name:""}).name + " · " + p.role), h("span",{class:"gro",style:{fontSize:"22px",fontWeight:"700",color:"#F4F6FF"}}, p.name),
-      h("span",{style:{fontSize:"13px",lineHeight:"1.5",color:"#B4BCDD"}}, p.desc), a ? h("span",{class:"small muted"}, `${a.title} · ${a.model} · ${a.done} tâche(s) terminée(s) · ${money4(a.cost_month)} ce mois`) : null),
+    h("div",{style:{flex:"1 1 280px",display:"flex",flexDirection:"column",gap:"6px"}}, h("span",{style:{fontSize:"11px",letterSpacing:".14em",textTransform:"uppercase",color:p.color}}, p.role), h("span",{class:"gro",style:{fontSize:"22px",fontWeight:"700",color:"#F4F6FF"}}, p.name),
+      h("span",{style:{fontSize:"13px",lineHeight:"1.5",color:"#B4BCDD"}}, p.desc), team),
     tasksBox,
     h("div",{style:{flex:"0 0 auto",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"4px"}}, h("span",{class:"gro",style:{fontSize:"34px",fontWeight:"700",color:p.color}}, String(active)), h("span",{class:"small muted"}, active>1?"tâches actives":"tâche active")),
     variants);
@@ -323,13 +335,13 @@ function renderAgents(list){
   AG = list; applyMap(); renderLabels();
   const order = [...new Set(list.map(a => a.division))];
   const card = a => { const st = STATE[a.state], rate = a.success_rate ?? 0;
-    return h("button",{class:"pn",onclick:()=>{ const pole = Object.entries(META?META.agent_of_pole:{}).find(([k,v])=>v===a.name); if (pole){ SEL = pole[0]; renderLabels(); renderDetail(); window.scrollTo({top:0,behavior:"smooth"}); } },style:{minWidth:"0",padding:"14px",display:"flex",flexDirection:"column",gap:"12px",cursor:"pointer",textAlign:"left",color:"#EEF1FF"}},
+    return h("button",{class:"pn",onclick:()=>{ const pole = [poleOfAgent(a.name)]; if (pole[0]){ SEL = pole[0]; renderLabels(); renderDetail(); window.scrollTo({top:0,behavior:"smooth"}); } },style:{minWidth:"0",padding:"14px",display:"flex",flexDirection:"column",gap:"12px",cursor:"pointer",textAlign:"left",color:"#EEF1FF"}},
       h("div",{style:{display:"flex",gap:"12px",alignItems:"center"}}, h("span",{class:"av",style:{width:"50px",height:"50px",background:`radial-gradient(circle at 35% 30%, ${a.color}55, ${a.color}14 70%)`,border:`1.5px solid ${a.color}`,boxShadow:`0 0 20px ${a.color}66`}}, ico("BOT","#FFFFFF",24)),
         h("span",{style:{display:"flex",flexDirection:"column",gap:"2px",minWidth:"0"}}, h("span",{style:{fontSize:"14px",fontWeight:"600",color:"#F4F6FF"}}, a.title.split(" — ")[0]), h("span",{class:"small muted"}, a.current ? a.current.title : (a.title.split(" — ")[1]||a.pole)),
           h("span",{style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:st[1]}}, h("span",{class:a.state==="running"?"live":null,style:{width:"7px",height:"7px",borderRadius:"50%",background:st[1],boxShadow:`0 0 8px ${st[1]}`}}), st[0] + (a.pending ? ` (${a.pending})` : "")))),
       h("div",{style:{display:"flex",alignItems:"center",gap:"10px"}}, h("span",{class:"bar",style:{flex:"1"}}, h("i",{style:{width:rate+"%",background:a.color,boxShadow:`0 0 10px ${a.color}`}})), h("span",{class:"gro",style:{fontSize:"13px",color:"#C7CEF0"}}, a.success_rate==null ? "—" : rate+" %")),
       h("span",{class:"small muted",style:{display:"flex",justifyContent:"space-between"}}, h("span",{}, `${a.done} terminée(s)`), h("span",{}, money4(a.cost_month)))); };
-  const dcol = name => ((META&&META.divisions||[]).find(d => d.name === name)||{color:"#9AA4C7"}).color;
+  const dcol = name => ({"Direction":"#818CF8","Division commerciale":"#38BDF8","Division production":"#FB923C","Administration":"#E879F9"})[name] || "#9AA4C7";
   put($("#acards"), order.map(dv => h("div",{style:{gridColumn:"1 / -1",display:"flex",flexDirection:"column",gap:"10px"}},
     h("span",{class:"gro",style:{fontSize:"12px",letterSpacing:".16em",textTransform:"uppercase",color:dcol(dv),borderBottom:`1px solid ${dcol(dv)}44`,paddingBottom:"6px"}}, dv || "Autres"),
     h("div",{class:"agrid"}, list.filter(a => a.division === dv).map(card)))));

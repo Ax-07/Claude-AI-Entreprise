@@ -266,7 +266,7 @@ def insights(cfg, db, days: int = 7) -> dict:
     return {"days": labels, "done": done, "cost": cost, "success_rate": rate, "pipeline": pipeline, "schedule": schedule[:5]}
 
 
-MAP_POLES = {"hq", "research", "marketing", "sales", "support", "data", "finance", "atelier", "legal"}
+MAP_POLES = {"hq", "data", "commercial", "production", "administration"}       # un bâtiment par pôle
 
 
 def map_settings(cfg, db) -> dict:
@@ -285,7 +285,7 @@ def set_map(cfg, db, body: dict) -> dict:
         db.kv_set("map_view", body["view"])
     if "pole" in body:
         pole, var = body.get("pole"), body.get("variant")
-        if pole not in MAP_POLES or var not in tuple("ABCDEF"):
+        if pole not in MAP_POLES or var not in tuple("ABCDEFGHI"):
             raise ApiError(400, "pôle ou variante invalide")
         cur["variants"][pole] = var
         db.kv_set("map_variants", json.dumps(cur["variants"]))
