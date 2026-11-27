@@ -75,6 +75,11 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(by["atelier"]["division"], "Division production")
         self.assertEqual(by["data"]["division"], "Direction")
         self.assertEqual(by["recherche"]["done"], 1)
+        self.assertEqual((by["recherche"]["level"], by["ventes"]["level"]), (1, 1))   # 10 tâches réussies par niveau
+        for i in range(10):
+            self.db.set_task(self.db.add_task(f"T{i}", "recherche"), status="done", result="ok")
+        st, ag, _ = self.req("GET", "/api/agents")
+        self.assertEqual({a["name"]: a for a in ag}["recherche"]["level"], 2)
         self.assertEqual(by["ventes"]["state"], "waiting")
 
     def test_engine_heartbeat(self):
@@ -181,6 +186,11 @@ class MaquetteTest(ServerTest):
         self.assertEqual(q["commercial"]["poles"], ["marketing", "sales", "support"])
         self.assertEqual(q["administration"]["poles"], ["legal", "finance", "security"])
         self.assertTrue(q["video"]["planned"] and q["ecommerce"]["planned"])
+        # plateau « ville » : nom de code et enseigne peinte à l'avant de chaque îlot (sauf le Data Core, au rond-point)
+        for p in meta["poles"]:
+            self.assertTrue(p["code"])
+            if p["id"] != "data":
+                self.assertIn(">%s</text>" % p["name"].upper(), svg)
 
     def test_static_files_revalidated_not_stale(self):
         c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)

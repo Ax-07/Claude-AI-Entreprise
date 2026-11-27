@@ -104,6 +104,13 @@ _Mis à jour le 27/11/2026_
 - 10 bâtiments (un par agent, 3 au choix, 6 pour le Data Core) ; 3 nouveaux pour la Cybersécurité (Bouclier, Pare-feu, Centre de veille). carte.json : `quarters` (avec `planned`), un agent par bâtiment.
 - Carte allégée : au repos, chaque bâtiment n'a qu'un voyant d'état (et le nombre de tâches) ; le nom s'affiche au survol ; les bâtiments eux-mêmes sont cliquables ; le bâtiment sélectionné a un voyant cerclé. 116 tests.
 
+## Plateau « ville » (27/11/2026)
+- Choix du propriétaire, d'après son image de référence : la carte devient une ville vue en isométrie (remplace les quartiers en dalles).
+- Grille de 4 × 4 îlots séparés par des rues (marquage, passages piétons, lampadaires, voitures), rond-point central avec le Data Core sur un îlot holographique, ligne d'horizon éclairée derrière le plateau.
+- Un îlot par agent, bordure lumineuse à la couleur de sa division : Direction (Command HQ derrière le rond-point), Pôle commercial à gauche (Marketing, Ventes, Support), Pôle production à droite (Labo Recherche, Atelier), Services partagés devant (Trésorerie, Cybersécurité, Juridique). Îlots en chantier avec grue au fond : Studio vidéo et E-commerce. Remplissage : immeubles éclairés et un parc devant le rond-point (pour laisser voir le Data Core).
+- Nom du pôle peint sur une enseigne à l'avant de chaque îlot ; chaque pôle a un nom de code (ATLAS, MNÉMOS, ÉCHO, HERMÈS, VESTA, ORION, FORGE, THÉMIS, MIDAS, SENTINEL), affiché au survol avec le niveau de l'agent et ses tâches.
+- `/api/agents` renvoie `level` (1 + tâches réussies // 10, même barème que l'entreprise). Les 3 bâtiments au choix par pôle (6 pour le Data Core) et la vue bureaux sont conservés. Générateur : `outils/carte/gen_carte.py` (LOTS, PLOTS, FILL). 116 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

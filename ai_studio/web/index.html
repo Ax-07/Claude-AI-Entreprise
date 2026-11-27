@@ -251,7 +251,9 @@ function renderLabels(){
       n ? h("span",{style:{fontSize:"10px",fontWeight:"700",color:"#0B1029",background:p.color,borderRadius:"999px",padding:"0 5px"}}, String(n)) : null);
     return h("button",{class:"lbl",title:st[0] + (n ? ` · ${n} tâche${n>1?"s":""}` : ""),onmouseleave:()=>{ if (HOVER===p.id){ HOVER=null; renderLabels(); } },style:{left:p.left,top:p.top,zIndex:2,flexDirection:"row",alignItems:"center",gap:"7px",padding:"5px 10px",border:`1px solid ${p.id===SEL?p.color:p.color+"66"}`,boxShadow: p.id===SEL?`0 0 22px ${p.color}AA, 0 0 0 1px ${p.color} inset`:`0 0 14px ${p.color}40`},onclick:()=>{ SEL=p.id; renderLabels(); renderDetail(); }},
       h("span",{class: ps.running?"live":null,style:{width:"7px",height:"7px",borderRadius:"50%",background:st[1],boxShadow:`0 0 6px ${st[1]}`}}),
-      h("span",{class:"gro",style:{fontSize:"12px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:"#F4F6FF"}}, p.name),
+      h("span",{style:{display:"flex",flexDirection:"column",alignItems:"flex-start",lineHeight:"1.25"}},
+        h("span",{class:"gro",style:{fontSize:"12px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:"#F4F6FF"}}, p.name),
+        h("span",{style:{fontSize:"10px",color:"#AEB6DA",whiteSpace:"nowrap"}}, [p.code, ags.length ? "niv. " + Math.max(...ags.map(a => a.level||1)) : null, n ? `${n} tâche${n>1?"s":""}` : "au repos"].filter(Boolean).join(" · "))),
       n ? h("span",{style:{fontSize:"11px",fontWeight:"700",color:"#0B1029",background:p.color,borderRadius:"999px",padding:"0 6px"}}, String(n)) : null); }));
 }
 function renderDetail(){

@@ -1,6 +1,6 @@
 """Génère la carte isométrique du tableau de bord (ai_studio/web/carte.svg + carte.json).
 
-Mêmes bâtiments, open-spaces et plateau que la maquette validée. À relancer seulement si on change le dessin :
+Plateau « ville » : rues, rond-point central (Data Core), un îlot par agent regroupé par division. À relancer seulement si on change le dessin :
     python outils/carte/gen_carte.py
 """
 import sys
@@ -50,165 +50,283 @@ def iso(cx, cy, r, u, v): return (cx + (u-v)*r/2, cy + (u+v)*r/4)
 
 import math
 from bld import S, POLES, office, mixw, mix
-# Quartiers par pôle, un bâtiment par agent (décision du propriétaire). Chaque quartier est une grande dalle à la
-# couleur de son pôle ; deux terrains sont réservés aux futures divisions. Positions écran : le plateau va de
-# x = 0 à 1000 et de y = 80 à 580 ; (dx, dy) = position d'un bâtiment par rapport au centre de son quartier.
-QUARTERS = [
- dict(id="direction", name="Direction", col="#818CF8", x=500, y=330, r=82,
-      members=[("hq", 0, -32), ("data", 0, 34)]),
- dict(id="commercial", name="Pôle commercial", col="#38BDF8", x=192, y=330, r=72,
-      members=[("marketing", 0, -30), ("sales", -56, 12), ("support", 56, 12)]),
- dict(id="production", name="Pôle production", col="#FB923C", x=808, y=330, r=72,
-      members=[("research", -40, -6), ("atelier", 40, 6)]),
- dict(id="administration", name="Services partagés", col="#E879F9", x=500, y=500, r=72,
-      members=[("legal", 0, -30), ("finance", -56, 12), ("security", 56, 12)]),
-]
-PLOTS = [dict(id="video", name="Studio vidéo", col="#F43F5E", x=318, y=192, r=60),
-         dict(id="ecommerce", name="E-commerce", col="#A3E635", x=682, y=192, r=60)]
-INFO = {  # nom, couleur, agent, rôle affiché, description, échelle du bâtiment
- "hq": ("Command HQ", "#818CF8", "pdg", "Orchestration", "Le PDG IA répartit les missions, arbitre les budgets et fait remonter les décisions sensibles.", .62),
- "data": ("Data Core", "#22D3EE", "data", "Mémoire et données", "Le cœur de l’entreprise : mémoire partagée, mesures et amélioration des agents.", .56),
- "marketing": ("Hub Marketing", "#60A5FA", "marketing", "Acquisition", "Positionnement, contenus et pages de vente, dans plusieurs langues.", .52),
- "sales": ("Centre Ventes", "#A78BFA", "ventes", "Revenus", "Prospection, offres, liens de paiement et conversion.", .56),
- "support": ("Zone Support", "#FBBF24", "support", "Clients", "Réponses aux clients, livraisons et suivi des commandes.", .56),
- "research": ("Labo Recherche", "#34D399", "recherche", "R&D et veille", "Marchés, niches, concurrence et nouvelles offres pour toutes les activités.", .56),
- "atelier": ("Atelier", "#FB923C", "atelier", "Production", "Fabrique les livrables vendus aux clients, selon la fiche d’offre.", .56),
- "legal": ("Juridique", "#CBD5E1", "juridique", "Conformité", "CGV, mentions, RGPD, factures : relit les actions avant ta décision.", .56),
- "finance": ("Trésorerie", "#F472B6", "finance", "Finances", "Revenus, coûts d’API et rentabilité de chaque activité.", .56),
- "security": ("Cybersécurité", "#F87171", "securite", "Protection", "Configuration, anomalies et emails piégés : veille défensive quotidienne.", .56),
+# Plateau « ville » (choix du propriétaire, d'après son image de référence) : une grille de rues avec un rond-point
+# central où trône le Data Core, un îlot par agent regroupé par division, deux îlots en chantier pour les futures
+# divisions, des immeubles de remplissage, des voitures et une ligne d'horizon. Coordonnées du plateau (u, v) :
+# écran x = 500 + (u - v), y = 330 + (u + v) / 2 ; le plateau va de -250 à 250 dans les deux sens.
+CX, CY, GR = 500, 330, 250
+E = [-250, -130, 0, 130, 250]       # axes des rues (les bords ±250 sont le bord du plateau)
+HW = 15                              # demi-largeur d'une rue
+RB = 44                              # rayon du rond-point central
+TH = 5                               # hauteur des trottoirs
+DIVS = {  # division : nom, couleur (bordure lumineuse des îlots)
+ "direction": ("Direction", "#818CF8"), "commercial": ("Pôle commercial", "#38BDF8"),
+ "production": ("Pôle production", "#FB923C"), "administration": ("Services partagés", "#E879F9")}
+# (i, j) = îlot entre E[i]..E[i+1] en u et E[j]..E[j+1] en v ; le Data Core est au centre, sur le rond-point
+LOTS = {"hq": (1, 1, "direction"), "marketing": (0, 2, "commercial"), "sales": (1, 2, "commercial"),
+        "support": (1, 3, "commercial"), "research": (2, 0, "production"), "atelier": (2, 1, "production"),
+        "legal": (3, 3, "administration"), "finance": (2, 3, "administration"), "security": (3, 2, "administration")}
+PLOTS = [dict(id="video", name="Studio vidéo", col="#F43F5E", ij=(0, 1)),
+         dict(id="ecommerce", name="E-commerce", col="#A3E635", ij=(1, 0))]
+FILL = {(0, 0): "towers", (0, 3): "towers", (3, 0): "towers", (3, 1): "towers", (2, 2): "park"}
+INFO = {  # nom, couleur, agent, rôle affiché, description, échelle du bâtiment, nom de code
+ "hq": ("Command HQ", "#818CF8", "pdg", "Orchestration", "Le PDG IA répartit les missions, arbitre les budgets et fait remonter les décisions sensibles.", .78, "ATLAS"),
+ "data": ("Data Core", "#22D3EE", "data", "Mémoire et données", "Le cœur de l’entreprise : mémoire partagée, mesures et amélioration des agents.", .74, "MNÉMOS"),
+ "marketing": ("Hub Marketing", "#60A5FA", "marketing", "Acquisition", "Positionnement, contenus et pages de vente, dans plusieurs langues.", .72, "ÉCHO"),
+ "sales": ("Centre Ventes", "#A78BFA", "ventes", "Revenus", "Prospection, offres, liens de paiement et conversion.", .72, "HERMÈS"),
+ "support": ("Zone Support", "#FBBF24", "support", "Clients", "Réponses aux clients, livraisons et suivi des commandes.", .72, "VESTA"),
+ "research": ("Labo Recherche", "#34D399", "recherche", "R&D et veille", "Marchés, niches, concurrence et nouvelles offres pour toutes les activités.", .72, "ORION"),
+ "atelier": ("Atelier", "#FB923C", "atelier", "Production", "Fabrique les livrables vendus aux clients, selon la fiche d’offre.", .72, "FORGE"),
+ "legal": ("Juridique", "#CBD5E1", "juridique", "Conformité", "CGV, mentions, RGPD, factures : relit les actions avant ta décision.", .72, "THÉMIS"),
+ "finance": ("Trésorerie", "#F472B6", "finance", "Finances", "Revenus, coûts d’API et rentabilité de chaque activité.", .72, "MIDAS"),
+ "security": ("Cybersécurité", "#F87171", "securite", "Protection", "Configuration, anomalies et emails piégés : veille défensive quotidienne.", .72, "SENTINEL"),
 }
 KIND = {"hq": "globe", "data": "city", "marketing": "target", "sales": "bars", "support": "headset", "research": "chart",
         "atelier": "gear", "legal": "scale", "finance": "coin", "security": "shield"}
 VARS = {p[0]: p[4] for p in POLES}
 DEFAULT = {"hq": "A", "data": "A", "marketing": "A", "sales": "A", "support": "B", "research": "A", "atelier": "A",
            "legal": "A", "finance": "A", "security": "A"}
-FOOT = 24          # demi-largeur (en unités du plateau) d'un bâtiment réduit, pour les étiquettes et les robots
-TH = 8
-CX, CY, GR = 500, 330, 250
-AREAS = QUARTERS + PLOTS
-B = {}             # position écran de chaque bâtiment
-for q in QUARTERS:
-    for (pid, dx, dy) in q["members"]:
-        B[pid] = (q["x"] + dx, q["y"] + dy, q["id"])
-
-def uv(x, y): dx, dy = x - CX, y - CY; return ((dx + 2*dy) / 2, (2*dy - dx) / 2)
-def seg_dist(px, py, a, b):
-    ax, ay = a; bx, by = b; vx, vy = bx-ax, by-ay; L = vx*vx + vy*vy or 1
-    t = max(0, min(1, ((px-ax)*vx + (py-ay)*vy) / L)); qx, qy = ax + vx*t, ay + vy*t
-    return math.hypot(px-qx, py-qy)
+FOOT = 34
 
 G = S("#A78BFA", "city", cx=CX, cy=CY)
+p = G.p
+def PP(pts): return " ".join("%.1f,%.1f" % q for q in pts)
+def poly(pts, fill, extra=""): return '<polygon points="%s" fill="%s"%s/>' % (PP(pts), fill, extra)
+def lot_bounds(i, j, pad=0):
+    u0 = E[i] + (HW if i else 8) + pad; u1 = E[i+1] - (HW if i < 3 else 8) - pad
+    v0 = E[j] + (HW if j else 8) + pad; v1 = E[j+1] - (HW if j < 3 else 8) - pad
+    return u0, u1, v0, v1
+def lot_center(i, j): u0, u1, v0, v1 = lot_bounds(i, j); return (u0 + u1) / 2, (v0 + v1) / 2
+
+def ubox(u0, u1, v0, v1, z0, z1, top, left, right, stroke=None):
+    """Pavé dans le repère du plateau : dessus, face avant-gauche (v = v1) et face avant-droite (u = u1)."""
+    out = poly([p(u0, v1, z0), p(u1, v1, z0), p(u1, v1, z1), p(u0, v1, z1)], left)
+    out += poly([p(u1, v0, z0), p(u1, v1, z0), p(u1, v1, z1), p(u1, v0, z1)], right)
+    out += poly([p(u0, v0, z1), p(u1, v0, z1), p(u1, v1, z1), p(u0, v1, z1)], top,
+                ' stroke="%s" stroke-opacity=".7" stroke-width=".8"' % stroke if stroke else "")
+    return out
+
+WINCOL = ["#FDE68A", "#FDE68A", "#93C5FD", "#67E8F9", "#FBCFE8"]
+def windows(rnd, x, y, length, height, mat, step=(6, 7)):
+    """Fenêtres éclairées sur une face (repère local : x le long de la façade, y vers le bas)."""
+    r = []
+    for yy in range(4, int(height) - 4, step[1]):
+        for xx in range(3, int(length) - 3, step[0]):
+            if rnd.random() < .42: continue
+            r.append('<rect x="%d" y="%d" width="3" height="2.6" fill="%s" fill-opacity="%.2f"/>' % (xx, yy, rnd.choice(WINCOL), rnd.uniform(.35, .95)))
+    return '<g transform="matrix(%s %.1f %.1f)">%s</g>' % (mat, x, y, "".join(r))
+
+def tower(rnd, u, v, a, b, h, col="#334155"):
+    out = ubox(u - a, u + a, v - b, v + b, 0, h, mix(col, .55), mix(col, .4), mix(col, .22), stroke=mixw(col, .3))
+    x, y = p(u - a, v + b, h); out += windows(rnd, x, y, 2 * a, h, "1 .5 0 1")
+    x, y = p(u + a, v + b, h); out += windows(rnd, x, y, 2 * b, h, "1 -.5 0 1")
+    return out
+
+def tree(x, y, s=1):
+    return ('<g><ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="#000" opacity=".4"/><line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#3f2d20" stroke-width="1.6"/>'
+            '<circle cx="%.1f" cy="%.1f" r="%.1f" fill="#0f3b33"/><circle cx="%.1f" cy="%.1f" r="%.1f" fill="#22c58f" fill-opacity=".55"/></g>') % (
+        x, y, 6*s, 2.5*s, x, y, x, y - 6*s, x, y - 9*s, 6.5*s, x - 1.5*s, y - 11*s, 3.6*s)
+
+def lamp(x, y):
+    return ('<g><line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#64748b" stroke-width="1.1"/>'
+            '<circle cx="%.1f" cy="%.1f" r="4.5" fill="#FDE68A" opacity=".18"/><circle cx="%.1f" cy="%.1f" r="1.7" fill="#FEF3C7"/></g>') % (x, y, x, y - 15, x, y - 16, x, y - 16)
+
+CARCOL = ["#F43F5E", "#38BDF8", "#FBBF24", "#E2E8F0", "#A78BFA", "#34D399", "#F472B6", "#64748B"]
+def car(u, v, along_v, sign, col):
+    """Petite voiture isométrique ; phares blancs à l'avant, feux rouges à l'arrière."""
+    L, Wd = 6, 3.2
+    if along_v: u0, u1, v0, v1 = u - Wd, u + Wd, v - L, v + L
+    else:       u0, u1, v0, v1 = u - L, u + L, v - Wd, v + Wd
+    out = '<g><ellipse cx="%.1f" cy="%.1f" rx="9" ry="4" fill="#000" opacity=".35"/>' % p(u, v, 0)
+    out += ubox(u0, u1, v0, v1, 0, 3.4, mixw(col, .15), mix(col, .75), mix(col, .5))
+    cu0, cu1, cv0, cv1 = (u0 + .6, u1 - .6, v0 + 3, v1 - 3) if along_v else (u0 + 3, u1 - 3, v0 + .6, v1 - .6)
+    out += ubox(cu0, cu1, cv0, cv1, 3.4, 6, "#1e293b", "#0f172a", "#111827")
+    fu, fv = (u, v + sign * L) if along_v else (u + sign * L, v)
+    bu, bv = (u, v - sign * L) if along_v else (u - sign * L, v)
+    fx, fy = p(fu, fv, 2); bx, by = p(bu, bv, 2)
+    out += '<circle cx="%.1f" cy="%.1f" r="5" fill="#FEF9C3" opacity=".22"/><circle cx="%.1f" cy="%.1f" r="1.3" fill="#FFFFFF"/>' % (fx, fy, fx, fy)
+    out += '<circle cx="%.1f" cy="%.1f" r="1.2" fill="#EF4444"/></g>' % (bx, by)
+    return out
+
+rnd = random.Random(11)
 svg = ['<svg viewBox="0 0 1000 620" width="100%" style="display: block" aria-hidden="true"><defs>', G.defs,
-       '<radialGradient id="sky"><stop offset="0" stop-color="#3b2a8a" stop-opacity=".5"/><stop offset="1" stop-color="#070b1a" stop-opacity="0"/></radialGradient>',
-       '</defs>', '<ellipse cx="500" cy="330" rx="560" ry="330" fill="url(#sky)"/>']
-G.slab(r=GR, t=22, road=True, lamps=True, col="#C084FC")
-rnd = random.Random(11); traces = []
-pal = ["#22D3EE", "#C084FC", "#FB923C", "#60A5FA"]
-def near_district(x, y, pad=1.2):
-    return any(abs(x-a["x"])/(2*a["r"]*pad) + abs(y-a["y"])/(a["r"]*pad) < 1 for a in AREAS)
-for _ in range(80):
-    u, v = rnd.uniform(-225, 225), rnd.uniform(-225, 225)
-    pts = [(u, v)]; ax = rnd.random() < .5
-    for k in range(rnd.randint(2, 4)):
-        L = rnd.choice([-1, 1]) * rnd.uniform(14, 40)
-        u, v = (u + L, v) if ax else (u, v + L); ax = not ax
-        if max(abs(u), abs(v)) > 230: break
-        pts.append((u, v))
-    scr = [G.p(a, b) for a, b in pts]
-    if len(scr) < 2 or any(near_district(x, y) for x, y in scr): continue
-    traces.append((scr, rnd.choice(pal)))
-    if len(traces) >= 14: break
-tr = ""
-for scr, c in traces:
-    tr += '<polyline points="%s" fill="none" stroke="%s" stroke-opacity=".55" stroke-width="1"/>' % (G.P(scr), c)
-    tr += '<circle cx="%.1f" cy="%.1f" r="2" fill="%s"/>' % (scr[-1] + (c,))
+       '<radialGradient id="sky"><stop offset="0" stop-color="#3b2a8a" stop-opacity=".55"/><stop offset="1" stop-color="#070b1a" stop-opacity="0"/></radialGradient>',
+       '<linearGradient id="haze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#070b1a" stop-opacity="0"/><stop offset="1" stop-color="#6d28d9" stop-opacity=".25"/></linearGradient>',
+       '<radialGradient id="holo"><stop offset="0" stop-color="#22D3EE" stop-opacity=".55"/><stop offset="1" stop-color="#22D3EE" stop-opacity="0"/></radialGradient>',
+       '</defs>', '<ellipse cx="500" cy="300" rx="600" ry="340" fill="url(#sky)"/>']
+# --- ligne d'horizon : silhouettes lointaines derrière les deux bords arrière du plateau
+sky = []
+x = 4
+while x < 996:
+    w = rnd.uniform(16, 34); edge = (330 - x * .5) if x < 500 else (80 + (x - 500) * .5)
+    h = rnd.uniform(40, 150) * (1 - abs(x - 500) / 900)
+    top = edge + 14 - h
+    if top < 6: h -= 6 - top; top = 6
+    col = rnd.choice(["#0d1433", "#111a3f", "#0b1130", "#151d48"])
+    sky.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="%s"/>' % (x, top, w, h, col))
+    for yy in range(int(top) + 5, int(top + h) - 4, 7):
+        for xx in range(int(x) + 3, int(x + w) - 3, 6):
+            if rnd.random() < .3:
+                sky.append('<rect x="%d" y="%d" width="2.4" height="2" fill="%s" fill-opacity="%.2f"/>' % (xx, yy, rnd.choice(WINCOL), rnd.uniform(.25, .7)))
+    if rnd.random() < .25: sky.append('<circle cx="%.1f" cy="%.1f" r="1.6" fill="#F43F5E"/>' % (x + w / 2, top - 1))
+    x += w + rnd.uniform(0, 6)
+svg.append('<g opacity=".9">%s</g><rect x="0" y="0" width="1000" height="330" fill="url(#haze)"/>' % "".join(sky))
+# --- dalle du plateau (bords lumineux) puis chaussée
+G.slab(r=GR, t=22, road=False, lamps=False, col="#C084FC")
 svg += G.o; G.o = []
-svg.append('<g filter="url(#nfcity)">%s</g>' % tr)
-# routes : depuis la Direction (centre) vers chaque quartier et chaque terrain réservé
-hu, hv = uv(500, 330)
-roads = []
-for a in AREAS[1:]:
-    du, dv = uv(a["x"], a["y"])
-    pts = [G.p(hu, hv), G.p(du, hv), G.p(du, dv)]
-    roads.append(pts)
-    path = "M%.1f %.1f L%.1f %.1f L%.1f %.1f" % (pts[0] + pts[1] + pts[2])
-    plot = a in PLOTS
-    svg.append('<path d="%s" fill="none" stroke="#03050d" stroke-width="16" stroke-linejoin="round"/>' % path)
-    svg.append('<path d="%s" fill="none" stroke="%s" stroke-opacity="%s" stroke-width="7" stroke-linejoin="round" filter="url(#sfcity)"/>' % (path, a["col"], ".35" if plot else ".9"))
-    svg.append('<path d="%s" fill="none" stroke="%s" stroke-width="4.5" stroke-opacity="%s" stroke-linejoin="round" filter="url(#nfcity)"%s/>' % (path, a["col"], ".5" if plot else "1", ' stroke-dasharray="10 8"' if plot else ""))
-    if not plot:
-        svg.append('<path d="%s" fill="none" stroke="%s" stroke-width="1.6" stroke-linejoin="round"/>' % (path, mixw(a["col"], .45)))
-        svg.append('<path class="flow" d="%s" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="1 30" filter="url(#nfcity)"/>' % path)
-def on_road(x, y, pad=14):
-    return any(seg_dist(x, y, r_[i], r_[i+1]) < pad for r_ in roads for i in range(2))
-# dalles des quartiers (sous les bâtiments) et terrains réservés (en pointillés, avec grue)
-for a in AREAS:
-    plot = a in PLOTS
-    s = S(a["col"], "q" + a["id"], cx=a["x"], cy=a["y"])
-    s.slab(r=a["r"], t=TH, road=not plot, lamps=not plot)
-    svg.append('<defs>%s</defs>%s' % (s.defs, "".join(s.o)))
-    if plot:
-        r = a["r"] - 12
-        svg.append('<polygon points="%s" fill="none" stroke="%s" stroke-opacity=".8" stroke-width="1.5" stroke-dasharray="7 6"/>' % (
-            s.P([s.p(-r, -r), s.p(r, -r), s.p(r, r), s.p(-r, r)]), a["col"]))
-        bx, by = s.p(-r + 8, -r + 8); tx, ty = s.p(-r + 8, -r + 8, 92)
-        svg.append('<g opacity=".85"><line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="3"/>'
-                   '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2.5"/>'
-                   '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="1" stroke-dasharray="2 2"/>'
-                   '<rect x="%.1f" y="%.1f" width="9" height="7" fill="%s"/></g>' % (
-                       bx, by, tx, ty, a["col"], tx - 14, ty, tx + 62, ty + 4, a["col"], tx + 46, ty + 3, tx + 46, ty + 40, mixw(a["col"], .56),
-                       tx + 41.5, ty + 40, a["col"]))
-objs = []
-for _ in range(220):
-    u, v = rnd.uniform(-228, 228), rnd.uniform(-228, 228)
-    x, y = G.p(u, v)
-    if not (5 < x < 995): continue
-    if near_district(x, y, 1.1) or on_road(x, y): continue
-    if rnd.random() < .78:
-        objs.append((y, '<g><ellipse cx="%.1f" cy="%.1f" rx="6" ry="2.5" fill="#000" opacity=".45"/><circle cx="%.1f" cy="%.1f" r="6" fill="#0f3b33"/><circle cx="%.1f" cy="%.1f" r="3.5" fill="#22c58f" fill-opacity=".55"/></g>' % (x, y, x, y-7, x-1.5, y-9)))
+svg.append(poly([p(-GR, -GR), p(GR, -GR), p(GR, GR), p(-GR, GR)], "#0a0e22"))
+# marquage : lignes médianes en pointillés, hors carrefours et rond-point
+marks = []
+for c in E[1:-1]:
+    for a, b in zip(E[:-1], E[1:]):
+        a0 = a + (HW + 6 if a > -GR else 6); b0 = b - (HW + 6 if b < GR else 6)
+        if c == 0 and a == 0: a0 = max(a0, RB + 6)
+        if c == 0 and b == 0: b0 = min(b0, -RB - 6)
+        if b0 <= a0: continue
+        marks.append("M%.1f %.1f L%.1f %.1f" % (p(c, a0) + p(c, b0)))
+        marks.append("M%.1f %.1f L%.1f %.1f" % (p(a0, c) + p(b0, c)))
+svg.append('<path d="%s" stroke="#FDE68A" stroke-opacity=".55" stroke-width="1" stroke-dasharray="5 5" fill="none"/>' % " ".join(marks))
+# passages piétons autour de chaque carrefour (sauf le rond-point)
+cw = []
+for cu in E[1:-1]:
+    for cv in E[1:-1]:
+        if cu == 0 and cv == 0: continue
+        for sgn in (-1, 1):
+            vv = cv + sgn * (HW + 2)
+            for t in range(int(cu - HW + 3), int(cu + HW - 3), 4):
+                cw.append(poly([p(t, vv), p(t + 2, vv), p(t + 2, vv + sgn * 5), p(t, vv + sgn * 5)], "#E2E8F0", ' fill-opacity=".45"'))
+            uu = cu + sgn * (HW + 2)
+            for t in range(int(cv - HW + 3), int(cv + HW - 3), 4):
+                cw.append(poly([p(uu, t), p(uu, t + 2), p(uu + sgn * 5, t + 2), p(uu + sgn * 5, t)], "#E2E8F0", ' fill-opacity=".45"'))
+svg.append("".join(cw))
+# rond-point : chaussée circulaire, îlot lumineux et halo holographique
+x0, y0, rx, ry = G.ell(0, 0, 0, RB)
+svg.append('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="#0a0e22" stroke="#FDE68A" stroke-opacity=".35" stroke-dasharray="5 5"/>' % (x0, y0, rx * .86, ry * .86))
+x0, y0, rx, ry = G.ell(0, 0, 0, RB - 16)
+svg.append('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="url(#holo)"/>' % (x0, y0 + 2, rx * 1.6, ry * 1.6))
+svg.append('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="#06303a"/>' % (x0, y0 + TH, rx, ry))
+svg.append('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="#0b2a33" stroke="#22D3EE" stroke-width="1.6" filter="url(#nfcity)"/>' % (x0, y0, rx, ry))
+svg.append('<ellipse class="flow" cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="none" stroke="#FFFFFF" stroke-width="1.4" stroke-dasharray="1 14" filter="url(#nfcity)"/>' % (x0, y0, rx - 5, ry - 2.5))
+
+# --- îlots : trottoir surélevé, cour intérieure teintée et bordure lumineuse à la couleur de la division
+objs = []     # (profondeur écran, svg) dessinés du fond vers l'avant
+B = {}        # position écran de chaque bâtiment d'agent
+def sidewalk(i, j, col, dashed=False):
+    u0, u1, v0, v1 = lot_bounds(i, j)
+    out = ubox(u0, u1, v0, v1, 0, TH, "#1a2142", "#141a36", "#0d1229")
+    q = [p(u0 + 5, v0 + 5, TH), p(u1 - 5, v0 + 5, TH), p(u1 - 5, v1 - 5, TH), p(u0 + 5, v1 - 5, TH)]
+    if dashed:
+        out += poly(q, mix(col, .08), ' stroke="%s" stroke-opacity=".85" stroke-width="1.4" stroke-dasharray="7 6"' % col)
     else:
-        objs.append((y, '<g><line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#6b7280" stroke-width="1.2"/><circle cx="%.1f" cy="%.1f" r="2.2" fill="#FDE68A" filter="url(#nfcity)"/></g>' % (x, y, x, y-14, x, y-15)))
-    if len(objs) > 60: break
-for (bu, bv) in [(-232, 232), (240, -240)]:
-    G.beam(bu, bv, 0, 170, 10)
-beams = "".join(G.o); G.o = []
-SPOTS = [(.95, .35), (.35, .95), (.95, -.25), (-.25, .95), (.8, .8), (.6, 1.05)]
-for pid, (x, y, qid) in B.items():
-    name, c, agent, role, desc, k = INFO[pid]
+        out += poly(q, mix(col, .14), ' stroke="%s" stroke-opacity=".9" stroke-width="1.2" filter="url(#nfcity)"' % col)
+    return out
+ground = []
+for pid, (i, j, d) in LOTS.items():
+    ground.append(sidewalk(i, j, DIVS[d][1]))
+    u, v = lot_center(i, j); x, y = p(u, v, TH); B[pid] = (x, y, d)
+for a in PLOTS:
+    ground.append(sidewalk(*a["ij"], a["col"], dashed=True))
+for (i, j), kind in FILL.items():
+    ground.append(sidewalk(i, j, "#475569" if kind == "towers" else "#22c58f"))
+svg.append("".join(ground))
+x, y = p(0, 0, TH); B["data"] = (x, y, "direction")
+# chantiers : grue et palissade
+for a in PLOTS:
+    u0, u1, v0, v1 = lot_bounds(*a["ij"], pad=12)
+    bx, by = p(u0 + 6, v0 + 6, TH); tx, ty = p(u0 + 6, v0 + 6, 110)
+    col = a["col"]
+    objs.append((by, '<g opacity=".9"><line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="3"/>'
+                     '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2.5"/>'
+                     '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="1" stroke-dasharray="2 2"/>'
+                     '<rect x="%.1f" y="%.1f" width="10" height="8" fill="%s"/><circle cx="%.1f" cy="%.1f" r="2" fill="#F43F5E" class="pulse"/></g>' % (
+        bx, by, tx, ty, col, tx - 16, ty, tx + 74, ty + 5, col, tx + 56, ty + 4, tx + 56, ty + 52, mixw(col, .56), tx + 51, ty + 52, col, tx, ty - 3)))
+    cu, cv = lot_center(*a["ij"])
+    objs.append((p(cu, cv)[1], ubox(cu - 4, cu + 22, cv - 10, cv + 14, TH, TH + 7, mix(col, .35), mix(col, .22), mix(col, .12), stroke=col)))
+# remplissage : immeubles éclairés et parc
+for (i, j), kind in FILL.items():
+    u0, u1, v0, v1 = lot_bounds(i, j, pad=10)
+    if kind == "park":
+        for _ in range(14):
+            u, v = rnd.uniform(u0, u1), rnd.uniform(v0, v1); x, y = p(u, v, TH)
+            objs.append((y, tree(x, y, rnd.uniform(.8, 1.2))))
+        continue
+    hmax = {(0, 0): 46, (0, 3): 40}.get((i, j), 80)   # bas devant les enseignes voisines
+    cells = [(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b) for a in (.27, .73) for b in (.27, .73)]
+    for (u, v) in cells:
+        if rnd.random() < .2:
+            x, y = p(u, v, TH); objs.append((y, tree(x, y))); continue
+        a_, b_ = rnd.uniform(12, 18), rnd.uniform(12, 18); h = rnd.uniform(24, hmax)
+        G2 = tower(rnd, u, v, a_, b_, h, rnd.choice(["#334155", "#3b3363", "#1e3a5f", "#3f3f46"]))
+        objs.append((p(u + a_, v + b_)[1] - 4, '<g transform="translate(0 %d)">%s</g>' % (-TH, G2)))
+# lampadaires aux angles des îlots
+for i in range(4):
+    for j in range(4):
+        u0, u1, v0, v1 = lot_bounds(i, j)
+        for (u, v) in [(u1 - 3, v1 - 3), (u0 + 3, v1 - 3), (u1 - 3, v0 + 3)]:
+            x, y = p(u, v, TH); objs.append((y, lamp(x, y)))
+# voitures sur les rues (pas dans les carrefours)
+for _ in range(60):
+    c = rnd.choice(E[1:-1]); along_v = rnd.random() < .5; t = rnd.uniform(-236, 236)
+    if any(abs(t - e) < HW + 8 for e in E[1:-1]) or (c == 0 and abs(t) < RB + 8): continue
+    lane = rnd.choice([-1, 1])
+    u, v = (c + lane * 6.5, t) if along_v else (t, c + lane * 6.5)
+    x, y = p(u, v)
+    objs.append((y, car(u, v, along_v, lane, rnd.choice(CARCOL))))
+    if sum(1 for o in objs if "EF4444" in o[1]) >= 16: break
+# enseignes : le nom du pôle sur un panneau à l'avant de son îlot (comme sur une façade)
+for pid, (i, j, d) in LOTS.items():
+    name, c = INFO[pid][0], INFO[pid][1]
+    u0, u1, v0, v1 = lot_bounds(i, j)
+    a, b, vv = u0 + 6, u1 - 6, v1 - 7
+    est = len(name) * 6.4 + 4
+    fit = ' textLength="%d" lengthAdjust="spacingAndGlyphs"' % (b - a - 10) if est > b - a - 10 else ""
+    board = poly([p(a, vv, TH), p(b, vv, TH), p(b, vv, TH + 13), p(a, vv, TH + 13)], "#070a1c", ' stroke="%s" stroke-opacity=".8" stroke-width=".8"' % c)
+    x, y = p((a + b) / 2, vv, TH + 13)
+    board += ('<g transform="matrix(1 .5 0 1 %.1f %.1f)"><text x="0" y="9.6" text-anchor="middle" font-family="Space Grotesk, Arial, sans-serif" '
+              'font-size="8.6" font-weight="700" letter-spacing="1" fill="%s"%s filter="url(#nfcity)">%s</text></g>') % (x, y, mixw(c, .35), fit, name.upper())
+    objs.append((B[pid][1] + 24, board))
+# --- bâtiments des agents (une variante visible à la fois), bureaux et robots
+SPOTS = [(1.0, -.35), (1.05, .15), (.7, -.8), (1.1, -.75), (.75, .5), (.3, -1.1)]   # sur le côté droit, hors de l'enseigne
+for pid, (x, y, d) in B.items():
+    name, c, agent, role, desc, k, code = INFO[pid]
     groups = ""
     for (Lt, vn, vd, fn) in VARS[pid]:
         s = S(c, "m" + pid + Lt, cx=0, cy=0); s.noground = True; fn(s)
-        groups += '<g class="bld" data-pole="%s" data-variant="%s" style="display:none" transform="translate(%d %d) scale(%.2f)"><defs>%s</defs>%s</g>' % (pid, Lt, x, y, k, s.defs, "".join(s.o))
-    so = S(c, "o" + pid, cx=0, cy=0); office(so, 26, KIND[pid], hq=False)
-    groups += '<g class="office" data-pole="%s" style="display:none" transform="translate(%d %d)"><defs>%s</defs>%s</g>' % (pid, x, y, so.defs, "".join(so.o))
+        groups += '<g class="bld" data-pole="%s" data-variant="%s" style="display:none" transform="translate(%.1f %.1f) scale(%.2f)"><defs>%s</defs>%s</g>' % (pid, Lt, x, y, k, s.defs, "".join(s.o))
+    so = S(c, "o" + pid, cx=0, cy=0); office(so, 30 if pid != "data" else 22, KIND[pid], hq=False)
+    groups += '<g class="office" data-pole="%s" style="display:none" transform="translate(%.1f %.1f)"><defs>%s</defs>%s</g>' % (pid, x, y, so.defs, "".join(so.o))
     objs.append((y, groups))
-    bots = "".join('<g class="bot" data-pole="%s" data-i="%d" style="display:none">%s</g>' % (pid, i, robot(*iso(x, y, 2*FOOT, u, v), c)) for i, (u, v) in enumerate(SPOTS))
-    objs.append((y + FOOT*.9, '<g class="bots">%s</g>' % bots))
+    foot = FOOT if pid != "data" else 24
+    bots = "".join('<g class="bot" data-pole="%s" data-i="%d" style="display:none">%s</g>' % (pid, i, robot(*iso(x, y, 2*foot, u, v), c)) for i, (u, v) in enumerate(SPOTS))
+    objs.append((y + foot * .9, '<g class="bots">%s</g>' % bots))
 objs.sort(key=lambda o: o[0])
 svg += [o[1] for o in objs]
-svg.append(beams)
 svg.append('</svg>')
 SVG = "".join(svg)
 
-LABEL_DY = {}       # décalages éventuels d'étiquettes (écran)
+# --- métadonnées pour le tableau de bord (étiquettes HTML posées sur la carte)
+W, H = 1000, 620
 poles_js = []
-for pid, (x, y, qid) in B.items():
-    name, c, agent, role, desc, k = INFO[pid]
-    q = next(q for q in QUARTERS if q["id"] == qid)
-    poles_js.append(dict(id=pid, name=name, color=c, agent=agent, quarter=qid, division=qid,
-                         left="%.2f%%" % (x / W * 100), top="%.2f%%" % ((y + FOOT * .55 + 4 + LABEL_DY.get(pid, 0)) / H * 100),
-                         role=q["name"] + " · " + role, desc=desc,
+for pid, (x, y, d) in B.items():
+    name, c, agent, role, desc, k, code = INFO[pid]
+    ly = y - 4          # voyant posé sur le bâtiment (les îlots de devant masqueraient le pied)
+    poles_js.append(dict(id=pid, name=name, code=code, color=c, agent=agent, quarter=d, division=d,
+                         left="%.2f%%" % (x / W * 100), top="%.2f%%" % (ly / H * 100),
+                         role=DIVS[d][0] + " · " + role, desc=desc,
                          variants=[dict(L=v[0], name=v[1], text=v[2]) for v in VARS[pid]]))
-quarters_js = [dict(id=a["id"], name=a["name"], color=a["col"], planned=a in PLOTS,
-                    poles=[m[0] for m in a.get("members", [])],
-                    left="%.2f%%" % (a["x"] / W * 100), top="%.2f%%" % ((a["y"] + a["r"] / 2 + TH + 6 + (16 if a["id"] == "direction" else 0)) / H * 100))
-               for a in AREAS]
+QLBL = {"direction": (500, 50), "commercial": (150, 432), "production": (850, 432), "administration": (500, 590)}
+quarters_js = [dict(id=q, name=n, color=c, planned=False, poles=[pid for pid in B if B[pid][2] == q],
+                    left="%.2f%%" % (QLBL[q][0] / W * 100), top="%.2f%%" % (QLBL[q][1] / H * 100)) for q, (n, c) in DIVS.items()]
+for a in PLOTS:
+    u, v = lot_center(*a["ij"]); x, y = p(u, v, TH)
+    quarters_js.append(dict(id=a["id"], name=a["name"], color=a["col"], planned=True, poles=[],
+                            left="%.2f%%" % (x / W * 100), top="%.2f%%" % ((y + 8) / H * 100)))
 AGENT = {pid: INFO[pid][2] for pid in B}
 SVG_OUT = SVG.replace('<svg viewBox="0 0 1000 620" width="100%" style="display: block" aria-hidden="true">',
                       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="100%" style="display:block" aria-hidden="true">', 1)
 assert "{{" not in SVG_OUT, "trou de gabarit restant"
 (OUT / "carte.svg").write_text(SVG_OUT, encoding="utf-8")
-meta = {"default_variants": DEFAULT, "agent_of_pole": AGENT, "agents_of_pole": {p: [a] for p, a in AGENT.items()},
+meta = {"default_variants": DEFAULT, "agent_of_pole": AGENT, "agents_of_pole": {p_: [a] for p_, a in AGENT.items()},
         "quarters": quarters_js, "divisions": [], "poles": poles_js}
 (OUT / "carte.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
 print("carte.svg :", len(SVG_OUT) // 1024, "Ko")
