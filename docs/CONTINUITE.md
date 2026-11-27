@@ -111,6 +111,8 @@ _Mis à jour le 27/11/2026_
 - Nom du pôle sur une enseigne à l'avant de chaque îlot ; au survol : nom, niveau de l'agent et tâches. Pas de noms de code (décision du propriétaire : rester professionnel malgré le design ludique).
 - `/api/agents` renvoie `level` (1 + tâches réussies // 10, même barème que l'entreprise). Les 3 bâtiments au choix par pôle (6 pour le Data Core) et la vue bureaux sont conservés. Générateur : `outils/carte/gen_carte.py` (E, ZONES, LOTS, PLOTS, PARKS, FREE). 116 tests.
 
+- Survol d'un bâtiment (sur la carte ou son étiquette) : aura lumineuse à la couleur du pôle (`applyHover`, classe CSS `hov`).
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.
