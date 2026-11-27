@@ -60,22 +60,22 @@ N = len(E) - 1                       # 5 îlots par côté ; l'îlot (2, 2) est 
 HW = 12                              # demi-largeur d'une rue
 TH = 5                               # hauteur des trottoirs
 DIVS = {  # division : nom, couleur (bordure lumineuse des îlots)
- "direction": ("Direction & Tech", "#818CF8"), "commercial": ("Pôle commercial", "#38BDF8"),
- "production": ("Pôle production", "#FB923C"), "administration": ("Services partagés", "#E879F9")}
+ "direction": ("Direction", "#818CF8"), "commercial": ("Pôle commercial", "#38BDF8"),
+ "production": ("Pôle production", "#FB923C"), "tech": ("Tech & Données", "#E2E8F0")}
 # (i, j) = îlot entre E[i]..E[i+1] en u et E[j]..E[j+1] en v. À l'écran : i croissant = vers la droite et l'avant,
-# j croissant = vers la gauche et l'avant. Le Data Core occupe la case centrale (2, 2) ; chaque pôle occupe un coin de
-# 2 × 2 cases (4 emplacements de bâtiment) ; les 8 cases entre les coins sont de petits parcs.
-ZONES = {"direction": (0, 0), "production": (3, 0), "commercial": (0, 3), "administration": (3, 3)}   # coin haut-gauche de chaque zone
-LOTS = {"data": (2, 2, "direction"), "hq": (1, 1, "direction"),
+# j croissant = vers la gauche et l'avant. La case centrale (2, 2) est la place de rassemblement, où attendent les agents
+# au repos ; chaque pôle occupe un coin de 2 × 2 cases (4 emplacements) ; les 8 cases entre les coins sont des parcs.
+ZONES = {"direction": (0, 0), "production": (3, 0), "commercial": (0, 3), "tech": (3, 3)}   # coin haut-gauche de chaque zone
+LOTS = {"hq": (1, 1, "direction"), "finance": (1, 0, "direction"), "legal": (0, 1, "direction"), "rh": (0, 0, "direction"),
         "marketing": (0, 4, "commercial"), "sales": (1, 3, "commercial"), "support": (1, 4, "commercial"),
+        "ecommerce": (0, 3, "commercial"),     # E-commerce = canal de vente
         "research": (3, 0, "production"), "atelier": (3, 1, "production"), "dev": (4, 1, "production"),
-        "legal": (3, 4, "administration"), "finance": (4, 4, "administration"),
-        "security": (1, 0, "direction"),   # Cybersécurité avec la Direction et le Data Core : pôle Tech
-        # divisions en préparation : bâtiment déjà construit, sans agent pour l'instant
-        "video": (4, 0, "production"), "ecommerce": (0, 3, "commercial")}   # E-commerce = canal de vente
+        "video": (4, 0, "production"),
+        "data": (4, 4, "tech"), "security": (4, 3, "tech")}   # Tech & Données : Data Core et Cybersécurité
+PLAZA = (2, 2)      # place de rassemblement (agents au repos)
 PLOTS = []          # plus de chantier : les futures divisions ont leur bâtiment
 PARKS = {(i, j) for i in range(N) for j in range(N) if (i == 2) != (j == 2)}   # la croix entre les 4 coins
-used = {(i, j) for (i, j, d) in LOTS.values()} | {a["ij"] for a in PLOTS} | PARKS
+used = {(i, j) for (i, j, d) in LOTS.values()} | {a["ij"] for a in PLOTS} | PARKS | {PLAZA}
 FREE = {(i, j): d for d, (i0, j0) in ZONES.items() for i in (i0, i0 + 1) for j in (j0, j0 + 1) if (i, j) not in used}
 FILL = {**{ij: "park" for ij in PARKS}, **{ij: "towers" for ij in FREE}}   # emplacements libres : immeubles éclairés
 INFO = {  # nom, couleur, agent, rôle affiché, description, échelle du bâtiment
@@ -89,14 +89,15 @@ INFO = {  # nom, couleur, agent, rôle affiché, description, échelle du bâtim
  "dev": ("Développement", "#22D3EE", "developpement", "Sites et applications", "Conçoit et livre les sites web, applications et outils sur mesure vendus aux clients.", .56),
  "video": ("Studio vidéo", "#F43F5E", None, "En préparation", "Future division vidéo : une chaîne YouTube de promotion de l’entreprise, puis des chaînes de contenu monétisées, à l’international.", .56),
  "ecommerce": ("E-commerce", "#A3E635", None, "En préparation", "Future division de vente en ligne (dropshipping international) : boutique, fournisseurs, commandes et retours.", .56),
+ "rh": ("Ressources humaines", "#E879F9", None, "En préparation", "Réserve d’agents spécialisés, mobilisés à la demande pour une mission précise, puis remis en réserve.", .56),
  "legal": ("Juridique", "#CBD5E1", "juridique", "Conformité", "CGV, mentions, RGPD, factures : relit les actions avant ta décision.", .56),
  "finance": ("Trésorerie", "#F472B6", "finance", "Finances", "Revenus, coûts d’API et rentabilité de chaque activité.", .56),
  "security": ("Cybersécurité", "#F87171", "securite", "Protection", "Configuration, anomalies et emails piégés : veille défensive quotidienne.", .56),
 }
 KIND = {"hq": "globe", "data": "city", "marketing": "target", "sales": "bars", "support": "headset", "research": "chart",
-        "atelier": "gear", "dev": "code", "video": "play", "ecommerce": "cart", "legal": "scale", "finance": "coin", "security": "shield"}
+        "atelier": "gear", "dev": "code", "video": "play", "ecommerce": "cart", "rh": "people", "legal": "scale", "finance": "coin", "security": "shield"}
 VARS = {p[0]: p[4] for p in POLES}
-DEFAULT = {"hq": "A", "data": "A", "marketing": "A", "sales": "A", "support": "B", "research": "A", "atelier": "A", "dev": "A", "video": "A", "ecommerce": "A",
+DEFAULT = {"hq": "A", "data": "A", "marketing": "A", "sales": "A", "support": "B", "research": "A", "atelier": "A", "dev": "A", "video": "A", "ecommerce": "A", "rh": "A",
            "legal": "A", "finance": "A", "security": "A"}
 FOOT = 25
 
@@ -207,7 +208,7 @@ def sidewalk(i, j, col, dashed=False):
     return out
 ground = []
 for pid, (i, j, d) in LOTS.items():
-    if pid == "data":   # case centrale : halo holographique cyan sous le Data Core
+    if pid == "data":   # halo lumineux sous le Data Core
         x0, y0 = p(*lot_center(i, j))
         ground.append('<ellipse cx="%.1f" cy="%.1f" rx="150" ry="75" fill="url(#holo)"/>' % (x0, y0))
     ground.append(sidewalk(i, j, INFO[pid][1] if pid == "data" else DIVS[d][1]))
@@ -216,6 +217,20 @@ for a in PLOTS:
     ground.append(sidewalk(*a["ij"], a["col"], dashed=True))
 for (i, j), kind in FILL.items():   # parcs en vert ; emplacements libres bordés à la couleur de leur pôle
     ground.append(sidewalk(i, j, "#22c58f" if kind == "park" else DIVS[FREE[(i, j)]][1]))
+# place de rassemblement : dallage, bassin lumineux, bancs ; les agents au repos s'y retrouvent
+pu0, pu1, pv0, pv1 = lot_bounds(*PLAZA); pcu, pcv = lot_center(*PLAZA)
+ground.append(ubox(pu0, pu1, pv0, pv1, 0, TH, "#232b4f", "#141a36", "#0d1229"))
+ground.append(poly([p(pu0 + 3, pv0 + 3, TH), p(pu1 - 3, pv0 + 3, TH), p(pu1 - 3, pv1 - 3, TH), p(pu0 + 3, pv1 - 3, TH)], "#262f57",
+                   ' stroke="#A5B4FC" stroke-opacity=".8" stroke-width="1.2" filter="url(#nfcity)"'))
+tiles = "".join("M%.1f %.1f L%.1f %.1f " % (p(t, pv0 + 3, TH) + p(t, pv1 - 3, TH)) + "M%.1f %.1f L%.1f %.1f " % (p(pu0 + 3, t, TH) + p(pu1 - 3, t, TH))
+                for t in range(int(pu0) + 10, int(pu1) - 4, 8))
+ground.append('<path d="%s" stroke="#3a4577" stroke-width=".6"/>' % tiles)
+for rr, fill, st in ((30, "none", "#A5B4FC"), (12, "#1e3a5f", "#C7D2FE")):
+    ex, ey, erx, ery = G.ell(pcu, pcv, TH, rr)
+    ground.append('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="%s" stroke="%s" stroke-opacity=".7" stroke-width="1.2"/>' % (ex, ey, erx, ery, fill, st))
+ex, ey = p(pcu, pcv, TH)
+ground.append('<ellipse class="pulse" cx="%.1f" cy="%.1f" rx="10" ry="5" fill="#E0E7FF" fill-opacity=".55" filter="url(#nfcity)"/>' % (ex, ey))
+ground.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#E0E7FF" stroke-opacity=".5" stroke-width="2" filter="url(#nfcity)"/>' % (ex, ey, ex, ey - 26))
 svg.append("".join(ground))
 # chantiers : grue et palissade
 for a in PLOTS:
@@ -294,6 +309,13 @@ for pid, (x, y, d) in B.items():
     if agent is None: continue      # division en préparation : pas encore de robots
     bots = "".join('<g class="bot" data-pole="%s" data-i="%d" style="display:none">%s</g>' % (pid, i, robot(*iso(x, y, 2*foot, u, v), c)) for i, (u, v) in enumerate(SPOTS))
     objs.append((y + foot * .9, '<g class="bots">%s</g>' % bots))
+# personnages des agents sur la place : visibles quand l'agent est au repos (géré par le tableau de bord)
+idle = [(pid, INFO[pid]) for pid in INFO if INFO[pid][2]]
+for k, (pid, inf) in enumerate(idle):
+    a = 2 * math.pi * k / len(idle) - math.pi / 4
+    u, v = pcu + 25 * math.cos(a), pcv + 25 * math.sin(a)
+    x, y = p(u, v, TH)
+    objs.append((y, '<g class="idle" data-agent="%s" data-pole="%s" style="display:none"><title>%s — au repos</title>%s</g>' % (inf[2], pid, inf[0], robot(x, y, inf[1]))))
 objs.sort(key=lambda o: o[0])
 svg += [o[1] for o in objs]
 svg.append('</svg>')
@@ -309,7 +331,7 @@ for pid, (x, y, d) in B.items():
                          left="%.2f%%" % (x / W * 100), top="%.2f%%" % (ly / H * 100),
                          role=DIVS[d][0] + " · " + role, desc=desc,
                          variants=[dict(L=v[0], name=v[1], text=v[2]) for v in VARS[pid]]))
-QLBL = {"direction": (500, 48), "commercial": (130, 425), "production": (905, 440), "administration": (500, 600)}
+QLBL = {"direction": (500, 14), "commercial": (130, 425), "production": (905, 440), "tech": (500, 600)}
 quarters_js = [dict(id=q, name=n, color=c, planned=False, poles=[pid for pid in B if B[pid][2] == q], free=sum(1 for d in FREE.values() if d == q),
                     left="%.2f%%" % (QLBL[q][0] / W * 100), top="%.2f%%" % (QLBL[q][1] / H * 100)) for q, (n, c) in DIVS.items()]
 for a in PLOTS:

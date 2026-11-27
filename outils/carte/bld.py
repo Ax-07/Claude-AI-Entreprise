@@ -753,6 +753,36 @@ def ec_c(s):
     x, y = s.p(0, -10, 86); s.raw(_sym_holo(s, x - 30, y, CART, .7))
     s.beam(-40, 32, 0, 56)
 
+PEOPLE = ('<circle cx="-13" cy="-4" r="4" fill="#FFFFFF" fill-opacity=".75"/><path d="M-21 10 a8 8 0 0 1 16 0 z" fill="#FFFFFF" fill-opacity=".6"/>'
+          '<circle cx="13" cy="-4" r="4" fill="#FFFFFF" fill-opacity=".75"/><path d="M5 10 a8 8 0 0 1 16 0 z" fill="#FFFFFF" fill-opacity=".6"/>'
+          '<circle cx="0" cy="-7" r="5" fill="#FFFFFF"/><path d="M-10 11 a10 10 0 0 1 20 0 z" fill="#FFFFFF"/>')
+def rh_a(s):
+    """Maison des talents : immeuble aux nombreuses fenêtres et réserve d'experts au sommet."""
+    s.slab()
+    f = rect(-36, 36, -30, 30); s.prism(f, 0, 64, "office"); s.cornice(f, 64, 2.5)
+    f2 = rect(-24, 24, -20, 20); s.prism(f2, 66.5, 84, "glass"); s.cornice(f2, 84)
+    x, y = s.p(0, 0, 116); s.raw(_sym_holo(s, x, y, PEOPLE))
+    s.beam(-36, 30, 0, 56); s.beam(36, -30, 0, 56)
+def rh_b(s):
+    """Tour des experts : tour élancée dont chaque étage vitré accueille un spécialiste."""
+    s.slab()
+    f0 = cham(-30, 30, -30, 30, 8); s.prism(f0, 0, 16, "office"); s.cornice(f0, 16, 2.5)
+    for k in range(5):
+        f = cham(-18, 18, -18, 18, 4); z0 = 18.5 + k*20
+        s.prism(f, z0, z0 + 16, "glass" if k % 2 else "bands"); s.cornice(f, z0 + 16, 2)
+    x, y = s.p(0, 0, 146); s.raw(_sym_holo(s, x, y, PEOPLE, .85))
+    s.line(s.p(0, 0, 117), (x, y + 16), 1.5, s.hi, .6)
+    s.beam(-30, 30, 0, 60)
+def rh_c(s):
+    """Campus RH : bâtiment en anneau autour d'un patio et d'un hologramme d'équipe."""
+    s.slab()
+    f = circ(0, 0, 36); s.prism(f, 0, 30, "bands", smooth=True); s.cornice(f, 30, 2, smooth=True)
+    x, y, rx, ry = s.ell(0, 0, 30.5, 22)
+    s.raw('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="%s" fill-opacity=".55" stroke="%s"/>' % (x, y, rx, ry, mix(s.c, .3), s.c))
+    x, y = s.p(0, 0, 76); s.raw(_sym_holo(s, x, y, PEOPLE, .8))
+    s.line(s.p(0, 0, 31), (x, y + 15), 1.5, s.hi, .6)
+    s.beam(-36, 36, 0, 50)
+
 POLES = [
  ("hq", "Command HQ", "Orchestration", "#818CF8", [("A", "Spire de commandement", "Tour à pans coupés, bandeaux vitrés lumineux et couronne qui brille.", hq_a), ("B", "Citadelle", "Deux tours noires à enseignes néon reliées par une passerelle de verre.", hq_b), ("C", "Anneau orbital", "Tour cylindrique vitrée entourée d’anneaux de données en orbite.", hq_c)]),
  ("research", "Labo Recherche", "Veille et opportunités", "#34D399", [("A", "Observatoire", "Rotonde nervurée, coupole et télescope pointé vers les marchés.", re_a), ("B", "Serre de verre", "Laboratoire transparent : on voit les idées pousser à l’intérieur.", re_b), ("C", "Labo à antenne", "Labo vitré aux écrans allumés et tour équipée d’une parabole.", re_c)]),
@@ -766,6 +796,7 @@ POLES = [
  ("dev", "Développement", "Sites et applications", "#22D3EE", [("A", "Tour du code", "Tour sombre couverte d’écrans de code, symbole </> flottant au sommet.", de_a), ("B", "Campus tech", "Open-space vitré et baies de serveurs qui clignotent sur le toit.", de_b), ("C", "Pile logicielle", "Couches empilées comme une architecture logicielle, sous une antenne de déploiement.", de_c)]),
  ("video", "Studio vidéo", "Vidéo · en préparation", "#F43F5E", [("A", "Studio de tournage", "Grand plateau, écran géant et projecteurs.", vi_a), ("B", "Tour média", "Tour vitrée, voyant REC et lecteur vidéo flottant.", vi_b), ("C", "Plateau de diffusion", "Coupole, antenne d’émission et ondes.", vi_c)]),
  ("ecommerce", "E-commerce", "Boutique · en préparation", "#A3E635", [("A", "Entrepôt logistique", "Halle, quais de chargement et colis empilés.", ec_a), ("B", "Boutique en ligne", "Tour vitrée et caddie lumineux au sommet.", ec_b), ("C", "Hub de livraison", "Centre de tri, tapis de colis et drone de livraison.", ec_c)]),
+ ("rh", "Ressources humaines", "Spécialistes · en préparation", "#E879F9", [("A", "Maison des talents", "Immeuble aux nombreuses fenêtres et réserve d’experts au sommet.", rh_a), ("B", "Tour des experts", "Tour élancée : chaque étage vitré accueille un spécialiste.", rh_b), ("C", "Campus RH", "Bâtiment en anneau autour d’un patio et d’un hologramme d’équipe.", rh_c)]),
  ("finance", "Trésorerie", "Finances", "#F472B6", [("A", "Coffre-fort", "Bloc noir, porte de coffre circulaire et lames dorées.", fi_a), ("B", "Temple financier", "Colonnade dorée et fronton : la solidité des comptes.", fi_b), ("C", "Tour des pièces", "Pile de pièces géante et pièce d’or flottante.", fi_c)]),
 ]
 
@@ -862,6 +893,10 @@ def _holo(s, u, v, kind, col, size=1.0):
         g += '<path d="M%.1f %.1f h%.1f l%.1f %.1f h%.1f l%.1f -%.1f h-%.1f" fill="%s" fill-opacity=".25" stroke="%s" stroke-width="1.8" stroke-linejoin="round"/>' % (
             x - R*1.3, cy - R*.8, R*.4, R*.35, R*1.2, R*1.4, R*.35, R*.9, R*1.9, col, hc)
         g += '<circle cx="%.1f" cy="%.1f" r="%.1f" fill="#FFFFFF"/><circle cx="%.1f" cy="%.1f" r="%.1f" fill="#FFFFFF"/>' % (x - R*.4, cy + R*.75, R*.18, x + R*.75, cy + R*.75, R*.18)
+    elif kind == "people":
+        for (dx, dy, k) in ((-R*.8, R*.15, .8), (R*.8, R*.15, .8), (0, 0, 1)):
+            g += '<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/><path d="M%.1f %.1f a%.1f %.1f 0 0 1 %.1f 0 z" fill="%s" fill-opacity=".8"/>' % (
+                x + dx, cy + dy - R*.35*k, R*.28*k, "#FFFFFF" if k == 1 else hc, x + dx - R*.5*k, cy + dy + R*.55*k, R*.5*k, R*.5*k, R*k, hc)
     elif kind == "coin":
         g += '<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="#FBBF24" stroke="#FFF1B8" stroke-width="1.5"/><ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="none" stroke="#B45309" stroke-width="1.2"/>' % (x, cy, R*.9, R*1.1, x, cy, R*.55, R*.7)
     g += '</g>'

@@ -29,10 +29,10 @@ class Role:
 
 # Divisions de l'entreprise : elles regroupent les pôles qui travaillent ensemble (même découpage que la carte).
 DIVISIONS = {
-    "Direction & Tech": ["pdg", "data", "securite"],
+    "Direction": ["pdg", "finance", "juridique"],
     "Division commerciale": ["marketing", "ventes", "support"],
     "Division production": ["atelier", "developpement", "recherche"],
-    "Administration": ["finance", "juridique"],
+    "Tech & Données": ["data", "securite"],
 }
 DIVISION_OF = {a: d for d, names in DIVISIONS.items() for a in names}
 
