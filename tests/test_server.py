@@ -184,13 +184,15 @@ class MaquetteTest(ServerTest):
             self.assertIn(f'class="office" data-pole="{p["id"]}"', svg)
         q = {x["id"]: x for x in meta["quarters"]}
         self.assertEqual(q["commercial"]["poles"], ["marketing", "sales", "support"])
-        self.assertEqual(q["administration"]["poles"], ["legal", "finance", "security"])
+        self.assertEqual(sorted(q["administration"]["poles"]), ["finance", "legal", "security"])
         self.assertTrue(q["video"]["planned"] and q["ecommerce"]["planned"])
-        # plateau « ville » : nom de code et enseigne peinte à l'avant de chaque îlot (sauf le Data Core, au rond-point)
+        # plateau « ville » : enseigne à l'avant de chaque îlot, pas de nom de code (rester professionnel)
         for p in meta["poles"]:
-            self.assertTrue(p["code"])
-            if p["id"] != "data":
-                self.assertIn(">%s</text>" % p["name"].upper(), svg)
+            self.assertNotIn("code", p)
+            self.assertIn(">%s</text>" % p["name"].upper(), svg)
+        # grille impaire : le Data Core est exactement au centre du plateau (500, 330 sur 1000 × 620)
+        data = next(p for p in meta["poles"] if p["id"] == "data")
+        self.assertEqual(data["left"], "50.00%")
 
     def test_static_files_revalidated_not_stale(self):
         c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
