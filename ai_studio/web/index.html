@@ -193,8 +193,16 @@ $("#mclose").onclick = closeModal; $("#modal").onclick = e => { if(e.target.id==
 const hd = (title, icon, col, extra) => h("div",{class:"hd"}, h("span",{class:"t"}, icon ? h("span",{style:{display:"flex",color:col}}, ico(icon,col,16)) : null, title), extra||null);
 
 // ------------------------------------------------ discussion avec le PDG
+// mise en forme légère des réponses (gras, listes, titres) sans jamais interpréter de HTML
+function mdInline(t){ return t.split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map(x => x.startsWith("**") && x.endsWith("**") && x.length > 4 ? h("b",{}, x.slice(2,-2)) : document.createTextNode(x)); }
+function mdNodes(text){ const out = []; let ul = null;
+  for (const raw of String(text).split("\n")){ const line = raw.trimEnd(), li = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
+    if (li){ if (!ul){ ul = h("ul",{style:{margin:"4px 0",paddingLeft:"18px"}}); out.push(ul); } ul.append(h("li",{}, ...mdInline(li[1]))); continue; }
+    ul = null; const hd = line.match(/^#{1,4}\s+(.*)$/);
+    out.push(line ? h("div",{style:hd?{fontWeight:"700",marginTop:"4px"}:{}}, ...mdInline(hd ? hd[1] : line)) : h("div",{style:{height:"6px"}})); }
+  return out; }
 function chatMsg(m){ const me = m.role === "owner";
-  return h("div",{class:"msg " + (me ? "me" : "pdg")}, m.text,
+  return h("div",{class:"msg " + (me ? "me" : "pdg"),style:{whiteSpace:me?"pre-wrap":"normal"}}, ...(me ? [m.text] : mdNodes(m.text)),
     (m.actions||[]).length ? h("span",{style:{display:"flex",flexDirection:"column",gap:"4px",marginTop:"8px"}}, m.actions.map(a => h("span",{style:{fontSize:"12px",padding:"4px 8px",borderRadius:"8px",background:"rgba(52,211,153,.15)",border:"1px solid rgba(52,211,153,.4)"}}, "✓ " + a))) : null,
     h("span",{class:"meta"}, new Date(m.created_at || Date.now()).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) + (!me && m.cost_usd ? ` · ${money4(m.cost_usd)}` : ""))); }
 async function openChat(){ $("#chat").classList.add("on"); $("#chatin").focus();
