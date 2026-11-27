@@ -7,7 +7,8 @@
   "support": "B",
   "data": "A",
   "finance": "A",
-  "atelier": "A"
+  "atelier": "A",
+  "legal": "A"
  },
  "agent_of_pole": {
   "hq": "pdg",
@@ -17,7 +18,8 @@
   "support": "support",
   "data": "data",
   "finance": "finance",
-  "atelier": "atelier"
+  "atelier": "atelier",
+  "legal": "juridique"
  },
  "poles": [
   {
@@ -235,6 +237,33 @@
     }
    ],
    "agent": "atelier"
+  },
+  {
+   "id": "legal",
+   "name": "Juridique",
+   "color": "#CBD5E1",
+   "left": "50.00%",
+   "top": "0.00%",
+   "role": "Conformité",
+   "desc": "CGV, mentions légales, RGPD, factures : relit les actions avant ta décision.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Palais de justice",
+     "text": "Colonnade, fronton et coupole de verre : le droit au cœur de la cité."
+    },
+    {
+     "L": "B",
+     "name": "Tour de la balance",
+     "text": "Tour élancée surmontée d’une balance lumineuse."
+    },
+    {
+     "L": "C",
+     "name": "Archives scellées",
+     "text": "Salle des registres sous un sceau officiel flottant."
+    }
+   ],
+   "agent": "juridique"
   }
  ]
 }

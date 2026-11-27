@@ -27,7 +27,7 @@ from .db import DB, now
 WEB_DIR = Path(__file__).resolve().parent / "web"
 POLE_COLORS = {"pdg": "#818CF8", "recherche": "#34D399", "marketing": "#60A5FA", "ventes": "#A78BFA",
                "support": "#FBBF24", "data": "#22D3EE", "finance": "#F472B6",
-               "atelier": "#FB923C"}
+               "atelier": "#FB923C", "juridique": "#CBD5E1"}
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 
 
@@ -175,6 +175,9 @@ def approvals(cfg, db) -> list[dict]:
     for a in db.pending_approvals():
         d = _row(a)
         d["payload"] = json.loads(a["payload"])
+        if d.get("review_task") and not d.get("review"):
+            t = db.task(d["review_task"])
+            d["review_pending"] = bool(t and t["status"] in ("pending", "running"))
         if "html" in d["payload"]:                     # la page complète est servie à part (aperçu)
             d["payload"]["size"] = len(d["payload"].pop("html").encode("utf-8"))
         out.append(d)
@@ -262,7 +265,7 @@ def insights(cfg, db, days: int = 7) -> dict:
     return {"days": labels, "done": done, "cost": cost, "success_rate": rate, "pipeline": pipeline, "schedule": schedule[:5]}
 
 
-MAP_POLES = {"hq", "research", "marketing", "sales", "support", "data", "finance", "atelier"}
+MAP_POLES = {"hq", "research", "marketing", "sales", "support", "data", "finance", "atelier", "legal"}
 
 
 def map_settings(cfg, db) -> dict:

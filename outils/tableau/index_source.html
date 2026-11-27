@@ -147,7 +147,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:rgba(255,255,255,.03)}
 "use strict";
 const ICONS = __ICONS__;
 const $ = s => document.querySelector(s);
-const C = {pdg:"#818CF8",recherche:"#34D399",marketing:"#60A5FA",ventes:"#A78BFA",support:"#FBBF24",data:"#22D3EE",finance:"#F472B6",atelier:"#FB923C",proprietaire:"#FDE68A",systeme:"#94A3B8"};
+const C = {pdg:"#818CF8",recherche:"#34D399",marketing:"#60A5FA",ventes:"#A78BFA",support:"#FBBF24",data:"#22D3EE",finance:"#F472B6",atelier:"#FB923C",juridique:"#CBD5E1",proprietaire:"#FDE68A",systeme:"#94A3B8"};
 const STATUS = {pending:"En attente",running:"En cours",done:"Terminée",failed:"En échec",blocked:"Bloquée"};
 const STATE = {running:["En cours","#34D399"],waiting:["En attente","#FBBF24"],idle:["Disponible","#9AA4C7"]};
 const LEVELS = ["Start-up naissante","Entreprise émergente","Entreprise structurée","Entreprise en croissance","Groupe établi","Empire autonome"];
@@ -270,7 +270,10 @@ function renderApprovals(list){
     else lines.push(pl.question || "", pl.context ? "\n" + pl.context : "");
     const act = async ok => { try { const r = await api("POST",`/api/approvals/${a.id}`,{decision: ok?"approve":"reject", note: note.value}); toast(r.message, ok); refresh(); } catch(e){ toast(e.message,false); } };
     return h("div",{class:"appr"}, h("div",{style:{display:"flex",justifyContent:"space-between",gap:"8px"}}, h("b",{}, `#${a.id} · ${ACTION[a.action]||a.action}`), h("span",{style:{fontSize:"11px",color:C[a.agent],border:`1px solid ${C[a.agent]}88`,borderRadius:"999px",padding:"2px 9px",whiteSpace:"nowrap",alignSelf:"flex-start"}}, a.agent)),
-      a.reason ? h("span",{class:"small muted"}, a.reason) : null, h("pre",{class:"pre",style:{maxHeight:"150px"}}, lines.join("\n")), note,
+      a.reason ? h("span",{class:"small muted"}, a.reason) : null, h("pre",{class:"pre",style:{maxHeight:"150px"}}, lines.join("\n")),
+      a.review ? h("div",{style:{fontSize:"12px",lineHeight:"1.45",padding:"8px 10px",borderRadius:"10px",background:"rgba(203,213,225,.07)",border:"1px solid rgba(203,213,225,.35)"}}, h("b",{},"Avis juridique : "), a.review)
+               : a.review_pending ? h("span",{class:"small muted"},"Relecture juridique en cours…") : null,
+      note,
       h("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}}, h("button",{class:"btn ok",onclick:()=>act(true)}, a.action==="decision"?"Répondre":a.action==="publish_page"?"Publier":"Valider"), h("button",{class:"btn no",onclick:()=>act(false)}, "Refuser"),
         a.action==="publish_page" ? h("a",{class:"btn",href:`/api/approvals/${a.id}/preview`,target:"_blank",rel:"noopener",style:{textDecoration:"none",color:"#EEF1FF"}}, "Aperçu de la page") : null));
   }));
