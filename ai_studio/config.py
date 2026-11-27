@@ -26,6 +26,10 @@ DEFAULTS: dict = {
         "anthropic": {"default": "claude-haiku-5-5", "strong": "claude-sonnet-5-5"},
         "openai": {"default": "gpt-6-luna", "strong": "gpt-6.1-terra"},
     },
+    "openai": {
+        # "none" est requis pour utiliser les outils avec les modèles à raisonnement via Chat Completions.
+        "reasoning_effort": "none",
+    },
     # Prix en USD par million de tokens (à mettre à jour si les fournisseurs changent leurs tarifs).
     "prices": {
         "claude-haiku-5-5": {"input": 0.10, "output": 0.50, "long_input": 0.50, "long_output": 2.50, "long_threshold": 100000},
