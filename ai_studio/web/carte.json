@@ -19,9 +19,9 @@
   "support": "support",
   "research": "recherche",
   "atelier": "atelier",
-  "finance": "finance",
+  "legal": "juridique",
   "security": "securite",
-  "legal": "juridique"
+  "finance": "finance"
  },
  "agents_of_pole": {
   "data": [
@@ -45,14 +45,14 @@
   "atelier": [
    "atelier"
   ],
-  "finance": [
-   "finance"
+  "legal": [
+   "juridique"
   ],
   "security": [
    "securite"
   ],
-  "legal": [
-   "juridique"
+  "finance": [
+   "finance"
   ]
  },
  "quarters": [
@@ -65,8 +65,9 @@
     "data",
     "hq"
    ],
+   "free": 3,
    "left": "50.00%",
-   "top": "8.06%"
+   "top": "7.74%"
   },
   {
    "id": "commercial",
@@ -78,8 +79,9 @@
     "sales",
     "support"
    ],
-   "left": "16.50%",
-   "top": "70.97%"
+   "free": 1,
+   "left": "13.00%",
+   "top": "68.55%"
   },
   {
    "id": "production",
@@ -90,8 +92,9 @@
     "research",
     "atelier"
    ],
-   "left": "90.00%",
-   "top": "40.32%"
+   "free": 0,
+   "left": "90.50%",
+   "top": "70.97%"
   },
   {
    "id": "administration",
@@ -99,12 +102,13 @@
    "color": "#E879F9",
    "planned": false,
    "poles": [
-    "finance",
+    "legal",
     "security",
-    "legal"
+    "finance"
    ],
-   "left": "76.00%",
-   "top": "85.48%"
+   "free": 1,
+   "left": "50.00%",
+   "top": "96.77%"
   },
   {
    "id": "video",
@@ -112,8 +116,8 @@
    "color": "#F43F5E",
    "planned": true,
    "poles": [],
-   "left": "29.80%",
-   "top": "37.42%"
+   "left": "90.40%",
+   "top": "53.71%"
   },
   {
    "id": "ecommerce",
@@ -121,8 +125,8 @@
    "color": "#A3E635",
    "planned": true,
    "poles": [],
-   "left": "70.20%",
-   "top": "37.42%"
+   "left": "80.20%",
+   "top": "61.94%"
   }
  ],
  "divisions": [],
@@ -207,8 +211,8 @@
    "agent": "marketing",
    "quarter": "commercial",
    "division": "commercial",
-   "left": "40.00%",
-   "top": "43.71%",
+   "left": "9.60%",
+   "top": "51.77%",
    "role": "Pôle commercial · Acquisition",
    "desc": "Positionnement, contenus et pages de vente, dans plusieurs langues.",
    "variants": [
@@ -265,8 +269,8 @@
    "agent": "support",
    "quarter": "commercial",
    "division": "commercial",
-   "left": "40.00%",
-   "top": "59.84%",
+   "left": "19.80%",
+   "top": "60.00%",
    "role": "Pôle commercial · Clients",
    "desc": "Réponses aux clients, livraisons et suivi des commandes.",
    "variants": [
@@ -294,8 +298,8 @@
    "agent": "recherche",
    "quarter": "production",
    "division": "production",
-   "left": "60.00%",
-   "top": "43.71%",
+   "left": "80.20%",
+   "top": "43.55%",
    "role": "Pôle production · R&D et veille",
    "desc": "Marchés, niches, concurrence et nouvelles offres pour toutes les activités.",
    "variants": [
@@ -346,31 +350,31 @@
    ]
   },
   {
-   "id": "finance",
-   "name": "Trésorerie",
-   "color": "#F472B6",
-   "agent": "finance",
+   "id": "legal",
+   "name": "Juridique",
+   "color": "#CBD5E1",
+   "agent": "juridique",
    "quarter": "administration",
    "division": "administration",
-   "left": "60.00%",
-   "top": "59.84%",
-   "role": "Services partagés · Finances",
-   "desc": "Revenus, coûts d’API et rentabilité de chaque activité.",
+   "left": "39.80%",
+   "top": "76.13%",
+   "role": "Services partagés · Conformité",
+   "desc": "CGV, mentions, RGPD, factures : relit les actions avant ta décision.",
    "variants": [
     {
      "L": "A",
-     "name": "Coffre-fort",
-     "text": "Bloc noir, porte de coffre circulaire et lames dorées."
+     "name": "Palais de justice",
+     "text": "Colonnade, fronton et coupole de verre : le droit au cœur de la cité."
     },
     {
      "L": "B",
-     "name": "Temple financier",
-     "text": "Colonnade dorée et fronton : la solidité des comptes."
+     "name": "Tour de la balance",
+     "text": "Tour élancée surmontée d’une balance lumineuse."
     },
     {
      "L": "C",
-     "name": "Tour des pièces",
-     "text": "Pile de pièces géante et pièce d’or flottante."
+     "name": "Archives scellées",
+     "text": "Salle des registres sous un sceau officiel flottant."
     }
    ]
   },
@@ -381,8 +385,8 @@
    "agent": "securite",
    "quarter": "administration",
    "division": "administration",
-   "left": "70.20%",
-   "top": "68.06%",
+   "left": "60.20%",
+   "top": "76.13%",
    "role": "Services partagés · Protection",
    "desc": "Configuration, anomalies et emails piégés : veille défensive quotidienne.",
    "variants": [
@@ -404,31 +408,31 @@
    ]
   },
   {
-   "id": "legal",
-   "name": "Juridique",
-   "color": "#CBD5E1",
-   "agent": "juridique",
+   "id": "finance",
+   "name": "Trésorerie",
+   "color": "#F472B6",
+   "agent": "finance",
    "quarter": "administration",
    "division": "administration",
-   "left": "60.20%",
-   "top": "76.13%",
-   "role": "Services partagés · Conformité",
-   "desc": "CGV, mentions, RGPD, factures : relit les actions avant ta décision.",
+   "left": "50.00%",
+   "top": "84.35%",
+   "role": "Services partagés · Finances",
+   "desc": "Revenus, coûts d’API et rentabilité de chaque activité.",
    "variants": [
     {
      "L": "A",
-     "name": "Palais de justice",
-     "text": "Colonnade, fronton et coupole de verre : le droit au cœur de la cité."
+     "name": "Coffre-fort",
+     "text": "Bloc noir, porte de coffre circulaire et lames dorées."
     },
     {
      "L": "B",
-     "name": "Tour de la balance",
-     "text": "Tour élancée surmontée d’une balance lumineuse."
+     "name": "Temple financier",
+     "text": "Colonnade dorée et fronton : la solidité des comptes."
     },
     {
      "L": "C",
-     "name": "Archives scellées",
-     "text": "Salle des registres sous un sceau officiel flottant."
+     "name": "Tour des pièces",
+     "text": "Pile de pièces géante et pièce d’or flottante."
     }
    ]
   }

@@ -193,6 +193,10 @@ class MaquetteTest(ServerTest):
         # grille impaire : le Data Core est exactement au centre du plateau (500, 330 sur 1000 × 620)
         data = next(p for p in meta["poles"] if p["id"] == "data")
         self.assertEqual(data["left"], "50.00%")
+        # chaque pôle occupe un coin de 4 emplacements (le Data Core est au centre ; les chantiers sont dans la production)
+        slots = {k: len([p for p in q[k]["poles"] if p != "data"]) + q[k]["free"] for k in ("direction", "commercial", "production", "administration")}
+        slots["production"] += 2
+        self.assertEqual(set(slots.values()), {4})
 
     def test_static_files_revalidated_not_stale(self):
         c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
