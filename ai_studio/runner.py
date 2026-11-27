@@ -15,7 +15,7 @@ def _model_for(cfg, role) -> str:
 
 
 def _tools_for(cfg, role, guard) -> list[dict]:
-    specs = [REGISTRY[n].spec() for n in role.all_tools() if n in REGISTRY]
+    specs = [REGISTRY[n].spec() for n in role.all_tools() if n in REGISTRY and REGISTRY[n].available()]
     if role.web_search:
         left = guard.searches_left()
         if os.environ.get("BRAVE_API_KEY"):

@@ -53,7 +53,7 @@ DEFAULTS: dict = {
         "cycle_seconds": 60,
         "max_tasks_per_cycle": 3,
         "max_steps_per_task": 8,
-        "max_output_tokens": 2000,
+        "max_output_tokens": 6000,
         "max_open_tasks": 30,
         "max_delegation_depth": 3,
         "max_attempts": 2,
