@@ -98,7 +98,7 @@ def run_task(cfg, db, llm, guard, task) -> str:
     system = [{"type": "text", "text": system_prompt(role, cfg), "cache_control": {"type": "ephemeral"}}]
     messages: list[dict] = [{"role": "user", "content": _briefing(db, task)}]
     last_text = ""
-    max_steps = int(rt["max_steps_per_task"])
+    max_steps = int(role.max_steps or rt["max_steps_per_task"])
 
     try:
         for step in range(max_steps + 1):

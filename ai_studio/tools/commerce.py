@@ -86,10 +86,10 @@ def propose_page(ctx: ToolContext, file: str, page_path: str, title: str, reason
        "deliverable": {"type": "string", "description": "ce que reçoit concrètement le client (format, contenu)"},
        "delay_hours": {"type": "integer", "description": "délai de livraison promis après paiement, en heures"},
        "required_info": {"type": "string", "description": "informations à obtenir du client pour livrer (vide si aucune)"},
-       "producer": {"type": "string", "description": "agent qui produit le livrable (recherche, marketing, data…)"}},
-      ["name", "price_eur", "summary", "deliverable", "delay_hours", "producer"])
+       "producer": {"type": "string", "description": "agent qui produit le livrable : atelier (par défaut, production client)"}},
+      ["name", "price_eur", "summary", "deliverable", "delay_hours"])
 def save_offer(ctx: ToolContext, name: str, price_eur: float, summary: str, deliverable: str, delay_hours: int,
-               producer: str, required_info: str = "") -> str:
+               producer: str = "atelier", required_info: str = "") -> str:
     from ..db import iso
     producer = producer.strip().lower()
     if producer not in ctx.agent_names:

@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS offers (
     deliverable TEXT NOT NULL DEFAULT '',            -- ce que reçoit le client
     delay_hours INTEGER NOT NULL DEFAULT 72,         -- délai de livraison promis
     required_info TEXT NOT NULL DEFAULT '',          -- ce qu'il faut demander au client pour livrer
-    producer TEXT NOT NULL DEFAULT 'recherche',      -- agent qui produit le livrable
+    producer TEXT NOT NULL DEFAULT 'atelier',        -- agent qui produit le livrable
     status TEXT NOT NULL DEFAULT 'active',           -- active | archived
     payment_link_id TEXT,
     payment_link_url TEXT,

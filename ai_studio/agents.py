@@ -20,6 +20,8 @@ class Role:
     tools: list[str] = field(default_factory=list)
     model: str = "default"            # "default" (économique) ou "strong"
     web_search: bool = False
+    max_steps: int | None = None      # sinon runtime.max_steps_per_task
+    task_budget_usd: float | None = None   # sinon budget.per_task_usd
 
     def all_tools(self) -> list[str]:
         return list(dict.fromkeys(COMMON_TOOLS + self.tools))
@@ -56,6 +58,16 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "problèmes récurrents et tu proposes des améliorations. Ton ton est poli, précis et rassurant.",
          ["send_email", "deliver_order", "list_orders", "set_order_status", "list_offers", "list_inbox", "read_email",
           "list_sales", "delegate_task"]),
+    Role("atelier", "Atelier", "Agent Atelier — production des livrables clients",
+         "Tu fabriques ce que les clients ont payé, à partir de la fiche d'offre (list_offers), de la commande "
+         "(list_orders) et des consignes du propriétaire. Méthode : 1) relis ce qui est promis et les informations du "
+         "client ; 2) collecte les faits nécessaires (pages du client avec fetch_url, recherche web si utile) ; "
+         "3) rédige le livrable FINAL complet, structuré et actionnable, dans livraisons/commande-N/ (en plusieurs "
+         "write_file avec append=true s'il est long) ; 4) relis-toi : chaque constat est vérifiable (URL, date), les "
+         "hypothèses sont signalées comme telles, rien n'est inventé ; 5) délègue la livraison au support "
+         "(deliver_order avec le fichier). Le client paie pour la qualité : clair, concret, utile dès la lecture.",
+         ["fetch_url", "list_orders", "list_offers", "delegate_task"], model="strong", web_search=True,
+         max_steps=16, task_budget_usd=0.40),
     Role("data", "Data Core", "Agent Data — mémoire, mesures et amélioration",
          "Tu entretiens la mémoire de l'entreprise (synthèses, déduplication), tu mesures ce qui fonctionne "
          "(tâches, coûts, résultats) et tu proposes des améliorations du fonctionnement des agents.",
