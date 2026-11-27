@@ -51,6 +51,25 @@ def delegate_task(ctx: ToolContext, agent: str, title: str, description: str, pr
     return f"Tâche #{tid} créée pour {agent}."
 
 
+@tool("create_objective",
+      "Enregistre un nouvel objectif de l'entreprise (mission de fond que le PDG découpera en tâches au prochain cycle). "
+      "À n'utiliser que sur demande du propriétaire.",
+      {"text": {"type": "string", "description": "l'objectif, formulé clairement avec le résultat attendu"},
+       "activity": {"type": "string", "description": "activité concernée (services, video, ecommerce) ; vide si transverse"}},
+      ["text"])
+def create_objective(ctx: ToolContext, text: str, activity: str = "") -> str:
+    from ..activities import exists
+    text = " ".join(str(text).split())[:600]
+    if len(text) < 8:
+        return "Objectif trop vague : formule le résultat attendu."
+    activity = activity.strip().lower() or None
+    if activity and not exists(ctx.db, activity):
+        return "Activité inconnue (services, video, ecommerce)."
+    oid = ctx.db.add_objective(text, activity)
+    ctx.db.log(ctx.agent, "objective", f"Nouvel objectif #{oid} (demandé par le propriétaire) : {text}")
+    return f"Objectif #{oid} enregistré : il sera découpé en tâches au prochain cycle."
+
+
 @tool("list_tasks", "Liste les tâches récentes (pour savoir ce qui est en cours ou terminé).",
       {"status": {"type": "string", "description": "pending, running, done, failed, blocked ou vide pour tout"},
        "agent": {"type": "string"}, "limit": {"type": "integer", "default": 15}})

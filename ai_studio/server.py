@@ -454,7 +454,7 @@ def make_handler(cfg):
                         "objectives": lambda: objectives(cfg, db), "files": lambda: files(cfg, db),
                         "map": lambda: map_settings(cfg, db), "integrations": lambda: integrations(cfg, db),
                         "sales": lambda: sales(cfg, db), "inbox": lambda: inbox(cfg, db),
-                        "activities": lambda: activities(cfg, db),
+                        "activities": lambda: activities(cfg, db), "chat": lambda: _chat_history(db),
                     }
                     if parts == ["tasks"]:
                         return self._send(200, tasks(cfg, db, q("status"), q("agent"), int(q("limit", "50") or 50)))
@@ -478,6 +478,8 @@ def make_handler(cfg):
                         return self._send(200, add_objective(cfg, db, body))
                     if parts == ["map"]:
                         return self._send(200, set_map(cfg, db, body))
+                    if parts == ["chat"]:
+                        return self._send(200, _chat_send(cfg, db, body))
                     if len(parts) == 2 and parts[0] == "objectives" and parts[1].isdigit():
                         return self._send(200, set_objective(cfg, db, int(parts[1]), body))
                     if len(parts) == 3 and parts[0] == "tasks" and parts[1].isdigit() and parts[2] == "retry":
@@ -530,6 +532,19 @@ def _gzip_cached(path: Path, data: bytes) -> bytes:
     if key not in _GZ:
         _GZ[key] = gzip.compress(data, 6)
     return _GZ[key]
+
+
+def _chat_history(db) -> list[dict]:
+    from .chat import history
+    return history(db)
+
+
+def _chat_send(cfg, db, body: dict) -> dict:
+    from .chat import send
+    try:
+        return send(cfg, db, body.get("text", ""))
+    except ValueError as e:
+        raise ApiError(400, str(e))
 
 
 def make_server(cfg, port: int = 8765) -> ThreadingHTTPServer:
