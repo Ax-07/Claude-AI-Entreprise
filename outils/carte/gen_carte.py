@@ -79,7 +79,7 @@ FREE = {(i, j): d for d, (i0, j0) in ZONES.items() for i in (i0, i0 + 1) for j i
 FILL = {**{ij: "park" for ij in PARKS}, **{ij: "towers" for ij in FREE}}   # emplacements libres : immeubles éclairés
 INFO = {  # nom, couleur, agent, rôle affiché, description, échelle du bâtiment
  "hq": ("Command HQ", "#818CF8", "pdg", "Orchestration", "Le PDG IA répartit les missions, arbitre les budgets et fait remonter les décisions sensibles.", .62),
- "data": ("Data Core", "#22D3EE", "data", "Mémoire et données", "Le cœur de l’entreprise : mémoire partagée, mesures et amélioration des agents.", .6),
+ "data": ("Data Core", "#F1F5F9", "data", "Mémoire et données", "Le cœur de l’entreprise : mémoire partagée, mesures et amélioration des agents.", .6),
  "marketing": ("Hub Marketing", "#60A5FA", "marketing", "Acquisition", "Positionnement, contenus et pages de vente, dans plusieurs langues.", .56),
  "sales": ("Centre Ventes", "#A78BFA", "ventes", "Revenus", "Prospection, offres, liens de paiement et conversion.", .56),
  "support": ("Service Client", "#FBBF24", "support", "Clients", "Réponses aux clients, livraisons et suivi des commandes.", .56),
@@ -160,7 +160,7 @@ rnd = random.Random(11)
 svg = ['<svg viewBox="0 0 1000 620" width="100%" style="display: block" aria-hidden="true"><defs>', G.defs,
        '<radialGradient id="sky"><stop offset="0" stop-color="#3b2a8a" stop-opacity=".55"/><stop offset="1" stop-color="#070b1a" stop-opacity="0"/></radialGradient>',
        '<linearGradient id="haze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#070b1a" stop-opacity="0"/><stop offset="1" stop-color="#6d28d9" stop-opacity=".25"/></linearGradient>',
-       '<radialGradient id="holo"><stop offset="0" stop-color="#22D3EE" stop-opacity=".55"/><stop offset="1" stop-color="#22D3EE" stop-opacity="0"/></radialGradient>',
+       '<radialGradient id="holo"><stop offset="0" stop-color="#E2E8F0" stop-opacity=".55"/><stop offset="1" stop-color="#E2E8F0" stop-opacity="0"/></radialGradient>',
        '</defs>', '<ellipse cx="500" cy="300" rx="600" ry="340" fill="url(#sky)"/>']
 # --- fond : seulement le halo (pas de silhouettes d'immeubles, choix du propriétaire)
 svg.append('<rect x="0" y="0" width="1000" height="330" fill="url(#haze)"/>')

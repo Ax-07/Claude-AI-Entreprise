@@ -26,7 +26,7 @@ from .db import DB, now
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
 POLE_COLORS = {"pdg": "#818CF8", "recherche": "#34D399", "marketing": "#60A5FA", "ventes": "#A78BFA",
-               "support": "#FBBF24", "data": "#22D3EE", "finance": "#F472B6",
+               "support": "#FBBF24", "data": "#F1F5F9", "finance": "#F472B6",
                "atelier": "#FB923C", "juridique": "#CBD5E1",
                "securite": "#F87171"}
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
