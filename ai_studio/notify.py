@@ -18,6 +18,7 @@ from xml.sax.saxutils import escape
 APP_ID = r"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"
 
 PS_SCRIPT = (
+    "$ErrorActionPreference = 'Stop';"   # toute erreur → code de sortie 1 et message lisible (au lieu d'un succès trompeur)
     "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null;"
     "[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] > $null;"
     "$x = New-Object Windows.Data.Xml.Dom.XmlDocument; $x.LoadXml($env:AI_STUDIO_TOAST);"
@@ -41,7 +42,10 @@ def _windows_runner(xml: str) -> bool:
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     r = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", PS_SCRIPT],
                        env=env, capture_output=True, timeout=30, creationflags=flags)
-    return r.returncode == 0
+    if r.returncode != 0:
+        err = (r.stderr or r.stdout or b"").decode("utf-8", "replace").strip()
+        raise RuntimeError(f"PowerShell a échoué (code {r.returncode}) : {err[:500]}")
+    return True
 
 
 # Remplaçable dans les tests.
