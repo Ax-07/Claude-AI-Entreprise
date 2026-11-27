@@ -110,6 +110,8 @@ La phase de test utilise OpenAI (crédits déjà disponibles chez le propriétai
 
 **Atelier (ajouté le 27/11/2026)** : agent de production des livrables clients (modèle fort, 16 étapes, 0,40 $ par tâche au maximum). Il fabrique ce qui est vendu selon la fiche d'offre, puis passe la main au support pour la livraison. Les autres pôles gardent leurs fonctions internes (veille, communication, ventes…).
 
+**Développement (ajouté le 27/11/2026)** : agent `developpement` de la Division production, pour les sites web, applications web et outils sur mesure vendus aux clients (modèle fort, 24 étapes, 0,60 $ par tâche au maximum). Par défaut un site statique HTML/CSS, JavaScript intégré aux pages (Gmail bloque les .js joints, même zippés), code complet dans `livraisons/commande-N/site/` avec un LISEZMOI de mise en ligne ; outil `package_files` (archive .zip, refuse secrets et fichiers bloqués par Gmail, 300 fichiers / 15 Mo max) puis livraison par le support. Une application qui exige serveur, base de données ou abonnement payant remonte au PDG pour arbitrage. Une offre de site se crée avec `save_offer(producer="developpement")`.
+
 ## 6. Catalogue des outils
 
 Chaque agent n'accède qu'aux outils de son rôle ; les outils marqués « validation » créent une demande au lieu d'agir. Un outil qui dépend d'une clé absente du `.env` (Stripe, Brave) n'est pas proposé aux agents, pour éviter des appels inutiles.

@@ -71,7 +71,7 @@ class ServerTest(unittest.TestCase):
         self.assertFalse(s["engine"]["running"])
         st, ag, _ = self.req("GET", "/api/agents")
         by = {a["name"]: a for a in ag}
-        self.assertEqual(len(ag), 10)
+        self.assertEqual(len(ag), 11)
         self.assertEqual(by["atelier"]["division"], "Division production")
         self.assertEqual(by["data"]["division"], "Direction & Tech")
         self.assertEqual(by["securite"]["division"], "Direction & Tech")

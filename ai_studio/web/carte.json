@@ -7,6 +7,7 @@
   "support": "B",
   "research": "A",
   "atelier": "A",
+  "dev": "A",
   "legal": "A",
   "finance": "A",
   "security": "A"
@@ -19,6 +20,7 @@
   "support": "support",
   "research": "recherche",
   "atelier": "atelier",
+  "dev": "developpement",
   "legal": "juridique",
   "finance": "finance",
   "security": "securite"
@@ -44,6 +46,9 @@
   ],
   "atelier": [
    "atelier"
+  ],
+  "dev": [
+   "developpement"
   ],
   "legal": [
    "juridique"
@@ -91,9 +96,10 @@
    "planned": false,
    "poles": [
     "research",
-    "atelier"
+    "atelier",
+    "dev"
    ],
-   "free": 1,
+   "free": 0,
    "left": "90.50%",
    "top": "70.97%"
   },
@@ -346,6 +352,35 @@
      "L": "C",
      "name": "Tour-atelier",
      "text": "Fût vitré surmonté d’un engrenage lumineux qui tourne."
+    }
+   ]
+  },
+  {
+   "id": "dev",
+   "name": "Développement",
+   "color": "#22D3EE",
+   "agent": "developpement",
+   "quarter": "production",
+   "division": "production",
+   "left": "80.20%",
+   "top": "60.00%",
+   "role": "Pôle production · Sites et applications",
+   "desc": "Conçoit et livre les sites web, applications et outils sur mesure vendus aux clients.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Tour du code",
+     "text": "Tour sombre couverte d’écrans de code, symbole </> flottant au sommet."
+    },
+    {
+     "L": "B",
+     "name": "Campus tech",
+     "text": "Open-space vitré et baies de serveurs qui clignotent sur le toit."
+    },
+    {
+     "L": "C",
+     "name": "Pile logicielle",
+     "text": "Couches empilées comme une architecture logicielle, sous une antenne de déploiement."
     }
    ]
   },
