@@ -1,0 +1,22 @@
+[
+ {
+  "name": "Diagnostic SEO local",
+  "price_eur": 89,
+  "delay_hours": 72,
+  "producer": "atelier",
+  "activity": "services",
+  "summary": "Audit de la visibilité locale d'un commerce, d'un artisan ou d'un indépendant sur Google : site, informations publiques de l'établissement, concurrents, avec un plan d'action priorisé et des textes prêts à copier.",
+  "deliverable": "Rapport HTML (s'ouvre dans le navigateur, imprimable en PDF), 8 à 12 pages : 1) synthèse et note de visibilité locale ; 2) analyse du site : titres, descriptions, pages services et ville, affichage mobile, données structurées, coordonnées ; 3) cohérence du nom, de l'adresse et du téléphone sur le site et les annuaires publics vérifiables ; 4) comparaison avec 3 concurrents locaux ; 5) 10 actions priorisées (impact, effort) avec des exemples de textes prêts à copier (description de fiche Google, titres de pages). Chaque constat cite sa source (URL, date) ; ce qui n'est pas vérifiable publiquement (statistiques de la fiche Google, par exemple) est signalé comme tel.",
+  "required_info": "Nom et adresse de l'établissement ; activité et 3 services principaux ; ville ou zone desservie ; adresse du site s'il existe ; lien de la fiche Google (facultatif) ; 1 à 3 concurrents connus (facultatif)."
+ },
+ {
+  "name": "Site vitrine",
+  "price_eur": 390,
+  "delay_hours": 120,
+  "producer": "developpement",
+  "activity": "services",
+  "summary": "Site vitrine professionnel de 1 à 5 pages pour un indépendant, un artisan ou une TPE : rapide, adapté au mobile, référencement de base, sans abonnement, prêt à mettre en ligne.",
+  "deliverable": "Archive .zip du site complet en HTML/CSS (sans CMS ni abonnement) : jusqu'à 5 pages (par exemple accueil, services, à propos, contact, mentions légales), design adapté à l'activité, lien de contact par email et téléphone, titres et descriptions pour Google, mentions légales et politique de confidentialité rédigées à partir des informations fournies, et un LISEZMOI de mise en ligne pas à pas (GitHub Pages, Netlify ou hébergeur du client). Nom de domaine et hébergement non inclus. Photos intégrées si le client fournit des liens publics, sinon emplacements prévus. Une série de corrections incluse après la livraison.",
+  "required_info": "Nom de l'entreprise et activité ; pages souhaitées (5 au maximum) ; textes ou éléments clés de chaque page (services, tarifs, zone, horaires) ; coordonnées (adresse, téléphone, email) ; SIRET et forme juridique pour les mentions légales ; logo et couleurs si disponibles (liens) ; liens vers des photos si disponibles ; 1 ou 2 sites appréciés (facultatif)."
+ }
+]

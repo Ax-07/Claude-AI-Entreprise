@@ -131,6 +131,11 @@ _Mis à jour le 27/11/2026_
 
 - Tech & Données complété (décision du propriétaire) : **Infrastructure** (#2DD4BF : hébergement et mise en ligne des sites, domaines, HTTPS, surveillance ; piste de forfaits hébergement + maintenance récurrents) et **Automatisations** (#FACC15 : n8n, API, connecteurs, workflows à vendre aux clients), bâtiments en préparation (Centre de données / Tour d'hébergement / Nuage ; Usine à workflows / Tour d'intégration / Hub de connecteurs). Leurs agents seront activés avec les premières ventes de sites. Tous les emplacements de la carte sont occupés.
 
+## Catalogue de départ et commandes d'essai (27/11/2026)
+- `catalogue/offres.json` (versionné) : **Diagnostic SEO local** (89 €, 72 h, atelier, rapport HTML 8–12 pages, sources citées) et **Site vitrine** (390 €, 120 h, developpement, 1 à 5 pages HTML/CSS en .zip + LISEZMOI, domaine et hébergement non inclus, une série de corrections). Prix fixés sous le marché freelance (site vitrine : ~800 à 3 000 € chez un freelance généraliste ; audit de fiche Google : ~60 à 120 € sur les plateformes) car production par IA et premières ventes.
+- CLI `importer-offres [fichier]` (création ou mise à jour, lien de paiement conservé) ; `commande-test "offre" -e email -i "infos client"` : vente fictive `essai_…` (mode test, sans paiement) qui suit exactement le parcours d'une vente Stripe (`commerce.open_order`, partagé avec la synchronisation Stripe) ; les infos du client deviennent une consigne du propriétaire. 119 tests.
+- À faire chez le propriétaire : importer le catalogue, lancer une commande d'essai pour chaque offre, juger les livrables.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

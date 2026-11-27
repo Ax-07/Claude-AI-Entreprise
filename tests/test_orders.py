@@ -239,6 +239,30 @@ class DeveloppementTest(Base):
         out = run_tool("package_files", ctx, {"folder": "../..", "name": "x"})      # hors de l'espace de travail
         self.assertNotIn("Archive prête", out)
 
+
+class CatalogueTest(Base):
+    def test_import_offers_and_test_order(self):
+        from pathlib import Path as P
+        path = P(__file__).resolve().parents[1] / "catalogue" / "offres.json"
+        self.assertEqual(commerce.import_offers(self.db, path), ["Diagnostic SEO local", "Site vitrine"])
+        site = self.db.one("SELECT * FROM offers WHERE name='Site vitrine'")
+        self.assertEqual((site["producer"], site["activity"], site["price_eur"]), ("developpement", "services", 390))
+        self.db.run("UPDATE offers SET payment_link_url='https://buy.stripe.com/x', price_eur=1 WHERE id=?", (site["id"],))
+        commerce.import_offers(self.db, path)                                   # mise à jour : pas de doublon
+        site = self.db.one("SELECT * FROM offers WHERE name='Site vitrine'")
+        self.assertEqual((self.db.one("SELECT COUNT(*) FROM offers")[0], site["price_eur"], site["payment_link_url"]),
+                         (2, 390, "https://buy.stripe.com/x"))                  # lien de paiement conservé
+        with self.assertRaises(ValueError):
+            commerce.test_order(self.cfg, self.db, "Offre inconnue", "moi@exemple.fr")
+        n = commerce.test_order(self.cfg, self.db, "site vitrine", "moi@exemple.fr", "Boulangerie Dupont, Lyon 3e, 3 pages")
+        o = commerce.get_order(self.db, n)
+        self.assertEqual((o["stage"], o["livemode"], o["amount"], o["offer_id"]), ("a_livrer", 0, 390, site["id"]))
+        self.assertTrue(o["due_at"])
+        t = self.db.task(o["task_id"])
+        self.assertEqual((t["agent"], t["order_ref"]), ("pdg", n))
+        self.assertIn("Boulangerie Dupont", t["description"])                   # informations du client dans le brief
+        self.assertIn("developpement", t["description"])                        # agent producteur de l'offre
+
 class LegalTest(Base):
     def test_review_queued_for_pages_and_links_not_replies(self):
         from ai_studio import legal

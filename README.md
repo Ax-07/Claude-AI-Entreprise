@@ -94,6 +94,8 @@ notification immédiate, sans coût d'API.
 ### Offres et commandes
 
 Chaque offre a une fiche (prix, livrable, délai, informations à demander, agent qui produit) : `python -m ai_studio offres`.
+Le catalogue de départ est dans `catalogue/offres.json` (Diagnostic SEO local, Site vitrine) : `python -m ai_studio importer-offres` le charge ou le met à jour (les liens de paiement déjà créés sont gardés).
+Pour essayer une offre sans paiement : `python -m ai_studio commande-test "Site vitrine" -e ton@email.fr -i "informations du client"`. La commande suit exactement le parcours d'une vente (mode test) et la livraison t'est envoyée après ta validation.
 Chaque paiement devient une commande suivie jusqu'à la livraison : `python -m ai_studio commandes`. Le moteur relance
 le PDG tant qu'une commande n'est pas livrée, et te prévient si elle est bloquée ou en retard. `livree N` marque une
 commande livrée si tu l'as livrée toi-même.

@@ -22,6 +22,7 @@ import re
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from .db import iso, now
 
@@ -122,18 +123,70 @@ def sync_stripe(cfg, db, request=None) -> dict:
         if first:
             db.run("UPDATE sales SET stage='historique' WHERE id=?", (s["id"],))
             continue
-        offer = match_offer(db, s)
-        due = None
-        if offer:
-            due = iso(datetime.fromisoformat(s["created_at"]) + timedelta(hours=int(offer["delay_hours"])))
-        db.run("UPDATE sales SET stage='a_livrer', offer_id=?, due_at=? WHERE id=?", (offer["id"] if offer else None, due, s["id"]))
-        n = order_number(db, s["id"])
-        tid = db.add_task(f"Commande n°{n} : livrer {s['product'] or 'la commande'} ({s['customer_email'] or 'client'})"[:120], "pdg",
-                          delivery_brief(db, n), priority=1, created_by="systeme", order_ref=n)
-        db.run("UPDATE sales SET task_id=? WHERE id=?", (tid, s["id"]))
+        open_order(cfg, db, s)
         _notify(cfg, db, f"Nouvelle vente : {s['amount']:.2f} {s['currency']}{test}",
                 f"{s['product'] or 'Produit'} — {s['customer_email'] or 'client'}. Les agents préparent la livraison.", "sales")
     return {"new": len(new_sales), "first_sync": first}
+
+
+def open_order(cfg, db, s: dict) -> int:
+    """Transforme une vente enregistrée en commande à livrer : fiche d'offre, échéance et tâche de livraison du PDG."""
+    offer = match_offer(db, s)
+    due = None
+    if offer:
+        due = iso(datetime.fromisoformat(s["created_at"]) + timedelta(hours=int(offer["delay_hours"])))
+    db.run("UPDATE sales SET stage='a_livrer', offer_id=?, due_at=? WHERE id=?", (offer["id"] if offer else None, due, s["id"]))
+    n = order_number(db, s["id"])
+    tid = db.add_task(f"Commande n°{n} : livrer {s['product'] or 'la commande'} ({s['customer_email'] or 'client'})"[:120], "pdg",
+                      delivery_brief(db, n), priority=1, created_by="systeme", order_ref=n)
+    db.run("UPDATE sales SET task_id=? WHERE id=?", (tid, s["id"]))
+    return n
+
+
+def import_offers(db, path) -> list[str]:
+    """Crée ou met à jour les fiches d'offre d'un catalogue JSON (liste d'objets, mêmes champs que save_offer).
+    Le lien de paiement déjà créé pour une offre est conservé."""
+    import json
+    from .activities import exists
+    items = json.loads(Path(path).read_text(encoding="utf-8"))
+    done = []
+    for o in items:
+        name = o["name"].strip()
+        price, delay = float(o["price_eur"]), int(o["delay_hours"])
+        if not 1 <= price <= 5000 or not 1 <= delay <= 24 * 60:
+            raise ValueError(f"{name} : prix (1 à 5000 €) ou délai (1 h à 60 jours) hors limites")
+        activity = o.get("activity") or "services"
+        if not exists(db, activity):
+            raise ValueError(f"{name} : activité inconnue ({activity})")
+        vals = (price, o.get("summary", "")[:1000], o.get("deliverable", "")[:1000], delay, o.get("required_info", "")[:600],
+                o.get("producer", "atelier"), activity, iso())
+        old = db.one("SELECT id FROM offers WHERE lower(name)=lower(?)", (name,))
+        if old:
+            db.run("UPDATE offers SET price_eur=?, summary=?, deliverable=?, delay_hours=?, required_info=?, producer=?, activity=?, "
+                   "updated_at=?, status='active' WHERE id=?", (*vals, old["id"]))
+        else:
+            db.run("INSERT INTO offers(name, price_eur, summary, deliverable, delay_hours, required_info, producer, activity, updated_at, "
+                   "created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (name, *vals, "proprietaire", iso()))
+        db.log("proprietaire", "offre", f"Offre {'mise à jour' if old else 'créée'} depuis le catalogue : {name}")
+        done.append(name)
+    return done
+
+
+def test_order(cfg, db, offer_name: str, email: str, infos: str = "") -> int:
+    """Commande d'essai sans paiement : même parcours qu'une vraie vente (mode test), livrée à l'adresse indiquée."""
+    o = db.one("SELECT * FROM offers WHERE lower(name)=lower(?) AND status='active'", (offer_name.strip(),))
+    if not o:
+        raise ValueError(f"Offre introuvable : {offer_name} (voir la commande offres)")
+    if "@" not in email:
+        raise ValueError("Adresse email invalide")
+    sale = {"id": "essai_%d" % int(now().timestamp() * 1000), "created_at": iso(), "amount": float(o["price_eur"]), "currency": "EUR",
+            "customer_email": email.strip(), "customer_name": "Client d'essai", "product": o["name"], "payment_link": None, "livemode": 0}
+    db.run("INSERT INTO sales(id, created_at, amount, currency, customer_email, customer_name, product, payment_link, livemode, recorded_at) "
+           "VALUES (?,?,?,?,?,?,?,?,?,?)", (*sale.values(), iso()))
+    db.log("finance", "vente", f"Commande d'essai (sans paiement) : {o['name']} pour {email}")
+    if infos.strip():
+        add_owner_note(db, order_number(db, sale["id"]), "Informations du client (commande d'essai) : " + infos)
+    return open_order(cfg, db, sale)
 
 
 # ============================================================================ Commandes : du paiement à la livraison
