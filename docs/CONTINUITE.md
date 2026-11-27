@@ -98,6 +98,12 @@ _Mis à jour le 27/11/2026_
 - Agent `securite` (pôle Administration, rebaptisé services partagés ; modèle économique) : `security.config_audit` (Git, clés Stripe/GitHub trop puissantes, mot de passe Gmail, sauvegardes, secrets recopiés dans les livrables ou la mémoire — jamais la valeur d'un secret), `anomalies` (dépenses, échecs, envois, emails suspects), `suspicious_text` (emails piégés : signalés dans la tâche de réponse) ; alerte automatique sans coût sur tout constat critique (une fois) ; revue quotidienne par l'agent ; outils `security_audit`, `security_alert` (3 par jour). 116 tests.
 - Points d'attention relevés : YouTube ne monétise pas le contenu produit en masse (politique « inauthentic content », clarifiée en juillet 2026) → vidéos originales, peu nombreuses, publication validée ; dropshipping = vendeur pleinement responsable (garanties, rétractation 14 jours, GPSR, fournisseurs UE à privilégier), international = TVA/douane à traiter par le Juridique.
 
+## Plateau final : quartiers par pôle, un bâtiment par agent (27/11/2026)
+- Décision du propriétaire : un quartier par pôle et un bâtiment par agent (remplace la carte à 5 bâtiments).
+- Quartiers (dalle à la couleur du pôle) : Direction au centre (Command HQ, Data Core), Pôle commercial à gauche (Marketing, Ventes, Support), Pôle production à droite (Labo Recherche, Atelier), Services partagés devant (Juridique, Trésorerie, Cybersécurité). Deux terrains réservés au fond, avec grue : Studio vidéo et E-commerce (« bientôt »).
+- 10 bâtiments (un par agent, 3 au choix, 6 pour le Data Core) ; 3 nouveaux pour la Cybersécurité (Bouclier, Pare-feu, Centre de veille). carte.json : `quarters` (avec `planned`), un agent par bâtiment.
+- Carte allégée : au repos, chaque bâtiment n'a qu'un voyant d'état (et le nombre de tâches) ; le nom s'affiche au survol ; les bâtiments eux-mêmes sont cliquables ; le bâtiment sélectionné a un voyant cerclé. 116 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

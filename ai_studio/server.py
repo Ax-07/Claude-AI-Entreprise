@@ -272,7 +272,7 @@ def insights(cfg, db, days: int = 7) -> dict:
     return {"days": labels, "done": done, "cost": cost, "success_rate": rate, "pipeline": pipeline, "schedule": schedule[:5]}
 
 
-MAP_POLES = {"hq", "data", "commercial", "production", "administration"}       # un bâtiment par pôle
+MAP_POLES = {"hq", "data", "marketing", "sales", "support", "research", "atelier", "legal", "finance", "security"}  # un bâtiment par agent
 
 
 def map_settings(cfg, db) -> dict:
