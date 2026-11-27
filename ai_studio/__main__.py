@@ -239,9 +239,13 @@ def cmd_notifier_test(cfg, db, a):
         _out("Les notifications Windows ne fonctionnent que sous Windows.")
         return
     ok = notify.send(cfg, db, "AI Enterprise Studio", "Notification de test : tu seras prévenu ici quand une validation t'attend.")
-    _out("Notification envoyée : elle doit apparaître en bas à droite de l'écran." if ok else
-         "La notification n'a pas pu être affichée (voir : python -m ai_studio journal). "
-         "Vérifie que les notifications sont autorisées dans Paramètres > Système > Notifications.")
+    if ok:
+        _out("Windows a accepté la notification. Si elle n'apparaît pas à l'écran, regarde le centre de notifications "
+             "(Windows + N) : le mode « Ne pas déranger » ou les réglages de « Windows PowerShell » dans "
+             "Paramètres > Système > Notifications peuvent la masquer.")
+    else:
+        last = db.one("SELECT message FROM events WHERE kind='notification' ORDER BY id DESC LIMIT 1")
+        _out("La notification n'a pas pu être affichée.\n" + (last[0] if last else ""))
 
 
 def cmd_sauvegarder(cfg, db, a):

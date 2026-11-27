@@ -78,6 +78,15 @@ class NotifyTest(Base):
             self.assertEqual(notify.check(self.cfg, self.db, {}), [])
         self.assertIn("Notification impossible", self.db.q("SELECT message FROM events ORDER BY id DESC LIMIT 1")[0][0])
 
+    def test_powershell_error_is_reported(self):
+        class R:
+            returncode, stdout, stderr = 1, b"", "Accès refusé".encode()
+        with unittest.mock.patch.object(notify.subprocess, "run", return_value=R()), \
+             unittest.mock.patch.object(notify, "runner", notify._windows_runner):
+            self.assertFalse(notify.send(self.cfg, self.db, "t", "m"))
+        self.assertIn("Accès refusé", self.db.q("SELECT message FROM events ORDER BY id DESC LIMIT 1")[0][0])
+        self.assertTrue(notify.PS_SCRIPT.startswith("$ErrorActionPreference = 'Stop'"))
+
     def test_engine_cycle_sends_notifications(self):
         from ai_studio.orchestrator import Studio
         self.approval()
