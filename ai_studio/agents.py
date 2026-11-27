@@ -27,6 +27,15 @@ class Role:
         return list(dict.fromkeys(COMMON_TOOLS + self.tools))
 
 
+# Divisions de l'entreprise : elles regroupent les pôles qui travaillent ensemble (même découpage que la carte).
+DIVISIONS = {
+    "Direction": ["pdg", "data"],
+    "Division commerciale": ["marketing", "ventes", "support"],
+    "Division production": ["atelier", "recherche"],
+    "Administration": ["finance", "juridique"],
+}
+DIVISION_OF = {a: d for d, names in DIVISIONS.items() for a in names}
+
 ROLES: dict[str, Role] = {r.name: r for r in [
     Role("pdg", "Command HQ", "Agent PDG — orchestrateur",
          "Tu diriges l'entreprise. Tu transformes les objectifs du propriétaire en missions concrètes, tu les "
@@ -108,7 +117,8 @@ RULES = """Règles permanentes :
 
 def system_prompt(role: Role, cfg) -> str:
     company = cfg["company"]
-    team = "\n".join(f"- {r.name} ({r.pole}) : {r.title}" for r in ROLES.values())
+    team = "\n".join(f"{d} :\n" + "\n".join(f"  - {n} ({ROLES[n].pole}) : {ROLES[n].title}" for n in names if n in ROLES)
+                     for d, names in DIVISIONS.items())
     return (f"Tu es {role.title} de {company['name']}.\n"
             f"Entreprise : {company['description']}\n"
             f"Propriétaire : {company['owner_name']}.\n"

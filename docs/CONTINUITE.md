@@ -79,6 +79,12 @@ _Mis à jour le 27/11/2026_
 - Règle commune : questions juridiques déléguées au juridique. 105 tests.
 - Prochaine étape juridique : faire rédiger CGV, mentions et politique de confidentialité ; factures conformes générées automatiquement à chaque vente (à développer).
 
+## Organisation en divisions (27/11/2026)
+- Divisions (décision du propriétaire) : Direction (PDG + Data Core, au centre), Commerciale (Marketing, Ventes, Support), Production (Atelier, Labo Recherche en R&D), Administration (Trésorerie, Juridique).
+- `agents.DIVISIONS` / `DIVISION_OF` : l'équipe est présentée par division dans le prompt de chaque agent ; `/api/agents` renvoie la division ; l'escouade du tableau de bord est rangée par division.
+- Carte refaite en trois rangées (outils/carte/gen_carte.py, positions `XY`) : HQ au fond, Data Core au centre (moyeu des routes), Commerciale à gauche, Production à droite (coin droit libre pour un futur pôle), Administration devant ; plateformes de division (contour lumineux à la couleur de la division) et noms des divisions ; étiquettes compactes sur une ligne (état en infobulle, nombre de tâches en pastille).
+- Data Core : 3 nouveaux bâtiments proposés par le propriétaire (D L'Archive circulaire, E Le Prisme neural, F L'Agora en spirale) ; variantes A à F acceptées par /api/map. 106 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

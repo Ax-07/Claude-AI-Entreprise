@@ -440,6 +440,70 @@ def da_c(s):
     s.neon([(T, E[1]), (E[2], E[1]), (E[1], E[0]), (B, E[1])], 1, s.hi, .8)
     s.beam(-24, 24, 20, 50); s.beam(24, -24, 20, 50)
 
+def da_d(s):
+    """L'Archive circulaire : cylindres de verre empilés, anneaux lumineux, disque et anneau flottant."""
+    s.slab()
+    for z in (22, 46, 70):
+        s.ring(0, 0, z, 40)
+    for (r, z0, z1) in [(30, 0, 24), (28, 24, 48), (26, 48, 72), (24, 72, 94)]:
+        f = circ(0, 0, r); s.prism(f, z0, z1, "glass", smooth=True); s.cornice(f, z1, 1.8, smooth=True)
+    for z in (22, 46, 70):
+        s.ring(0, 0, z, 40, back=False)
+    x, y, rx, ry = s.ell(0, 0, 96, 20)
+    s.raw('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="#E0FFFF" filter="url(#nf%s)"/>' % (x, y, rx, ry, s.uid))
+    s.raw('<polygon points="%.1f,%.1f %.1f,%.1f %.1f,%.1f %.1f,%.1f" fill="#FFFFFF" fill-opacity=".12"/>' % (x - rx, y, x - rx*.55, y - 38, x + rx*.55, y - 38, x + rx, y))
+    s.raw('<ellipse class="pulse" cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="none" stroke="%s" stroke-width="3" filter="url(#nf%s)"/>' % (x, y - 44, rx*.6, ry*.6, mixw(s.c, .4), s.uid))
+def da_e(s):
+    """Le Prisme neural : grand prisme de verre traversé d'un réseau de neurones, livre holographique au-dessus."""
+    s.slab()
+    zc, r, hh = 70, 40, 62
+    T, B = s.p(0, 0, zc + hh), s.p(0, 0, zc - hh)
+    E = [s.p(r, 0, zc), s.p(0, r, zc), s.p(-r, 0, zc), s.p(0, -r, zc)]
+    s.poly([T, E[2], E[3]], mix(s.c, .25), .55); s.poly([T, E[3], E[0]], mix(s.c, .3), .5)
+    cx, cy = s.p(0, 0, zc)
+    rnd = random.Random(5); g = ""
+    for k in range(14):
+        a = k * 2 * math.pi / 14 + rnd.uniform(-.1, .1); L = rnd.uniform(16, 27)
+        mx, my = cx + math.cos(a)*L*.55, cy + math.sin(a)*L*.45
+        ex, ey = cx + math.cos(a)*L, cy + math.sin(a)*L*.8
+        g += '<path d="M%.1f %.1f L%.1f %.1f L%.1f %.1f"/>' % (cx, cy, mx, my, ex, ey)
+        g += '<circle cx="%.1f" cy="%.1f" r="1.6" fill="%s" stroke="none"/>' % (ex, ey, mixw(s.c, .5))
+        if k % 2:
+            g += '<path d="M%.1f %.1f l%.1f %.1f"/>' % (mx, my, math.cos(a + .7)*7, math.sin(a + .7)*6)
+    s.raw('<g class="pulse" style="animation-duration: 2.8s" fill="none" stroke="%s" stroke-width="1.3" filter="url(#nf%s)">%s'
+          '<circle cx="%.1f" cy="%.1f" r="4" fill="#FFFFFF" stroke="none"/></g>' % (s.c, s.uid, g, cx, cy))
+    s.poly([T, E[2], E[1]], mix(s.c, .5), .28, "#FFFFFF", .5); s.poly([T, E[1], E[0]], mix(s.c, .4), .22, "#FFFFFF", .5)
+    s.poly([B, E[2], E[1]], mix(s.c, .35), .45, "#FFFFFF", .3); s.poly([B, E[1], E[0]], mix(s.c, .25), .45, "#FFFFFF", .3)
+    s.neon([(T, E[1]), (E[2], E[1]), (E[1], E[0]), (B, E[1]), (T, E[2]), (T, E[0])], 1, s.hi, .8)
+    bx, by = T[0], T[1] - 34
+    s.raw('<polygon points="%.1f,%.1f %.1f,%.1f %.1f,%.1f" fill="#FFFFFF" fill-opacity=".1"/>' % (T[0], T[1], bx - 14, by + 6, bx + 14, by + 6))
+    s.raw('<g filter="url(#nf%s)" fill="none" stroke="%s" stroke-width="1.6" stroke-linejoin="round">'
+          '<path d="M%.1f %.1f q-7 -4 -14 0 v-11 q7 -4 14 0 z M%.1f %.1f q7 -4 14 0 v-11 q-7 -4 -14 0 z"/></g>' % (s.uid, mixw(s.c, .4), bx, by + 4, bx, by + 4))
+def da_f(s):
+    """L'Agora en spirale : rampe hélicoïdale lumineuse autour d'une colonne de lumière."""
+    s.slab()
+    f = circ(0, 0, 30); s.prism(f, 0, 6, "office", smooth=True); s.cornice(f, 6, 1.5, smooth=True)
+    pts = []
+    for i in range(0, 361):
+        th = i / 360 * 4.25 * 2 * math.pi
+        u, v, z = 24 * math.cos(th), 24 * math.sin(th), 10 + th / (2 * math.pi) * 30
+        pts.append((s.p(u, v, z), math.cos(th) + math.sin(th) >= 0))
+    def runs(front):
+        out, cur = [], []
+        for q, fr in pts:
+            if fr == front: cur.append(q)
+            elif cur: out.append(cur); cur = []
+        if cur: out.append(cur)
+        return out
+    for seg in runs(False):
+        s.raw('<polyline points="%s" fill="none" stroke="%s" stroke-width="7" stroke-opacity=".45" stroke-linecap="round"/>' % (s.P(seg), mix(s.c, .7)))
+    x0, y0 = s.p(0, 0, 6); x1, y1 = s.p(0, 0, 170)
+    s.raw('<rect x="%.1f" y="%.1f" width="16" height="%.1f" fill="url(#bm%s)" opacity=".8"/>' % (x0 - 8, y1, y0 - y1, s.uid))
+    s.raw('<rect class="pulse" x="%.1f" y="%.1f" width="5" height="%.1f" rx="2.5" fill="#FFFFFF" filter="url(#nf%s)"/>' % (x0 - 2.5, y1 + 20, y0 - y1 - 20, s.uid))
+    for seg in runs(True):
+        s.raw('<polyline points="%s" fill="none" stroke="%s" stroke-width="7" stroke-linecap="round" filter="url(#nf%s)"/>'
+              '<polyline points="%s" fill="none" stroke="#FFFFFF" stroke-opacity=".7" stroke-width="1" stroke-dasharray="1 9"/>' % (s.P(seg), s.c, s.uid, s.P(seg)))
+
 def fi_a(s):
     s.slab()
     f = rect(-38, 38, -38, 38); s.prism(f, 0, 62, "dark"); s.cornice(f, 62, 3.5)
@@ -547,7 +611,7 @@ POLES = [
  ("marketing", "Hub Marketing", "Acquisition", "#60A5FA", [("A", "Tour média", "Tour noire couverte d’écrans géants et d’enseignes néon.", ma_a), ("B", "Studio de diffusion", "Pylône émetteur qui propage les ondes de la marque.", ma_b), ("C", "Place des panneaux", "Panneaux publicitaires flottants au-dessus d’un studio.", ma_c)]),
  ("sales", "Centre Ventes", "Revenus", "#A78BFA", [("A", "Tour de verre", "Gradins vitrés, corniches dorées et flèche de croissance.", ve_a), ("B", "Ziggurat des deals", "Pyramide à étages : chaque niveau est une étape du pipeline.", ve_b), ("C", "Tours jumelles", "Deux tours de bureaux illuminées reliées par un pont de verre.", ve_c)]),
  ("support", "Zone Support", "Clients", "#FBBF24", [("A", "Centre d’écoute", "Rotonde à bandeaux lumineux surmontée d’une parabole.", su_a), ("B", "Phare", "Le phare qui guide les clients, 24 h/24.", su_b), ("C", "Hub en anneau", "Bâtiment circulaire autour d’une tour relais qui émet.", su_c)]),
- ("data", "Data Core", "Mémoire et données", "#22D3EE", [("A", "Réacteur de données", "Cœur lumineux sous verre, entouré d’anneaux d’énergie.", da_a), ("B", "Ferme de serveurs", "Rangées de baies noires et leurs voyants qui clignotent.", da_b), ("C", "Cristal de mémoire", "Cristal flottant au-dessus de son socle : la mémoire partagée.", da_c)]),
+ ("data", "Data Core", "Mémoire et données", "#22D3EE", [("A", "Réacteur de données", "Cœur lumineux sous verre, entouré d’anneaux d’énergie.", da_a), ("B", "Ferme de serveurs", "Rangées de baies noires et leurs voyants qui clignotent.", da_b), ("C", "Cristal de mémoire", "Cristal flottant au-dessus de son socle : la mémoire partagée.", da_c), ("D", "L’Archive circulaire", "Cylindres de verre empilés, cerclés d’anneaux lumineux, disque et anneau flottant.", da_d), ("E", "Le Prisme neural", "Grand prisme de verre traversé d’un réseau de neurones, livre holographique au sommet.", da_e), ("F", "L’Agora en spirale", "Rampe hélicoïdale lumineuse qui s’enroule autour d’une colonne de lumière.", da_f)]),
  ("atelier", "Atelier", "Production", "#FB923C", [("A", "Manufacture", "Halle de production et cheminées qui fument : on fabrique les livrables.", at_a), ("B", "Atelier à sheds", "Toits vitrés en dents de scie et pont roulant au-dessus des postes.", at_b), ("C", "Tour-atelier", "Fût vitré surmonté d’un engrenage lumineux qui tourne.", at_c)]),
  ("legal", "Juridique", "Conformité", "#CBD5E1", [("A", "Palais de justice", "Colonnade, fronton et coupole de verre : le droit au cœur de la cité.", ju_a), ("B", "Tour de la balance", "Tour élancée surmontée d’une balance lumineuse.", ju_b), ("C", "Archives scellées", "Salle des registres sous un sceau officiel flottant.", ju_c)]),
  ("finance", "Trésorerie", "Finances", "#F472B6", [("A", "Coffre-fort", "Bloc noir, porte de coffre circulaire et lames dorées.", fi_a), ("B", "Temple financier", "Colonnade dorée et fronton : la solidité des comptes.", fi_b), ("C", "Tour des pièces", "Pile de pièces géante et pièce d’or flottante.", fi_c)]),
