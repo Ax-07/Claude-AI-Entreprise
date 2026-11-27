@@ -12,18 +12,21 @@
   "security": "A"
  },
  "agent_of_pole": {
+  "data": "data",
   "hq": "pdg",
   "marketing": "marketing",
   "sales": "ventes",
   "support": "support",
   "research": "recherche",
   "atelier": "atelier",
-  "legal": "juridique",
   "finance": "finance",
   "security": "securite",
-  "data": "data"
+  "legal": "juridique"
  },
  "agents_of_pole": {
+  "data": [
+   "data"
+  ],
   "hq": [
    "pdg"
   ],
@@ -42,17 +45,14 @@
   "atelier": [
    "atelier"
   ],
-  "legal": [
-   "juridique"
-  ],
   "finance": [
    "finance"
   ],
   "security": [
    "securite"
   ],
-  "data": [
-   "data"
+  "legal": [
+   "juridique"
   ]
  },
  "quarters": [
@@ -62,8 +62,8 @@
    "color": "#818CF8",
    "planned": false,
    "poles": [
-    "hq",
-    "data"
+    "data",
+    "hq"
    ],
    "left": "50.00%",
    "top": "8.06%"
@@ -78,8 +78,8 @@
     "sales",
     "support"
    ],
-   "left": "15.00%",
-   "top": "69.68%"
+   "left": "16.50%",
+   "top": "70.97%"
   },
   {
    "id": "production",
@@ -90,8 +90,8 @@
     "research",
     "atelier"
    ],
-   "left": "85.00%",
-   "top": "69.68%"
+   "left": "90.00%",
+   "top": "40.32%"
   },
   {
    "id": "administration",
@@ -99,12 +99,12 @@
    "color": "#E879F9",
    "planned": false,
    "poles": [
-    "legal",
     "finance",
-    "security"
+    "security",
+    "legal"
    ],
-   "left": "50.00%",
-   "top": "95.16%"
+   "left": "76.00%",
+   "top": "85.48%"
   },
   {
    "id": "video",
@@ -112,8 +112,8 @@
    "color": "#F43F5E",
    "planned": true,
    "poles": [],
-   "left": "37.15%",
-   "top": "32.86%"
+   "left": "29.80%",
+   "top": "37.42%"
   },
   {
    "id": "ecommerce",
@@ -121,286 +121,15 @@
    "color": "#A3E635",
    "planned": true,
    "poles": [],
-   "left": "62.85%",
-   "top": "32.86%"
+   "left": "70.20%",
+   "top": "37.42%"
   }
  ],
  "divisions": [],
  "poles": [
   {
-   "id": "hq",
-   "name": "Command HQ",
-   "code": "ATLAS",
-   "color": "#818CF8",
-   "agent": "pdg",
-   "quarter": "direction",
-   "division": "direction",
-   "left": "50.00%",
-   "top": "41.29%",
-   "role": "Direction · Orchestration",
-   "desc": "Le PDG IA répartit les missions, arbitre les budgets et fait remonter les décisions sensibles.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Spire de commandement",
-     "text": "Tour à pans coupés, bandeaux vitrés lumineux et couronne qui brille."
-    },
-    {
-     "L": "B",
-     "name": "Citadelle",
-     "text": "Deux tours noires à enseignes néon reliées par une passerelle de verre."
-    },
-    {
-     "L": "C",
-     "name": "Anneau orbital",
-     "text": "Tour cylindrique vitrée entourée d’anneaux de données en orbite."
-    }
-   ]
-  },
-  {
-   "id": "marketing",
-   "name": "Hub Marketing",
-   "code": "ÉCHO",
-   "color": "#60A5FA",
-   "agent": "marketing",
-   "quarter": "commercial",
-   "division": "commercial",
-   "left": "24.15%",
-   "top": "41.41%",
-   "role": "Pôle commercial · Acquisition",
-   "desc": "Positionnement, contenus et pages de vente, dans plusieurs langues.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Tour média",
-     "text": "Tour noire couverte d’écrans géants et d’enseignes néon."
-    },
-    {
-     "L": "B",
-     "name": "Studio de diffusion",
-     "text": "Pylône émetteur qui propage les ondes de la marque."
-    },
-    {
-     "L": "C",
-     "name": "Place des panneaux",
-     "text": "Panneaux publicitaires flottants au-dessus d’un studio."
-    }
-   ]
-  },
-  {
-   "id": "sales",
-   "name": "Centre Ventes",
-   "code": "HERMÈS",
-   "color": "#A78BFA",
-   "agent": "ventes",
-   "quarter": "commercial",
-   "division": "commercial",
-   "left": "37.00%",
-   "top": "51.77%",
-   "role": "Pôle commercial · Revenus",
-   "desc": "Prospection, offres, liens de paiement et conversion.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Tour de verre",
-     "text": "Gradins vitrés, corniches dorées et flèche de croissance."
-    },
-    {
-     "L": "B",
-     "name": "Ziggurat des deals",
-     "text": "Pyramide à étages : chaque niveau est une étape du pipeline."
-    },
-    {
-     "L": "C",
-     "name": "Tours jumelles",
-     "text": "Deux tours de bureaux illuminées reliées par un pont de verre."
-    }
-   ]
-  },
-  {
-   "id": "support",
-   "name": "Zone Support",
-   "code": "VESTA",
-   "color": "#FBBF24",
-   "agent": "support",
-   "quarter": "commercial",
-   "division": "commercial",
-   "left": "24.15%",
-   "top": "62.14%",
-   "role": "Pôle commercial · Clients",
-   "desc": "Réponses aux clients, livraisons et suivi des commandes.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Centre d’écoute",
-     "text": "Rotonde à bandeaux lumineux surmontée d’une parabole."
-    },
-    {
-     "L": "B",
-     "name": "Phare",
-     "text": "Le phare qui guide les clients, 24 h/24."
-    },
-    {
-     "L": "C",
-     "name": "Hub en anneau",
-     "text": "Bâtiment circulaire autour d’une tour relais qui émet."
-    }
-   ]
-  },
-  {
-   "id": "research",
-   "name": "Labo Recherche",
-   "code": "ORION",
-   "color": "#34D399",
-   "agent": "recherche",
-   "quarter": "production",
-   "division": "production",
-   "left": "75.85%",
-   "top": "41.41%",
-   "role": "Pôle production · R&D et veille",
-   "desc": "Marchés, niches, concurrence et nouvelles offres pour toutes les activités.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Observatoire",
-     "text": "Rotonde nervurée, coupole et télescope pointé vers les marchés."
-    },
-    {
-     "L": "B",
-     "name": "Serre de verre",
-     "text": "Laboratoire transparent : on voit les idées pousser à l’intérieur."
-    },
-    {
-     "L": "C",
-     "name": "Labo à antenne",
-     "text": "Labo vitré aux écrans allumés et tour équipée d’une parabole."
-    }
-   ]
-  },
-  {
-   "id": "atelier",
-   "name": "Atelier",
-   "code": "FORGE",
-   "color": "#FB923C",
-   "agent": "atelier",
-   "quarter": "production",
-   "division": "production",
-   "left": "63.00%",
-   "top": "51.77%",
-   "role": "Pôle production · Production",
-   "desc": "Fabrique les livrables vendus aux clients, selon la fiche d’offre.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Manufacture",
-     "text": "Halle de production et cheminées qui fument : on fabrique les livrables."
-    },
-    {
-     "L": "B",
-     "name": "Atelier à sheds",
-     "text": "Toits vitrés en dents de scie et pont roulant au-dessus des postes."
-    },
-    {
-     "L": "C",
-     "name": "Tour-atelier",
-     "text": "Fût vitré surmonté d’un engrenage lumineux qui tourne."
-    }
-   ]
-  },
-  {
-   "id": "legal",
-   "name": "Juridique",
-   "code": "THÉMIS",
-   "color": "#CBD5E1",
-   "agent": "juridique",
-   "quarter": "administration",
-   "division": "administration",
-   "left": "50.00%",
-   "top": "82.98%",
-   "role": "Services partagés · Conformité",
-   "desc": "CGV, mentions, RGPD, factures : relit les actions avant ta décision.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Palais de justice",
-     "text": "Colonnade, fronton et coupole de verre : le droit au cœur de la cité."
-    },
-    {
-     "L": "B",
-     "name": "Tour de la balance",
-     "text": "Tour élancée surmontée d’une balance lumineuse."
-    },
-    {
-     "L": "C",
-     "name": "Archives scellées",
-     "text": "Salle des registres sous un sceau officiel flottant."
-    }
-   ]
-  },
-  {
-   "id": "finance",
-   "name": "Trésorerie",
-   "code": "MIDAS",
-   "color": "#F472B6",
-   "agent": "finance",
-   "quarter": "administration",
-   "division": "administration",
-   "left": "37.15%",
-   "top": "72.62%",
-   "role": "Services partagés · Finances",
-   "desc": "Revenus, coûts d’API et rentabilité de chaque activité.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Coffre-fort",
-     "text": "Bloc noir, porte de coffre circulaire et lames dorées."
-    },
-    {
-     "L": "B",
-     "name": "Temple financier",
-     "text": "Colonnade dorée et fronton : la solidité des comptes."
-    },
-    {
-     "L": "C",
-     "name": "Tour des pièces",
-     "text": "Pile de pièces géante et pièce d’or flottante."
-    }
-   ]
-  },
-  {
-   "id": "security",
-   "name": "Cybersécurité",
-   "code": "SENTINEL",
-   "color": "#F87171",
-   "agent": "securite",
-   "quarter": "administration",
-   "division": "administration",
-   "left": "62.85%",
-   "top": "72.62%",
-   "role": "Services partagés · Protection",
-   "desc": "Configuration, anomalies et emails piégés : veille défensive quotidienne.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Bouclier",
-     "text": "Coupole de verre sous un bouclier hexagonal lumineux."
-    },
-    {
-     "L": "B",
-     "name": "Pare-feu",
-     "text": "Muraille de panneaux en flammes devant une tour de contrôle."
-    },
-    {
-     "L": "C",
-     "name": "Centre de veille",
-     "text": "Salle d’écrans et radar qui balaie l’horizon 24 h/24."
-    }
-   ]
-  },
-  {
    "id": "data",
    "name": "Data Core",
-   "code": "MNÉMOS",
    "color": "#22D3EE",
    "agent": "data",
    "quarter": "direction",
@@ -439,6 +168,267 @@
      "L": "F",
      "name": "L’Agora en spirale",
      "text": "Rampe hélicoïdale lumineuse qui s’enroule autour d’une colonne de lumière."
+    }
+   ]
+  },
+  {
+   "id": "hq",
+   "name": "Command HQ",
+   "color": "#818CF8",
+   "agent": "pdg",
+   "quarter": "direction",
+   "division": "direction",
+   "left": "50.00%",
+   "top": "35.65%",
+   "role": "Direction · Orchestration",
+   "desc": "Le PDG IA répartit les missions, arbitre les budgets et fait remonter les décisions sensibles.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Spire de commandement",
+     "text": "Tour à pans coupés, bandeaux vitrés lumineux et couronne qui brille."
+    },
+    {
+     "L": "B",
+     "name": "Citadelle",
+     "text": "Deux tours noires à enseignes néon reliées par une passerelle de verre."
+    },
+    {
+     "L": "C",
+     "name": "Anneau orbital",
+     "text": "Tour cylindrique vitrée entourée d’anneaux de données en orbite."
+    }
+   ]
+  },
+  {
+   "id": "marketing",
+   "name": "Hub Marketing",
+   "color": "#60A5FA",
+   "agent": "marketing",
+   "quarter": "commercial",
+   "division": "commercial",
+   "left": "40.00%",
+   "top": "43.71%",
+   "role": "Pôle commercial · Acquisition",
+   "desc": "Positionnement, contenus et pages de vente, dans plusieurs langues.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Tour média",
+     "text": "Tour noire couverte d’écrans géants et d’enseignes néon."
+    },
+    {
+     "L": "B",
+     "name": "Studio de diffusion",
+     "text": "Pylône émetteur qui propage les ondes de la marque."
+    },
+    {
+     "L": "C",
+     "name": "Place des panneaux",
+     "text": "Panneaux publicitaires flottants au-dessus d’un studio."
+    }
+   ]
+  },
+  {
+   "id": "sales",
+   "name": "Centre Ventes",
+   "color": "#A78BFA",
+   "agent": "ventes",
+   "quarter": "commercial",
+   "division": "commercial",
+   "left": "30.00%",
+   "top": "51.77%",
+   "role": "Pôle commercial · Revenus",
+   "desc": "Prospection, offres, liens de paiement et conversion.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Tour de verre",
+     "text": "Gradins vitrés, corniches dorées et flèche de croissance."
+    },
+    {
+     "L": "B",
+     "name": "Ziggurat des deals",
+     "text": "Pyramide à étages : chaque niveau est une étape du pipeline."
+    },
+    {
+     "L": "C",
+     "name": "Tours jumelles",
+     "text": "Deux tours de bureaux illuminées reliées par un pont de verre."
+    }
+   ]
+  },
+  {
+   "id": "support",
+   "name": "Zone Support",
+   "color": "#FBBF24",
+   "agent": "support",
+   "quarter": "commercial",
+   "division": "commercial",
+   "left": "40.00%",
+   "top": "59.84%",
+   "role": "Pôle commercial · Clients",
+   "desc": "Réponses aux clients, livraisons et suivi des commandes.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Centre d’écoute",
+     "text": "Rotonde à bandeaux lumineux surmontée d’une parabole."
+    },
+    {
+     "L": "B",
+     "name": "Phare",
+     "text": "Le phare qui guide les clients, 24 h/24."
+    },
+    {
+     "L": "C",
+     "name": "Hub en anneau",
+     "text": "Bâtiment circulaire autour d’une tour relais qui émet."
+    }
+   ]
+  },
+  {
+   "id": "research",
+   "name": "Labo Recherche",
+   "color": "#34D399",
+   "agent": "recherche",
+   "quarter": "production",
+   "division": "production",
+   "left": "60.00%",
+   "top": "43.71%",
+   "role": "Pôle production · R&D et veille",
+   "desc": "Marchés, niches, concurrence et nouvelles offres pour toutes les activités.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Observatoire",
+     "text": "Rotonde nervurée, coupole et télescope pointé vers les marchés."
+    },
+    {
+     "L": "B",
+     "name": "Serre de verre",
+     "text": "Laboratoire transparent : on voit les idées pousser à l’intérieur."
+    },
+    {
+     "L": "C",
+     "name": "Labo à antenne",
+     "text": "Labo vitré aux écrans allumés et tour équipée d’une parabole."
+    }
+   ]
+  },
+  {
+   "id": "atelier",
+   "name": "Atelier",
+   "color": "#FB923C",
+   "agent": "atelier",
+   "quarter": "production",
+   "division": "production",
+   "left": "70.00%",
+   "top": "51.77%",
+   "role": "Pôle production · Production",
+   "desc": "Fabrique les livrables vendus aux clients, selon la fiche d’offre.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Manufacture",
+     "text": "Halle de production et cheminées qui fument : on fabrique les livrables."
+    },
+    {
+     "L": "B",
+     "name": "Atelier à sheds",
+     "text": "Toits vitrés en dents de scie et pont roulant au-dessus des postes."
+    },
+    {
+     "L": "C",
+     "name": "Tour-atelier",
+     "text": "Fût vitré surmonté d’un engrenage lumineux qui tourne."
+    }
+   ]
+  },
+  {
+   "id": "finance",
+   "name": "Trésorerie",
+   "color": "#F472B6",
+   "agent": "finance",
+   "quarter": "administration",
+   "division": "administration",
+   "left": "60.00%",
+   "top": "59.84%",
+   "role": "Services partagés · Finances",
+   "desc": "Revenus, coûts d’API et rentabilité de chaque activité.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Coffre-fort",
+     "text": "Bloc noir, porte de coffre circulaire et lames dorées."
+    },
+    {
+     "L": "B",
+     "name": "Temple financier",
+     "text": "Colonnade dorée et fronton : la solidité des comptes."
+    },
+    {
+     "L": "C",
+     "name": "Tour des pièces",
+     "text": "Pile de pièces géante et pièce d’or flottante."
+    }
+   ]
+  },
+  {
+   "id": "security",
+   "name": "Cybersécurité",
+   "color": "#F87171",
+   "agent": "securite",
+   "quarter": "administration",
+   "division": "administration",
+   "left": "70.20%",
+   "top": "68.06%",
+   "role": "Services partagés · Protection",
+   "desc": "Configuration, anomalies et emails piégés : veille défensive quotidienne.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Bouclier",
+     "text": "Coupole de verre sous un bouclier hexagonal lumineux."
+    },
+    {
+     "L": "B",
+     "name": "Pare-feu",
+     "text": "Muraille de panneaux en flammes devant une tour de contrôle."
+    },
+    {
+     "L": "C",
+     "name": "Centre de veille",
+     "text": "Salle d’écrans et radar qui balaie l’horizon 24 h/24."
+    }
+   ]
+  },
+  {
+   "id": "legal",
+   "name": "Juridique",
+   "color": "#CBD5E1",
+   "agent": "juridique",
+   "quarter": "administration",
+   "division": "administration",
+   "left": "60.20%",
+   "top": "76.13%",
+   "role": "Services partagés · Conformité",
+   "desc": "CGV, mentions, RGPD, factures : relit les actions avant ta décision.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Palais de justice",
+     "text": "Colonnade, fronton et coupole de verre : le droit au cœur de la cité."
+    },
+    {
+     "L": "B",
+     "name": "Tour de la balance",
+     "text": "Tour élancée surmontée d’une balance lumineuse."
+    },
+    {
+     "L": "C",
+     "name": "Archives scellées",
+     "text": "Salle des registres sous un sceau officiel flottant."
     }
    ]
   }
