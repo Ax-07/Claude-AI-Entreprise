@@ -202,6 +202,43 @@ class AtelierTest(Base):
         self.assertEqual(self.db.one("SELECT producer FROM offers")[0], "atelier")
 
 
+
+class DeveloppementTest(Base):
+    def ctx(self, agent="developpement"):
+        from ai_studio.agents import ROLES
+        return ToolContext(self.cfg, self.db, agent, self.db.task(self.db.add_task("t", agent)), list(ROLES))
+
+    def test_role_and_routing(self):
+        from ai_studio.agents import DIVISION_OF, ROLES
+        r = ROLES["developpement"]
+        self.assertEqual((r.model, r.max_steps, r.task_budget_usd), ("strong", 24, 0.60))
+        self.assertIn("package_files", r.all_tools())
+        self.assertEqual(DIVISION_OF["developpement"], "Division production")
+        self.assertIn("developpement", ROLES["pdg"].mission)
+        run_tool("save_offer", self.ctx("pdg"), {"name": "Site vitrine", "price_eur": 490, "summary": "s", "deliverable": "d",
+                                                  "delay_hours": 72, "producer": "developpement"})
+        self.assertEqual(self.db.one("SELECT producer FROM offers")[0], "developpement")
+
+    def test_package_files(self):
+        import zipfile
+        site = self.cfg.workspace / "livraisons" / "commande-1" / "site"
+        (site / "css").mkdir(parents=True)
+        (site / "index.html").write_text("<html><script>console.log(1)</script></html>" * 20, encoding="utf-8")
+        (site / "css" / "style.css").write_text("body{margin:0}", encoding="utf-8")
+        ctx = self.ctx()
+        self.assertIn("introuvable", run_tool("package_files", ctx, {"folder": "livraisons/rien", "name": "x"}))
+        (site / "app.js").write_text("alert(1)", encoding="utf-8")
+        self.assertIn("Gmail bloque", run_tool("package_files", ctx, {"folder": "livraisons/commande-1/site", "name": "x"}))
+        (site / "app.js").unlink(); (site / ".env").write_text("KEY=1", encoding="utf-8")
+        self.assertIn("sensibles", run_tool("package_files", ctx, {"folder": "livraisons/commande-1/site", "name": "x"}))
+        (site / ".env").unlink()
+        out = run_tool("package_files", ctx, {"folder": "livraisons/commande-1/site", "name": "Site Boulangerie !"})
+        self.assertIn("livraisons/commande-1/site-boulangerie.zip", out)
+        with zipfile.ZipFile(site.parent / "site-boulangerie.zip") as z:
+            self.assertEqual(sorted(z.namelist()), ["site-boulangerie/css/style.css", "site-boulangerie/index.html"])
+        out = run_tool("package_files", ctx, {"folder": "../..", "name": "x"})      # hors de l'espace de travail
+        self.assertNotIn("Archive prête", out)
+
 class LegalTest(Base):
     def test_review_queued_for_pages_and_links_not_replies(self):
         from ai_studio import legal

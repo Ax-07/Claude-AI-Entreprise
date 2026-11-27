@@ -637,16 +637,57 @@ def se_c(s):
           '<path class="pulse" d="M%.1f %.1f L%.1f %.1f A34 14 0 0 1 %.1f %.1f Z" fill="%s" fill-opacity=".35"/></g>' % (s.uid, x, y, s.c, x, y, x + 34, y, x + 24, y + 10, s.c))
     s.beam(-38, 30, 0, 56)
 
+def _code_holo(s, x, y, size=1.0):
+    """Symbole « </> » lumineux flottant."""
+    k = size
+    return ('<g class="pulse" style="animation-duration: 3s" filter="url(#nf%s)"><rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="4" '
+            'fill="%s" fill-opacity=".22" stroke="%s" stroke-width="2"/><path d="M%.1f %.1f l-9 9 l9 9 M%.1f %.1f l9 9 l-9 9 M%.1f %.1f l-6 22" '
+            'fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" transform="translate(%.1f %.1f) scale(%.2f) translate(%.1f %.1f)"/></g>') % (
+        s.uid, x - 30*k, y - 18*k, 60*k, 36*k, s.c, mixw(s.c, .3), -8, -9, 8, -9, 3, -11, x, y, k, 0, 0)
+def de_a(s):
+    """Tour du code : tour sombre couverte d'écrans de code et symbole </> flottant."""
+    s.slab()
+    f = cham(-24, 24, -24, 24, 5); s.prism(f, 0, 128, "dark"); s.cornice(f, 128)
+    s.screen("l", -18, 24, 118, 36, 50, s.c); s.screen("r", 24, 18, 96, 36, 40, mixw(s.c, .25))
+    s.screen("l", -18, 24, 56, 36, 30, mix(s.c, .8))
+    x, y = s.p(0, 0, 160); s.raw(_code_holo(s, x, y))
+    s.line(s.p(0, 0, 131), (x, y + 18), 1.5, s.hi, .6)
+    s.beam(-24, 24, 0, 70)
+def de_b(s):
+    """Campus tech : open-space vitré, terrasse et baies de serveurs sur le toit."""
+    s.slab()
+    def inside():
+        for (u, v) in [(-22, -10), (-2, 8), (18, -6)]:
+            x, y = s.p(u, v, 6); s.raw('<rect x="%.1f" y="%.1f" width="12" height="8" rx="1.5" fill="%s" filter="url(#nf%s)"/>' % (x-6, y-8, s.c, s.uid))
+    f = rect(-42, 42, -34, 34); s.prism(f, 0, 30, "glass", inside=inside); s.cornice(f, 30, 2)
+    f2 = rect(-42, 0, -34, 0); s.prism(f2, 32.5, 62, "office"); s.cornice(f2, 62)
+    for k, u in enumerate((8, 18, 28)):
+        r = rect(u - 4, u + 4, -26, -6); s.prism(r, 32.5, 46, "dark"); s.crown(r, 46)
+        x, y = s.p(u + 4, -16, 40); s.raw('<circle class="pulse" cx="%.1f" cy="%.1f" r="1.6" fill="%s" style="animation-delay: %.1fs"/>' % (x, y, s.c, k*.4))
+    x, y = s.p(-21, -17, 96); s.raw(_code_holo(s, x, y, .8))
+    s.beam(-42, 34, 0, 56); s.beam(42, -34, 0, 56)
+def de_c(s):
+    """Pile logicielle : couches empilées et décalées, comme une architecture en couches, sous une antenne de déploiement."""
+    s.slab()
+    for k, (d, h0, h1) in enumerate([(36, 0, 22), (30, 24.5, 46), (24, 48.5, 70), (18, 72.5, 94)]):
+        o = (k % 2) * 4 - 2
+        f = cham(-d + o, d + o, -d - o, d - o, 4)
+        s.prism(f, h0, h1, ("glass", "bands", "glass", "bands")[k]); s.cornice(f, h1, 2)
+    s.antenna(2, -2, 96.5, 124)
+    x, y = s.p(0, 0, 150); s.raw(_code_holo(s, x, y, .7))
+    s.beam(-36, 36, 0, 56); s.beam(36, -36, 0, 56)
+
 POLES = [
  ("hq", "Command HQ", "Orchestration", "#818CF8", [("A", "Spire de commandement", "Tour à pans coupés, bandeaux vitrés lumineux et couronne qui brille.", hq_a), ("B", "Citadelle", "Deux tours noires à enseignes néon reliées par une passerelle de verre.", hq_b), ("C", "Anneau orbital", "Tour cylindrique vitrée entourée d’anneaux de données en orbite.", hq_c)]),
  ("research", "Labo Recherche", "Veille et opportunités", "#34D399", [("A", "Observatoire", "Rotonde nervurée, coupole et télescope pointé vers les marchés.", re_a), ("B", "Serre de verre", "Laboratoire transparent : on voit les idées pousser à l’intérieur.", re_b), ("C", "Labo à antenne", "Labo vitré aux écrans allumés et tour équipée d’une parabole.", re_c)]),
  ("marketing", "Hub Marketing", "Acquisition", "#60A5FA", [("A", "Tour média", "Tour noire couverte d’écrans géants et d’enseignes néon.", ma_a), ("B", "Studio de diffusion", "Pylône émetteur qui propage les ondes de la marque.", ma_b), ("C", "Place des panneaux", "Panneaux publicitaires flottants au-dessus d’un studio.", ma_c)]),
  ("sales", "Centre Ventes", "Revenus", "#A78BFA", [("A", "Tour de verre", "Gradins vitrés, corniches dorées et flèche de croissance.", ve_a), ("B", "Ziggurat des deals", "Pyramide à étages : chaque niveau est une étape du pipeline.", ve_b), ("C", "Tours jumelles", "Deux tours de bureaux illuminées reliées par un pont de verre.", ve_c)]),
- ("support", "Zone Support", "Clients", "#FBBF24", [("A", "Centre d’écoute", "Rotonde à bandeaux lumineux surmontée d’une parabole.", su_a), ("B", "Phare", "Le phare qui guide les clients, 24 h/24.", su_b), ("C", "Hub en anneau", "Bâtiment circulaire autour d’une tour relais qui émet.", su_c)]),
+ ("support", "Service Client", "Clients", "#FBBF24", [("A", "Centre d’écoute", "Rotonde à bandeaux lumineux surmontée d’une parabole.", su_a), ("B", "Phare", "Le phare qui guide les clients, 24 h/24.", su_b), ("C", "Hub en anneau", "Bâtiment circulaire autour d’une tour relais qui émet.", su_c)]),
  ("data", "Data Core", "Mémoire et données", "#F1F5F9", [("A", "Réacteur de données", "Cœur lumineux sous verre, entouré d’anneaux d’énergie.", da_a), ("B", "Ferme de serveurs", "Rangées de baies noires et leurs voyants qui clignotent.", da_b), ("C", "Cristal de mémoire", "Cristal flottant au-dessus de son socle : la mémoire partagée.", da_c), ("D", "L’Archive circulaire", "Cylindres de verre empilés, cerclés d’anneaux lumineux, disque et anneau flottant.", da_d), ("E", "Le Prisme neural", "Grand prisme de verre traversé d’un réseau de neurones, livre holographique au sommet.", da_e), ("F", "L’Agora en spirale", "Rampe hélicoïdale lumineuse qui s’enroule autour d’une colonne de lumière.", da_f)]),
  ("atelier", "Atelier", "Production", "#FB923C", [("A", "Manufacture", "Halle de production et cheminées qui fument : on fabrique les livrables.", at_a), ("B", "Atelier à sheds", "Toits vitrés en dents de scie et pont roulant au-dessus des postes.", at_b), ("C", "Tour-atelier", "Fût vitré surmonté d’un engrenage lumineux qui tourne.", at_c)]),
  ("legal", "Juridique", "Conformité", "#CBD5E1", [("A", "Palais de justice", "Colonnade, fronton et coupole de verre : le droit au cœur de la cité.", ju_a), ("B", "Tour de la balance", "Tour élancée surmontée d’une balance lumineuse.", ju_b), ("C", "Archives scellées", "Salle des registres sous un sceau officiel flottant.", ju_c)]),
  ("security", "Cybersécurité", "Protection", "#F87171", [("A", "Bouclier", "Coupole de verre sous un bouclier hexagonal lumineux.", se_a), ("B", "Pare-feu", "Muraille de panneaux en flammes devant une tour de contrôle.", se_b), ("C", "Centre de veille", "Salle d’écrans et radar qui balaie l’horizon 24 h/24.", se_c)]),
+ ("dev", "Développement", "Sites et applications", "#22D3EE", [("A", "Tour du code", "Tour sombre couverte d’écrans de code, symbole </> flottant au sommet.", de_a), ("B", "Campus tech", "Open-space vitré et baies de serveurs qui clignotent sur le toit.", de_b), ("C", "Pile logicielle", "Couches empilées comme une architecture logicielle, sous une antenne de déploiement.", de_c)]),
  ("finance", "Trésorerie", "Finances", "#F472B6", [("A", "Coffre-fort", "Bloc noir, porte de coffre circulaire et lames dorées.", fi_a), ("B", "Temple financier", "Colonnade dorée et fronton : la solidité des comptes.", fi_b), ("C", "Tour des pièces", "Pile de pièces géante et pièce d’or flottante.", fi_c)]),
 ]
 
@@ -732,6 +773,10 @@ def _holo(s, u, v, kind, col, size=1.0):
     elif kind == "shield":
         g += '<path d="M%.1f %.1f l%.1f %.1f v%.1f q0 %.1f %.1f %.1f q%.1f %.1f %.1f %.1f v%.1f z" fill="%s" fill-opacity=".3" stroke="%s" stroke-width="2"/>' % (
             x, cy - R, R, R*.35, R*.8, R*.9, -R, R*.9, -R, -R*.9, -R, -R*.9, -R*.8, col, hc)
+    elif kind == "code":
+        g += '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="3" fill="%s" fill-opacity=".18" stroke="%s"/>' % (x - R*1.4, cy - R, R*2.8, R*2, col, hc)
+        g += '<path d="M%.1f %.1f l-%.1f %.1f l%.1f %.1f M%.1f %.1f l%.1f %.1f l-%.1f %.1f M%.1f %.1f l-%.1f %.1f" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/>' % (
+            x - R*.45, cy - R*.5, R*.5, R*.5, R*.5, R*.5, x + R*.45, cy - R*.5, R*.5, R*.5, R*.5, R*.5, x + R*.15, cy - R*.6, R*.3, R*1.2)
     elif kind == "coin":
         g += '<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="#FBBF24" stroke="#FFF1B8" stroke-width="1.5"/><ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="none" stroke="#B45309" stroke-width="1.2"/>' % (x, cy, R*.9, R*1.1, x, cy, R*.55, R*.7)
     g += '</g>'

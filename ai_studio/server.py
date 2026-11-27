@@ -27,7 +27,7 @@ from .db import DB, now
 WEB_DIR = Path(__file__).resolve().parent / "web"
 POLE_COLORS = {"pdg": "#818CF8", "recherche": "#34D399", "marketing": "#60A5FA", "ventes": "#A78BFA",
                "support": "#FBBF24", "data": "#F1F5F9", "finance": "#F472B6",
-               "atelier": "#FB923C", "juridique": "#CBD5E1",
+               "atelier": "#FB923C", "developpement": "#22D3EE", "juridique": "#CBD5E1",
                "securite": "#F87171"}
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 
@@ -273,7 +273,7 @@ def insights(cfg, db, days: int = 7) -> dict:
     return {"days": labels, "done": done, "cost": cost, "success_rate": rate, "pipeline": pipeline, "schedule": schedule[:5]}
 
 
-MAP_POLES = {"hq", "data", "marketing", "sales", "support", "research", "atelier", "legal", "finance", "security"}  # un bâtiment par agent
+MAP_POLES = {"hq", "data", "marketing", "sales", "support", "research", "atelier", "dev", "legal", "finance", "security"}  # un bâtiment par agent
 
 
 def map_settings(cfg, db) -> dict:

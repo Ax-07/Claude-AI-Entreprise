@@ -86,7 +86,7 @@ def propose_page(ctx: ToolContext, file: str, page_path: str, title: str, reason
        "deliverable": {"type": "string", "description": "ce que reçoit concrètement le client (format, contenu)"},
        "delay_hours": {"type": "integer", "description": "délai de livraison promis après paiement, en heures"},
        "required_info": {"type": "string", "description": "informations à obtenir du client pour livrer (vide si aucune)"},
-       "producer": {"type": "string", "description": "agent qui produit le livrable : atelier (par défaut, production client)"},
+       "producer": {"type": "string", "description": "agent qui produit le livrable : atelier (par défaut : rapports, audits, contenus) ou developpement (sites web, applications)"},
        "activity": {"type": "string", "description": "activité de l'offre (services, video, ecommerce) ; par défaut celle de ta tâche"}},
       ["name", "price_eur", "summary", "deliverable", "delay_hours"])
 def save_offer(ctx: ToolContext, name: str, price_eur: float, summary: str, deliverable: str, delay_hours: int,
@@ -253,3 +253,48 @@ def security_alert(ctx: ToolContext, level: str, message: str) -> str:
     ctx.db.log(ctx.agent, "alerte", f"[{level}] {message[:500]}")
     notify.send(ctx.cfg, ctx.db, "Sécurité : " + ("alerte critique" if level == "critique" else "point d'attention"), message[:300])
     return "Alerte envoyée au propriétaire."
+
+
+# Extensions refusées par Gmail en pièce jointe, même à l'intérieur d'une archive : un .zip qui en contient ne partirait pas.
+BLOCKED_EXT = {".ade", ".adp", ".apk", ".appx", ".bat", ".cab", ".chm", ".cmd", ".com", ".cpl", ".dll", ".dmg", ".exe",
+               ".hta", ".img", ".ins", ".iso", ".isp", ".jar", ".jnlp", ".js", ".jse", ".lib", ".lnk", ".mde", ".msc",
+               ".msi", ".msix", ".msp", ".mst", ".nsh", ".pif", ".ps1", ".scr", ".sct", ".shb", ".sys", ".vb", ".vbe",
+               ".vbs", ".vhd", ".vxd", ".wsc", ".wsf", ".wsh", ".xll", ".mjs", ".cjs"}
+SECRET_NAMES = {".env", "id_rsa", "id_ed25519", "credentials.json"}
+
+
+@tool("package_files",
+      "Rassemble un dossier de livrables (ex. un site) dans une archive .zip prête à être livrée par deliver_order. "
+      "Refuse les secrets et les types de fichiers bloqués par Gmail (.js, .exe…) : mets le JavaScript dans les pages HTML.",
+      {"folder": {"type": "string", "description": "dossier à archiver (ex. livraisons/commande-3/site)"},
+       "name": {"type": "string", "description": "nom de l'archive sans extension (ex. site-boulangerie)"}},
+      ["folder", "name"])
+def package_files(ctx: ToolContext, folder: str, name: str) -> str:
+    import re
+    import zipfile
+    src = _safe_path(ctx, folder)
+    if not src.is_dir():
+        return f"Dossier introuvable : {folder}"
+    files = [f for f in sorted(src.rglob("*")) if f.is_file()]
+    if not files:
+        return "Dossier vide : rien à archiver."
+    if len(files) > 300:
+        return "Trop de fichiers (300 au maximum)."
+    bad = [str(f.relative_to(src)) for f in files if f.suffix.lower() in BLOCKED_EXT]
+    if bad:
+        return ("Refusé : Gmail bloque ces fichiers, même dans une archive : " + ", ".join(bad[:8]) +
+                ". Intègre le JavaScript dans les pages HTML (balise script) puis supprime ces fichiers.")
+    secrets = [str(f.relative_to(src)) for f in files if f.name.lower() in SECRET_NAMES or f.suffix.lower() in {".pem", ".key"}]
+    if secrets:
+        return "Refusé : fichiers sensibles dans le dossier : " + ", ".join(secrets[:8])
+    total = sum(f.stat().st_size for f in files)
+    if total > 15_000_000:
+        return "Refusé : plus de 15 Mo, trop lourd pour un email."
+    slug = re.sub(r"[^a-z0-9-]+", "-", name.lower()).strip("-")[:60] or "livrable"
+    dest = src.parent / f"{slug}.zip"
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in files:
+            z.write(f, f"{slug}/{f.relative_to(src)}")
+    rel = dest.relative_to(ctx.cfg.workspace.resolve()).as_posix()
+    ctx.db.log(ctx.agent, "file", f"Archive créée : {rel} ({len(files)} fichiers)", ctx.task["id"] if ctx.task is not None else None)
+    return f"Archive prête : {rel} ({len(files)} fichiers, {dest.stat().st_size // 1024} Ko). Livre-la avec deliver_order."

@@ -68,7 +68,7 @@ DIVS = {  # division : nom, couleur (bordure lumineuse des îlots)
 ZONES = {"direction": (0, 0), "production": (3, 0), "commercial": (0, 3), "administration": (3, 3)}   # coin haut-gauche de chaque zone
 LOTS = {"data": (2, 2, "direction"), "hq": (1, 1, "direction"),
         "marketing": (0, 4, "commercial"), "sales": (1, 3, "commercial"), "support": (1, 4, "commercial"),
-        "research": (3, 0, "production"), "atelier": (3, 1, "production"),
+        "research": (3, 0, "production"), "atelier": (3, 1, "production"), "dev": (4, 1, "production"),
         "legal": (3, 4, "administration"), "finance": (4, 4, "administration"),
         "security": (1, 0, "direction")}   # Cybersécurité avec la Direction et le Data Core : pôle Tech
 PLOTS = [dict(id="video", name="Studio vidéo", col="#F43F5E", ij=(4, 0)),
@@ -85,14 +85,15 @@ INFO = {  # nom, couleur, agent, rôle affiché, description, échelle du bâtim
  "support": ("Service Client", "#FBBF24", "support", "Clients", "Réponses aux clients, livraisons et suivi des commandes.", .56),
  "research": ("Labo Recherche", "#34D399", "recherche", "R&D et veille", "Marchés, niches, concurrence et nouvelles offres pour toutes les activités.", .56),
  "atelier": ("Atelier", "#FB923C", "atelier", "Production", "Fabrique les livrables vendus aux clients, selon la fiche d’offre.", .56),
+ "dev": ("Développement", "#22D3EE", "developpement", "Sites et applications", "Conçoit et livre les sites web, applications et outils sur mesure vendus aux clients.", .56),
  "legal": ("Juridique", "#CBD5E1", "juridique", "Conformité", "CGV, mentions, RGPD, factures : relit les actions avant ta décision.", .56),
  "finance": ("Trésorerie", "#F472B6", "finance", "Finances", "Revenus, coûts d’API et rentabilité de chaque activité.", .56),
  "security": ("Cybersécurité", "#F87171", "securite", "Protection", "Configuration, anomalies et emails piégés : veille défensive quotidienne.", .56),
 }
 KIND = {"hq": "globe", "data": "city", "marketing": "target", "sales": "bars", "support": "headset", "research": "chart",
-        "atelier": "gear", "legal": "scale", "finance": "coin", "security": "shield"}
+        "atelier": "gear", "dev": "code", "legal": "scale", "finance": "coin", "security": "shield"}
 VARS = {p[0]: p[4] for p in POLES}
-DEFAULT = {"hq": "A", "data": "A", "marketing": "A", "sales": "A", "support": "B", "research": "A", "atelier": "A",
+DEFAULT = {"hq": "A", "data": "A", "marketing": "A", "sales": "A", "support": "B", "research": "A", "atelier": "A", "dev": "A",
            "legal": "A", "finance": "A", "security": "A"}
 FOOT = 25
 
