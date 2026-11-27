@@ -136,6 +136,10 @@ _Mis à jour le 27/11/2026_
 - CLI `importer-offres [fichier]` (création ou mise à jour, lien de paiement conservé) ; `commande-test "offre" -e email -i "infos client"` : vente fictive `essai_…` (mode test, sans paiement) qui suit exactement le parcours d'une vente Stripe (`commerce.open_order`, partagé avec la synchronisation Stripe) ; les infos du client deviennent une consigne du propriétaire. 119 tests.
 - À faire chez le propriétaire : importer le catalogue, lancer une commande d'essai pour chaque offre, juger les livrables.
 
+## Parler au PDG (27/11/2026)
+- Demande du propriétaire : donner une mission au PDG depuis l'interface. Bouton « Parler au PDG » dans l'en-tête (et dans la fiche du Command HQ) : panneau de discussion à droite, réponse immédiate du PDG (modèle fort, coût affiché sous chaque réponse).
+- `ai_studio/chat.py` : table `chat`, 16 derniers messages en contexte, 6 étapes max, consignes de discussion (court, tutoiement, consulter les outils plutôt qu'inventer, une seule question si ambigu, ne pas faire le travail lui-même). Outils : nouveau `create_objective`, `delegate_task`, `company_stats`, `budget_status`, `list_tasks`, `get_task_result`, `list_orders`, `list_offers`, `list_sales`, `recall` — aucune action externe directe. Budget et erreurs du modèle renvoyés comme réponse lisible. API GET/POST /api/chat. 121 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

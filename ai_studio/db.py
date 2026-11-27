@@ -111,6 +111,13 @@ CREATE TABLE IF NOT EXISTS inbox (
     recorded_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_inbox_msgid ON inbox(message_id);
+CREATE TABLE IF NOT EXISTS chat (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    role TEXT NOT NULL,                              -- owner | pdg
+    text TEXT NOT NULL,
+    cost_usd REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS activities (
     id TEXT PRIMARY KEY,                             -- identifiant court : services, video, ecommerce…
     name TEXT NOT NULL,

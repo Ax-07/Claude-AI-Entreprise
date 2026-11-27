@@ -16,6 +16,12 @@ button:focus-visible,a:focus-visible{outline:2px solid #A5B4FC;outline-offset:2p
 .gro{font-family:"Space Grotesk",sans-serif}
 .pn{background:linear-gradient(180deg,rgba(22,30,66,.78),rgba(12,17,40,.82));border:1px solid rgba(130,150,255,.18);border-radius:18px;box-shadow:0 0 0 1px rgba(255,255,255,.02) inset,0 20px 50px rgba(0,0,0,.35);backdrop-filter:blur(10px)}
 #map .bld,#map .office{transition:filter .2s}#map .hov{filter:drop-shadow(0 0 4px var(--aura)) drop-shadow(0 0 14px var(--aura)) brightness(1.15)}
+#chat{position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);z-index:9;display:none;flex-direction:column;background:#0B1029F2;border-left:1px solid rgba(129,140,248,.35);box-shadow:-20px 0 50px rgba(0,0,0,.5);backdrop-filter:blur(8px)}#chat.on{display:flex}
+#chatlog{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:86%;padding:10px 13px;border-radius:14px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.msg.me{align-self:flex-end;background:linear-gradient(135deg,#6366F1,#7C3AED);color:#fff;border-bottom-right-radius:4px}
+.msg.pdg{align-self:flex-start;background:rgba(129,140,248,.12);border:1px solid rgba(129,140,248,.3);color:#EEF1FF;border-bottom-left-radius:4px}
+.msg .meta{display:block;margin-top:4px;font-size:11px;opacity:.6}
 .flow{animation:flow 1.6s linear infinite}@keyframes flow{to{stroke-dashoffset:-32}}
 .pulse,.live{animation:pulse 2.2s ease-in-out infinite}.live{animation-duration:1.4s}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 .page{min-height:100vh;background:radial-gradient(1200px 600px at 55% 25%,#1a1650 0%,rgba(7,11,26,0) 70%),radial-gradient(800px 500px at 95% 0%,#0d2a4a 0%,rgba(7,11,26,0) 70%),#070B1A;padding:18px}
@@ -51,7 +57,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #A5B4FC;outline-offset:2p
 .btn.no{background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.5);color:#FECACA}
 .btn.pri{background:linear-gradient(135deg,#6366F1,#4F46E5);border-color:#818CF8}
 .link{background:none;border:0;cursor:pointer;color:#A5B4FC;font-size:12px;padding:0}
-input[type=text],select{background:rgba(5,8,22,.7);border:1px solid rgba(130,150,255,.2);border-radius:10px;padding:8px 10px;color:#EEF1FF;font:inherit}
+input[type=text],select,textarea{background:rgba(5,8,22,.7);border:1px solid rgba(130,150,255,.2);border-radius:10px;padding:8px 10px;color:#EEF1FF;font:inherit}
 .pre{white-space:pre-wrap;word-break:break-word;margin:0;font:13px/1.5 ui-monospace,Consolas,monospace;background:rgba(5,8,22,.6);border:1px solid rgba(130,150,255,.16);border-radius:10px;padding:10px;max-height:320px;overflow:auto}
 .appr{padding:14px;border-radius:14px;border:1px solid rgba(251,191,36,.45);background:rgba(251,191,36,.06);display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
 .muted{color:#9AA4C7}.small{font-size:12px}
@@ -99,6 +105,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:rgba(255,255,255,.03)}
   <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:stretch">
     <div style="flex:999 1 700px;display:flex;flex-wrap:wrap;gap:14px" id="kpis"></div>
     <div style="flex:0 0 auto;display:flex;align-items:center;gap:12px">
+      <button class="btn" id="btnchat" style="display:flex;align-items:center;gap:8px;height:46px;padding:0 16px;border-radius:14px"><span data-ico="BOT" data-col="#A5B4FC" data-size="18"></span>Parler au PDG</button>
       <button aria-label="Validations en attente" id="bell" style="position:relative;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;cursor:pointer;background:rgba(255,255,255,.04);border:1px solid rgba(130,150,255,.2)"><span data-ico="BELL" data-col="#C7CEF0" data-size="20"></span><span id="belldot" style="display:none;position:absolute;top:8px;right:9px;width:9px;height:9px;border-radius:50%;background:#F43F5E;box-shadow:0 0 8px #F43F5E"></span></button>
       <span aria-label="Profil du propriétaire" class="gro" style="width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:linear-gradient(135deg,#A78BFA,#6366F1);box-shadow:0 0 16px rgba(167,139,250,.5)">P</span>
     </div>
@@ -142,6 +149,19 @@ tr.click{cursor:pointer}tr.click:hover td{background:rgba(255,255,255,.03)}
 </div></div>
 
 <div class="modal" id="modal" role="dialog" aria-modal="true"><div class="pn"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px"><h3 class="gro" id="mtitle" style="margin:0"></h3><button class="btn" id="mclose">Fermer</button></div><div id="mbody"></div></div></div>
+<aside id="chat" role="dialog" aria-label="Discussion avec le PDG">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid rgba(130,150,255,.16)">
+    <span style="width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(129,140,248,.18)"><span data-ico="BOT" data-col="#A5B4FC" data-size="18"></span></span>
+    <span style="flex:1;display:flex;flex-direction:column"><span class="gro" style="font-weight:700">PDG · Command HQ</span><span class="small muted">Donne-lui une mission ou pose une question</span></span>
+    <button class="btn" id="chatclose" aria-label="Fermer">✕</button>
+  </div>
+  <div id="chatlog"></div>
+  <form id="chatform" style="display:flex;gap:8px;padding:12px 16px;border-top:1px solid rgba(130,150,255,.16)">
+    <textarea id="chatin" rows="2" placeholder="Ex. : trouve 20 artisans sans site web à Lyon et prépare la prospection" aria-label="Message au PDG" style="flex:1;resize:none"></textarea>
+    <button class="btn" id="chatsend" type="submit" style="align-self:stretch">Envoyer</button>
+  </form>
+  <div class="small muted" style="padding:0 16px 12px">Entrée pour envoyer, Maj+Entrée pour aller à la ligne. Chaque réponse coûte quelques centimes (modèle fort).</div>
+</aside>
 <div class="toast" id="toast" role="status"></div>
 
 <script>
@@ -171,6 +191,27 @@ function modal(title, body){ $("#mtitle").textContent=title; put($("#mbody"), bo
 const closeModal = () => $("#modal").classList.remove("on");
 $("#mclose").onclick = closeModal; $("#modal").onclick = e => { if(e.target.id==="modal") closeModal(); }; document.addEventListener("keydown", e => { if(e.key==="Escape") closeModal(); });
 const hd = (title, icon, col, extra) => h("div",{class:"hd"}, h("span",{class:"t"}, icon ? h("span",{style:{display:"flex",color:col}}, ico(icon,col,16)) : null, title), extra||null);
+
+// ------------------------------------------------ discussion avec le PDG
+function chatMsg(m){ const me = m.role === "owner";
+  return h("div",{class:"msg " + (me ? "me" : "pdg")}, m.text,
+    (m.actions||[]).length ? h("span",{style:{display:"flex",flexDirection:"column",gap:"4px",marginTop:"8px"}}, m.actions.map(a => h("span",{style:{fontSize:"12px",padding:"4px 8px",borderRadius:"8px",background:"rgba(52,211,153,.15)",border:"1px solid rgba(52,211,153,.4)"}}, "✓ " + a))) : null,
+    h("span",{class:"meta"}, new Date(m.created_at || Date.now()).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) + (!me && m.cost_usd ? ` · ${money4(m.cost_usd)}` : ""))); }
+async function openChat(){ $("#chat").classList.add("on"); $("#chatin").focus();
+  try { const list = await api("GET","/api/chat");
+    put($("#chatlog"), list.length ? list.map(chatMsg) : h("div",{class:"msg pdg"}, "Bonjour ! Je suis le PDG. Confie-moi une mission ou demande-moi où en est l’entreprise."));
+    $("#chatlog").scrollTop = 1e9; } catch(e){ toast(e.message,false); } }
+$("#btnchat").onclick = openChat; $("#chatclose").onclick = () => $("#chat").classList.remove("on");
+$("#chatin").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); $("#chatform").requestSubmit(); } });
+$("#chatform").onsubmit = async e => { e.preventDefault(); const text = $("#chatin").value.trim(); if (!text) return;
+  const log = $("#chatlog"); log.append(chatMsg({role:"owner", text}));
+  const wait = h("div",{class:"msg pdg live"}, "Le PDG réfléchit…"); log.append(wait); log.scrollTop = 1e9;
+  $("#chatin").value = ""; $("#chatsend").disabled = true;
+  try { const r = await api("POST","/api/chat",{text}); wait.replaceWith(chatMsg(r));
+    if ((r.actions||[]).length) refresh && refresh(); }
+  catch(err){ wait.replaceWith(h("div",{class:"msg pdg"}, "Erreur : " + err.message)); }
+  finally { $("#chatsend").disabled = false; log.scrollTop = 1e9; $("#chatin").focus(); } };
+document.addEventListener("keydown", e => { if(e.key==="Escape") $("#chat").classList.remove("on"); });
 
 // ------------------------------------------------ navigation (même menu que la maquette)
 const NAV = [["Vue d’ensemble","HOME",()=>window.scrollTo({top:0,behavior:"smooth"})],["Agents","USERS",()=>$("#agents").scrollIntoView({behavior:"smooth"})],["Missions","FLAG",()=>openTasks()],["Analyses","CHART",()=>openCosts()],["Connaissances","BOOK",()=>openFiles()],["Intégrations","PLUG",()=>openIntegrations()],["Paramètres","GEAR",()=>openSettings()]];
@@ -293,7 +334,8 @@ function renderDetail(){
   $("#detail").style.borderColor = p.color + "88";
   put($("#detail"),
     h("div",{style:{flex:"1 1 280px",display:"flex",flexDirection:"column",gap:"6px"}}, h("span",{style:{fontSize:"11px",letterSpacing:".14em",textTransform:"uppercase",color:p.color}}, p.role), h("span",{class:"gro",style:{fontSize:"22px",fontWeight:"700",color:"#F4F6FF"}}, p.name),
-      h("span",{style:{fontSize:"13px",lineHeight:"1.5",color:"#B4BCDD"}}, p.desc), p.planned ? h("span",{class:"small",style:{color:p.color}},"Division en préparation : aucun agent pour l’instant.") : team),
+      h("span",{style:{fontSize:"13px",lineHeight:"1.5",color:"#B4BCDD"}}, p.desc), p.planned ? h("span",{class:"small",style:{color:p.color}},"Division en préparation : aucun agent pour l’instant.") : team,
+      p.id === "hq" ? h("button",{class:"btn",style:{alignSelf:"flex-start",marginTop:"6px"},onclick:openChat}, "Parler au PDG") : null),
     tasksBox,
     h("div",{style:{flex:"0 0 auto",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"4px"}}, h("span",{class:"gro",style:{fontSize:"34px",fontWeight:"700",color:p.color}}, String(active)), h("span",{class:"small muted"}, active>1?"tâches actives":"tâche active")),
     variants);
