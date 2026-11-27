@@ -16,7 +16,7 @@ Tout ce qui engage l'entreprise vers l'extérieur (envoyer un email, créer un l
 | `recherche` | Labo Recherche | Haiku 5.5 / gpt-6-luna (économique) | recherche web, lecture de pages |
 | `marketing` | Hub Marketing | économique | recherche web, lecture de pages |
 | `ventes` | Centre Ventes | économique | recherche web, brouillons d'emails*, liens de paiement* |
-| `support` | Zone Support | économique | brouillons d'emails* |
+| `support` | Service Client | économique | brouillons d'emails* |
 | `data` | Data Core | économique | statistiques, budget |
 | `finance` | Trésorerie | économique | budget, Stripe (lecture), liens de paiement* |
 

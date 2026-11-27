@@ -362,7 +362,7 @@ function renderAgents(list){
           h("span",{style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:st[1]}}, h("span",{class:a.state==="running"?"live":null,style:{width:"7px",height:"7px",borderRadius:"50%",background:st[1],boxShadow:`0 0 8px ${st[1]}`}}), st[0] + (a.pending ? ` (${a.pending})` : "")))),
       h("div",{style:{display:"flex",alignItems:"center",gap:"10px"}}, h("span",{class:"bar",style:{flex:"1"}}, h("i",{style:{width:rate+"%",background:a.color,boxShadow:`0 0 10px ${a.color}`}})), h("span",{class:"gro",style:{fontSize:"13px",color:"#C7CEF0"}}, a.success_rate==null ? "—" : rate+" %")),
       h("span",{class:"small muted",style:{display:"flex",justifyContent:"space-between"}}, h("span",{}, `${a.done} terminée(s)`), h("span",{}, money4(a.cost_month)))); };
-  const dcol = name => ({"Direction":"#818CF8","Division commerciale":"#38BDF8","Division production":"#FB923C","Administration":"#E879F9"})[name] || "#9AA4C7";
+  const dcol = name => ({"Direction & Tech":"#818CF8","Division commerciale":"#38BDF8","Division production":"#FB923C","Administration":"#E879F9"})[name] || "#9AA4C7";
   put($("#acards"), order.map(dv => h("div",{style:{gridColumn:"1 / -1",display:"flex",flexDirection:"column",gap:"10px"}},
     h("span",{class:"gro",style:{fontSize:"12px",letterSpacing:".16em",textTransform:"uppercase",color:dcol(dv),borderBottom:`1px solid ${dcol(dv)}44`,paddingBottom:"6px"}}, dv || "Autres"),
     h("div",{class:"agrid"}, list.filter(a => a.division === dv).map(card)))));

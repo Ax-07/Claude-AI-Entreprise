@@ -113,6 +113,8 @@ _Mis à jour le 27/11/2026_
 
 - Survol d'un bâtiment (sur la carte ou son étiquette) : aura lumineuse à la couleur du pôle (`applyHover`, classe CSS `hov`).
 
+- Réorganisation validée par le propriétaire (proposition de Gemini, ajustée) : E-commerce (chantier) dans le Pôle commercial, emplacement libre de ce coin ; « Zone Support » renommé **Service Client** (l'agent `support` fait du service client, pas du support interne) ; **Cybersécurité dans le coin Direction**, rebaptisé « Direction & Tech » (`DIVISIONS` : Direction & Tech = pdg, data, securite ; Administration = finance, juridique). Une case Tech collée au Data Core aurait supprimé un parc de la croix : écarté. Emplacements libres : 2 en Direction & Tech, 1 en Production, 2 en Services partagés.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.
