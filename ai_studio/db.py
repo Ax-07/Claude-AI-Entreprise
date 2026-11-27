@@ -199,7 +199,9 @@ class DB:
         if agent:
             params.append(agent)
         params.append(limit)
-        return self.q(f"SELECT * FROM memory WHERE ({cond}) AND {vis} ORDER BY id DESC LIMIT ?", tuple(params))
+        # Les consignes du propriétaire passent en premier : elles corrigent ce que les agents ont pu mémoriser de faux.
+        return self.q(f"SELECT * FROM memory WHERE ({cond}) AND {vis} ORDER BY (agent='proprietaire') DESC, id DESC LIMIT ?",
+                      tuple(params))
 
     # ---------- coûts ----------
     def add_cost(self, agent: str, task_id, model: str, inp: int, out: int, searches: int, usd: float) -> None:

@@ -20,6 +20,9 @@ Commandes principales :
   objectifs                    liste les objectifs
   archiver ID                  met un objectif en pause (et annule ses tâches en attente)
   relancer [ID]                remet en attente les tâches en échec (toutes, ou une seule)
+  memoire [RECHERCHE]          affiche la mémoire des agents (ou les entrées qui contiennent ces mots)
+  oublier ID [ID...]           efface des entrées de mémoire (une information fausse, par exemple)
+  retenir SUJET "texte"        ajoute une consigne du propriétaire, prioritaire sur ce que les agents ont mémorisé
   notifier-test                affiche une notification Windows de test
   sauvegarder                  sauvegarde immédiate (la sauvegarde quotidienne est automatique)
   sauvegardes                  liste les sauvegardes
@@ -236,6 +239,39 @@ def cmd_agents(cfg, db, a):
         _out(f"{r.name:<10} {r.pole:<15} {model:<20} outils : {', '.join(n for n in r.all_tools() if n in REGISTRY and REGISTRY[n].available())}{' + recherche web' if r.web_search else ''}")
 
 
+def cmd_memoire(cfg, db, a):
+    if a.recherche:
+        words = [w.lower() for w in a.recherche.split() if w]
+        cond = " AND ".join("(lower(topic) LIKE ? OR lower(content) LIKE ?)" for _ in words)
+        params = [p for w in words for p in (f"%{w}%", f"%{w}%")]
+        rows = db.q(f"SELECT * FROM memory WHERE {cond} ORDER BY id DESC LIMIT ?", (*params, a.n))
+    else:
+        rows = db.q("SELECT * FROM memory ORDER BY id DESC LIMIT ?", (a.n,))
+    if not rows:
+        _out("Aucune entrée.")
+    for m in rows:
+        text = " ".join(m["content"].split())
+        _out(f"#{m['id']:<4} {m['created_at'][:10]} {m['agent']:<12} [{m['topic']}]\n      {text[:220]}{'…' if len(text) > 220 else ''}")
+    if rows:
+        _out("\nPour effacer : python -m ai_studio oublier ID [ID…]")
+
+
+def cmd_oublier(cfg, db, a):
+    for i in a.ids:
+        m = db.one("SELECT topic FROM memory WHERE id=?", (i,))
+        if not m:
+            _out(f"#{i} : introuvable"); continue
+        db.run("DELETE FROM memory WHERE id=?", (i,))
+        db.log("proprietaire", "memoire", f"Entrée de mémoire #{i} effacée ({m['topic']})")
+        _out(f"#{i} effacée ({m['topic']})")
+
+
+def cmd_retenir(cfg, db, a):
+    mid = db.remember("proprietaire", a.sujet, a.texte)
+    db.log("proprietaire", "memoire", f"Consigne mémorisée #{mid} ({a.sujet})")
+    _out(f"Consigne #{mid} mémorisée : les agents la verront en premier quand ils chercheront « {a.sujet} ».")
+
+
 def cmd_notifier_test(cfg, db, a):
     from . import notify
     if notify.runner is None:
@@ -312,6 +348,9 @@ def main(argv=None):
     sub.add_parser("couts"); sub.add_parser("agents"); sub.add_parser("objectifs")
     s = sub.add_parser("relancer"); s.add_argument("id", type=int, nargs="?")
     s = sub.add_parser("archiver"); s.add_argument("id", type=int)
+    s = sub.add_parser("memoire"); s.add_argument("recherche", nargs="?", default=""); s.add_argument("-n", type=int, default=30)
+    s = sub.add_parser("oublier"); s.add_argument("ids", type=int, nargs="+")
+    s = sub.add_parser("retenir"); s.add_argument("sujet"); s.add_argument("texte")
     sub.add_parser("notifier-test"); sub.add_parser("sauvegarder"); sub.add_parser("sauvegardes")
     s = sub.add_parser("restaurer"); s.add_argument("nom")
     s = sub.add_parser("demarrage-auto"); s.add_argument("--retirer", action="store_true")
@@ -323,6 +362,7 @@ def main(argv=None):
                 "validations": cmd_validations, "taches": cmd_taches, "voir": cmd_voir, "journal": cmd_journal,
                 "couts": cmd_couts, "agents": cmd_agents, "relancer": cmd_relancer, "objectifs": cmd_objectifs,
                 "archiver": cmd_archiver, "serveur": cmd_serveur, "notifier-test": cmd_notifier_test,
+                "memoire": cmd_memoire, "oublier": cmd_oublier, "retenir": cmd_retenir,
                 "sauvegarder": cmd_sauvegarder, "sauvegardes": cmd_sauvegardes, "restaurer": cmd_restaurer,
                 "demarrage-auto": cmd_demarrage_auto,
                 "valider": lambda c, d, x: cmd_decide(c, d, x, True), "refuser": lambda c, d, x: cmd_decide(c, d, x, False)}
