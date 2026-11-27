@@ -7,11 +7,12 @@ import os
 import shutil
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from ai_studio.config import load_config
 from ai_studio.db import DB
-from ai_studio.llm import BudgetExceeded, BudgetGuard, compute_cost
+from ai_studio.llm import BudgetExceeded, BudgetGuard, compute_cost, models_for
 from ai_studio.orchestrator import Studio
 from ai_studio.runner import run_task
 from ai_studio.approvals import decide
@@ -39,6 +40,11 @@ class FakeLLM:
 
 class Base(unittest.TestCase):
     def setUp(self):
+        # Les tests ne doivent pas dépendre des clés présentes sur la machine (fournisseur forcé à Anthropic).
+        env = unittest.mock.patch.dict(os.environ, {}, clear=False)
+        env.start(); self.addCleanup(env.stop)
+        for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "BRAVE_API_KEY", "OPENAI_BASE_URL"):
+            os.environ.pop(k, None)
         self.dir = Path(tempfile.mkdtemp())
         (self.dir / "config.json").write_text(json.dumps({"budget": {"monthly_usd": 1.0, "daily_usd": 0.5, "per_task_usd": 0.05}}))
         self.cfg = load_config(self.dir)
@@ -113,7 +119,7 @@ class TestRunner(Base):
                         tu("delegate_task", {"agent": "recherche", "title": "Étude", "description": "b"})],
                        [tu("complete_task", {"result": "plan"})]])
         run_task(self.cfg, self.db, llm, self.guard, self.db.task(tid))
-        self.assertEqual(llm.calls[0]["model"], self.cfg["models"]["strong"])
+        self.assertEqual(llm.calls[0]["model"], models_for(self.cfg)["strong"])
         child = self.db.q("SELECT * FROM tasks WHERE parent_id=?", (tid,))
         self.assertEqual(len(child), 1)
         self.assertEqual(child[0]["depth"], 1)

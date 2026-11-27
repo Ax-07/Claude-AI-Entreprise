@@ -1,4 +1,9 @@
-"""Client de l'API Claude (sans dépendance externe) + calcul des coûts + plafonds budgétaires."""
+"""Clients LLM (Anthropic et OpenAI, sans dépendance externe) + calcul des coûts + plafonds budgétaires.
+
+Le moteur parle en interne le format « Messages » d'Anthropic (blocs text / tool_use / tool_result).
+Le client OpenAI traduit ce format vers l'API Chat Completions et retraduit la réponse : le reste du
+moteur (runner, outils, tests) n'a donc pas à savoir quel fournisseur est utilisé.
+"""
 from __future__ import annotations
 
 import json
@@ -7,8 +12,9 @@ import time
 import urllib.error
 import urllib.request
 
-API_URL = "https://api.anthropic.com/v1/messages"
-API_VERSION = "2023-06-01"
+ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+ANTHROPIC_VERSION = "2023-06-01"
+OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 
 
 class LLMError(Exception):
@@ -19,10 +25,41 @@ class BudgetExceeded(Exception):
     """Levée quand un plafond (jour, mois, tâche, recherches) est atteint : le travail s'arrête proprement."""
 
 
+def _http_post_json(url: str, body: dict, headers: dict, timeout: int) -> dict:
+    data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"content-type": "application/json", **headers}, method="POST")
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _post_with_retries(url: str, body: dict, headers: dict, timeout: int, transport=None) -> dict:
+    """POST JSON avec 3 nouvelles tentatives sur les erreurs temporaires (429, 5xx, réseau)."""
+    send = transport or _http_post_json
+    delay = 5
+    for attempt in range(4):
+        try:
+            return send(url, body, headers, timeout)
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", "replace")[:800]
+            if e.code in (429, 500, 502, 503, 529) and attempt < 3:
+                time.sleep(delay); delay *= 2
+                continue
+            raise LLMError(f"API {e.code} : {detail}") from None
+        except (urllib.error.URLError, TimeoutError) as e:
+            if attempt < 3:
+                time.sleep(delay); delay *= 2
+                continue
+            raise LLMError(f"Réseau : {e}") from None
+    raise LLMError("Échec après plusieurs tentatives")
+
+
+# ====================================================================== Anthropic
 class AnthropicClient:
-    def __init__(self, api_key: str | None = None, timeout: int = 120):
+    provider = "anthropic"
+
+    def __init__(self, api_key: str | None = None, timeout: int = 120, transport=None):
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
-        self.timeout = timeout
+        self.timeout, self.transport = timeout, transport
         if not self.api_key:
             raise LLMError("ANTHROPIC_API_KEY manquante : ajoute-la dans le fichier .env")
 
@@ -31,34 +68,143 @@ class AnthropicClient:
         body = {"model": model, "max_tokens": max_tokens, "system": system, "messages": messages}
         if tools:
             body["tools"] = tools
-        data = json.dumps(body).encode("utf-8")
-        headers = {
-            "content-type": "application/json",
-            "x-api-key": self.api_key,
-            "anthropic-version": API_VERSION,
-        }
-        delay = 5
-        for attempt in range(4):
-            req = urllib.request.Request(API_URL, data=data, headers=headers, method="POST")
-            try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                    return json.loads(resp.read().decode("utf-8"))
-            except urllib.error.HTTPError as e:
-                detail = e.read().decode("utf-8", "replace")[:800]
-                if e.code in (429, 500, 502, 503, 529) and attempt < 3:
-                    time.sleep(delay); delay *= 2
-                    continue
-                raise LLMError(f"API {e.code} : {detail}") from None
-            except (urllib.error.URLError, TimeoutError) as e:
-                if attempt < 3:
-                    time.sleep(delay); delay *= 2
-                    continue
-                raise LLMError(f"Réseau : {e}") from None
-        raise LLMError("Échec après plusieurs tentatives")
+        headers = {"x-api-key": self.api_key, "anthropic-version": ANTHROPIC_VERSION}
+        return _post_with_retries(ANTHROPIC_URL, body, headers, self.timeout, self.transport)
 
 
+# ====================================================================== OpenAI
+def _text_of(content) -> str:
+    if isinstance(content, str):
+        return content
+    return "\n".join(b.get("text", "") for b in content or [] if b.get("type") == "text")
+
+
+def to_openai_messages(system, messages: list) -> list:
+    """Format Anthropic → messages Chat Completions."""
+    out = []
+    sys_text = _text_of(system) if not isinstance(system, str) else system
+    if sys_text:
+        out.append({"role": "system", "content": sys_text})
+    for m in messages:
+        content = m["content"]
+        if m["role"] == "user":
+            if isinstance(content, str):
+                out.append({"role": "user", "content": content}); continue
+            texts = []
+            for b in content:
+                if b.get("type") == "tool_result":
+                    c = b.get("content", "")
+                    out.append({"role": "tool", "tool_call_id": b["tool_use_id"],
+                                "content": c if isinstance(c, str) else _text_of(c)})
+                elif b.get("type") == "text":
+                    texts.append(b.get("text", ""))
+            if texts:
+                out.append({"role": "user", "content": "\n".join(texts)})
+        else:  # assistant
+            if isinstance(content, str):
+                out.append({"role": "assistant", "content": content}); continue
+            text = _text_of(content)
+            calls = [{"id": b["id"], "type": "function",
+                      "function": {"name": b["name"], "arguments": json.dumps(b.get("input") or {}, ensure_ascii=False)}}
+                     for b in content if b.get("type") == "tool_use"]
+            msg = {"role": "assistant", "content": text or None}
+            if calls:
+                msg["tool_calls"] = calls
+            out.append(msg)
+    return out
+
+
+def to_openai_tools(tools: list | None) -> list:
+    """Outils locaux uniquement : les outils serveur d'Anthropic (web_search…) n'existent pas chez OpenAI."""
+    return [{"type": "function", "function": {"name": t["name"], "description": t.get("description", ""),
+                                              "parameters": t["input_schema"]}}
+            for t in tools or [] if "input_schema" in t]
+
+
+def from_openai_response(resp: dict) -> dict:
+    """Réponse Chat Completions → format Anthropic attendu par le runner."""
+    choice = (resp.get("choices") or [{}])[0]
+    msg = choice.get("message") or {}
+    content = []
+    if msg.get("content"):
+        content.append({"type": "text", "text": msg["content"]})
+    for c in msg.get("tool_calls") or []:
+        fn = c.get("function", {})
+        try:
+            args = json.loads(fn.get("arguments") or "{}")
+        except json.JSONDecodeError:
+            args = {"_arguments_invalides": fn.get("arguments", "")}
+        content.append({"type": "tool_use", "id": c["id"], "name": fn.get("name", ""), "input": args})
+    finish = choice.get("finish_reason")
+    stop = {"tool_calls": "tool_use", "stop": "end_turn", "length": "max_tokens"}.get(finish, "end_turn")
+    if any(b["type"] == "tool_use" for b in content):
+        stop = "tool_use"
+    u = resp.get("usage") or {}
+    cached = int((u.get("prompt_tokens_details") or {}).get("cached_tokens", 0) or 0)
+    usage = {"input_tokens": max(0, int(u.get("prompt_tokens", 0)) - cached),
+             "cache_read_input_tokens": cached,
+             "output_tokens": int(u.get("completion_tokens", 0))}
+    return {"content": content, "stop_reason": stop, "usage": usage}
+
+
+class OpenAIClient:
+    provider = "openai"
+
+    def __init__(self, api_key: str | None = None, timeout: int = 120, transport=None, base_url: str | None = None):
+        self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
+        self.url = (base_url or os.environ.get("OPENAI_BASE_URL") or "").rstrip("/")
+        self.url = f"{self.url}/chat/completions" if self.url else OPENAI_URL
+        self.timeout, self.transport = timeout, transport
+        if not self.api_key:
+            raise LLMError("OPENAI_API_KEY manquante : ajoute-la dans le fichier .env")
+
+    def complete(self, model: str, system: list | str, messages: list, tools: list | None = None,
+                 max_tokens: int = 2000) -> dict:
+        body = {"model": model, "messages": to_openai_messages(system, messages),
+                "max_completion_tokens": max_tokens}
+        oa_tools = to_openai_tools(tools)
+        if oa_tools:
+            body["tools"] = oa_tools
+        resp = _post_with_retries(self.url, body, {"authorization": f"Bearer {self.api_key}"}, self.timeout, self.transport)
+        return from_openai_response(resp)
+
+
+# ====================================================================== choix du fournisseur
+def resolve_provider(cfg) -> str:
+    """'anthropic' | 'openai'. En mode 'auto', choisit selon la clé présente dans l'environnement (.env)."""
+    p = (cfg.get("provider", default="auto") or "auto").lower()
+    if p in ("anthropic", "openai"):
+        return p
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return "anthropic"
+    if os.environ.get("OPENAI_API_KEY"):
+        return "openai"
+    return "anthropic"
+
+
+def models_for(cfg) -> dict:
+    """{'default': …, 'strong': …} pour le fournisseur actif.
+
+    Compatible avec l'ancien format de config.json (models = {"default", "strong"} = modèles Anthropic).
+    """
+    models = cfg["models"]
+    provider = resolve_provider(cfg)
+    if provider == "anthropic" and "default" in models:      # ancien format, prioritaire s'il est présent
+        return {"default": models["default"], "strong": models.get("strong", models["default"])}
+    if provider in models and isinstance(models[provider], dict):
+        return models[provider]
+    from .config import DEFAULTS
+    return DEFAULTS["models"][provider]
+
+
+def make_llm(cfg):
+    timeout = int(cfg["runtime"]["request_timeout_seconds"])
+    return OpenAIClient(timeout=timeout) if resolve_provider(cfg) == "openai" else AnthropicClient(timeout=timeout)
+
+
+# ====================================================================== coûts et budget
 def compute_cost(prices: dict, model: str, usage: dict) -> tuple[float, int, int, int]:
-    """Retourne (usd, tokens_entrée, tokens_sortie, recherches_web) pour une réponse de l'API."""
+    """Retourne (usd, tokens_entrée, tokens_sortie, recherches_web) pour une réponse (format Anthropic)."""
     p = prices.get(model) or prices.get("claude-sonnet-5-5") or {"input": 3.0, "output": 15.0}
     inp = int(usage.get("input_tokens", 0))
     cache_w = int(usage.get("cache_creation_input_tokens", 0) or 0)
@@ -68,7 +214,8 @@ def compute_cost(prices: dict, model: str, usage: dict) -> tuple[float, int, int
     pin, pout = p["input"], p["output"]
     if "long_threshold" in p and total_in > p["long_threshold"]:
         pin, pout = p.get("long_input", pin), p.get("long_output", pout)
-    usd = (inp * pin + cache_w * pin * 1.25 + cache_r * pin * 0.1 + out * pout) / 1_000_000
+    pcache = p.get("cached_input", pin * 0.1)
+    usd = (inp * pin + cache_w * pin * 1.25 + cache_r * pcache + out * pout) / 1_000_000
     searches = int((usage.get("server_tool_use") or {}).get("web_search_requests", 0) or 0)
     usd += searches * float(prices.get("web_search_per_call", 0.01))
     return round(usd, 6), total_in, out, searches

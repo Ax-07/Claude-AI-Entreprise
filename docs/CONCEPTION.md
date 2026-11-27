@@ -81,15 +81,24 @@ En pointillés, l'API locale qui reliera le tableau de bord au moteur à la phas
 
 Sept agents, un par pôle du tableau de bord : le PDG délègue, les six spécialistes exécutent. Seul le PDG utilise le modèle fort, pour contenir les coûts.
 
+**Deux fournisseurs possibles** : Anthropic ou OpenAI, au choix dans `config.json` (`provider`). En mode `auto`, le moteur prend Anthropic si `ANTHROPIC_API_KEY` est présente, sinon OpenAI. Le moteur parle en interne le format d'Anthropic ; le client OpenAI traduit les messages et les appels d'outils vers l'API Chat Completions.
+
+| Niveau | Anthropic | OpenAI | Prix OpenAI (entrée / sortie, par million de tokens) |
+| --- | --- | --- | --- |
+| Économique (6 agents) | Claude Haiku 5.5 | gpt-6-luna | 0,10 $ / 0,50 $ |
+| Fort (PDG) | Claude Sonnet 5.5 | gpt-6.1-terra | 1 $ / 5 $ |
+
+La phase de test utilise OpenAI (crédits déjà disponibles chez le propriétaire).
+
 | Agent | Pôle | Modèle | Responsabilités | Ne fait jamais |
 | --- | --- | --- | --- | --- |
-| pdg | Command HQ | Claude Sonnet 5.5 | Traduit les objectifs en missions, délègue, suit l'avancement, arbitre budgets et priorités, clôture les objectifs | Le travail des spécialistes |
-| recherche | Labo Recherche | Claude Haiku 5.5 | Marchés, besoins, concurrence, prix, niches ; cite ses sources | Présenter une estimation comme un fait |
-| marketing | Hub Marketing | Claude Haiku 5.5 | Positionnement, offres, messages, contenus multilingues | Promesses exagérées |
-| ventes | Centre Ventes | Claude Haiku 5.5 | Prospects B2B, messages personnalisés, offres, liens de paiement | Envoyer un email ou créer un paiement sans validation |
-| support | Zone Support | Claude Haiku 5.5 | Réponses clients, FAQ, procédures, problèmes récurrents | Répondre à un client sans validation |
-| data | Data Core | Claude Haiku 5.5 | Entretien de la mémoire, mesures, propositions d'amélioration | Modifier les règles des autres agents |
-| finance | Trésorerie | Claude Haiku 5.5 | Revenus Stripe, coûts API, rentabilité, alertes de dérive, prix | Effectuer un paiement |
+| pdg | Command HQ | Fort | Traduit les objectifs en missions, délègue, suit l'avancement, arbitre budgets et priorités, clôture les objectifs | Le travail des spécialistes |
+| recherche | Labo Recherche | Économique | Marchés, besoins, concurrence, prix, niches ; cite ses sources | Présenter une estimation comme un fait |
+| marketing | Hub Marketing | Économique | Positionnement, offres, messages, contenus multilingues | Promesses exagérées |
+| ventes | Centre Ventes | Économique | Prospects B2B, messages personnalisés, offres, liens de paiement | Envoyer un email ou créer un paiement sans validation |
+| support | Zone Support | Économique | Réponses clients, FAQ, procédures, problèmes récurrents | Répondre à un client sans validation |
+| data | Data Core | Économique | Entretien de la mémoire, mesures, propositions d'amélioration | Modifier les règles des autres agents |
+| finance | Trésorerie | Économique | Revenus Stripe, coûts API, rentabilité, alertes de dérive, prix | Effectuer un paiement |
 
 **Comment un agent est défini** : un nom, un pôle, une mission rédigée, une liste d'outils autorisés, un niveau de modèle (économique ou fort) et l'accès ou non à la recherche web. Le prompt système assemble l'identité de l'entreprise, la mission, la liste de l'équipe et les règles permanentes.
 
@@ -111,7 +120,7 @@ Chaque agent n'accède qu'aux outils de son rôle ; les outils marqués « valid
 | list_objectives | Lit les objectifs de l'entreprise | Tous | Non | — |
 | delegate_task | Crée une tâche pour un autre agent | Tous (profondeur max. 3) | Non | — |
 | set_objective_status | Clôture ou met en pause un objectif | pdg | Non | — |
-| brave_search (principal) / web_search Anthropic (secours) | Recherche web avec sources | recherche, marketing, ventes | Non | Brave 0,005 $ par requête (crédits offerts) ; Anthropic 0,01 $ ; 15 par jour au total |
+| brave_search (principal) / web_search Anthropic (secours, fournisseur Anthropic uniquement) | Recherche web avec sources | recherche, marketing, ventes | Non | Brave 0,005 $ par requête (crédits offerts) ; Anthropic 0,01 $ ; 15 par jour au total |
 | fetch_url | Lit le texte d'une page publique | recherche, marketing, ventes | Non | Tokens uniquement |
 | draft_email | Prépare un email, envoyé en SMTP après accord | ventes, support | Oui | — |
 | propose_payment_link | Propose un lien de paiement Stripe | ventes, finance | Oui | — |
@@ -122,7 +131,7 @@ Chaque agent n'accède qu'aux outils de son rôle ; les outils marqués « valid
 
 ### Recherche web : Brave Search API en priorité
 
-Brave devient le moteur de recherche principal des agents : il coûte deux fois moins cher par requête et ses crédits mensuels gratuits couvrent notre volume de test. La recherche web d'Anthropic reste en secours.
+Brave devient le moteur de recherche principal des agents : il coûte deux fois moins cher par requête et ses crédits mensuels gratuits couvrent notre volume de test. La recherche web d'Anthropic reste en secours, uniquement quand le fournisseur est Anthropic et que `BRAVE_API_KEY` est absente ; avec OpenAI sans clé Brave, les agents n'ont que `fetch_url`.
 
 | Critère | Brave Search API | Recherche web Anthropic |
 | --- | --- | --- |
@@ -174,7 +183,7 @@ Quatre familles de protections encadrent les agents : budget, validations, sécu
 | Étapes par tâche | 8 | L'agent est sommé de conclure |
 | Tâches ouvertes | 30 | Toute nouvelle délégation est refusée |
 
-Le coût est calculé à partir des tokens réellement facturés par l'API, cache et recherches web compris. Une limite de dépense est aussi fixée côté console Anthropic, en double sécurité.
+Le coût est calculé à partir des tokens réellement facturés par l'API, cache et recherches web compris. Une limite de dépense est aussi fixée dans la console du fournisseur (OpenAI ou Anthropic), en double sécurité.
 
 **Validations du propriétaire** : emails, liens de paiement et décisions passent par une file d'attente. Après décision, l'action validée est exécutée et l'agent demandeur reçoit une tâche de suite.
 
@@ -252,8 +261,8 @@ L'installation prend une dizaine de minutes sur Windows et ne demande que Python
 1. Installer Python depuis python.org en cochant « Add Python to PATH ».
 2. Cloner le dépôt : `git clone https://github.com/Ax-07/Claude-AI-Entreprise.git`.
 3. Lancer `python -m ai_studio init` : création de `config.json` et `.env`.
-4. Coller la clé API Anthropic dans `.env` ; ajouter la clé Stripe restreinte et le SMTP quand ils sont prêts.
-5. Fixer une limite de dépense mensuelle dans la console Anthropic.
+4. Coller une clé de fournisseur (`OPENAI_API_KEY` ou `ANTHROPIC_API_KEY`) et `BRAVE_API_KEY` dans `.env` ; ajouter la clé Stripe restreinte et le SMTP quand ils sont prêts.
+5. Fixer une limite de dépense mensuelle dans la console du fournisseur.
 6. Tester avec `python -m ai_studio run --once`, puis lancer `demarrer.bat` pour le fonctionnement continu.
 
 **Exploitation au quotidien (objectif : moins de 10 minutes par jour)**
@@ -270,7 +279,7 @@ L'installation prend une dizaine de minutes sur Windows et ne demande que Python
 
 ## 12. Tests et qualité
 
-Le moteur v0.1 passe 10 tests automatisés qui n'appellent jamais l'API : un faux modèle rejoue des réponses au format exact de l'API Claude.
+Le moteur passe 20 tests automatisés qui n'appellent jamais l'API : un faux modèle rejoue des réponses au format exact de l'API Claude.
 
 | Test | Ce qu'il vérifie |
 | --- | --- |
@@ -283,6 +292,8 @@ Le moteur v0.1 passe 10 tests automatisés qui n'appellent jamais l'API : un fau
 | Plafond par tâche | La boucle s'arrête avec un résultat partiel |
 | Plafond journalier | Le moteur se met en pause sans exécuter de tâche |
 | Revue d'objectif | Le PDG est planifié une fois, puis la chaîne de tâches s'exécute |
+| Fournisseur OpenAI | Choix automatique selon les clés, traduction des messages et outils, coût avec cache, tâche complète via un faux serveur |
+| Brave Search | Brave prioritaire sur l'outil serveur, extraits nettoyés, coût de 0,005 $ enregistré, limite quotidienne |
 | Simulation complète | Objectif → PDG → recherche (web serveur, pause) → ventes → validation, environ 0,04 $ estimés |
 
 **Règles qualité** : tout nouvel outil ou agent arrive avec son test ; les tests passent avant chaque livraison ; le premier lancement réel de chaque version est fait avec `run --once` et un objectif simple.
@@ -307,8 +318,9 @@ La phase 2 se termine dès que le premier cycle réel tourne sans erreur sur le 
 | --- | --- |
 | Python standard, sans dépendance | Installation simple sur le PC, maintenance légère |
 | SQLite comme base unique | Un fichier, zéro serveur, suffisant pour un seul PC |
-| Haiku 5.5 par défaut, Sonnet 5.5 pour le PDG | Coût faible pour l'exécution, meilleur raisonnement pour la planification |
-| Appels directs à l'API Claude en HTTP | Pas de SDK à installer, contrôle total des coûts |
+| Modèle économique par défaut, modèle fort pour le PDG | Coût faible pour l'exécution, meilleur raisonnement pour la planification |
+| Deux fournisseurs (Anthropic, OpenAI), choix automatique selon les clés | Tests avec les crédits OpenAI existants, pas de dépendance à un seul fournisseur |
+| Appels HTTP directs aux API (Claude, OpenAI, Brave) | Pas de SDK à installer, contrôle total des coûts |
 | Brave Search API comme recherche web principale | Deux fois moins cher par requête, crédits mensuels offerts, extraits maîtrisés ; Anthropic en secours |
 | n8n comme couche d'intégrations, à partir de la phase 4 | Centaines de connecteurs gratuits en auto-hébergé ; le moteur Python garde budget, validations et journal |
 | Validation obligatoire pour tout engagement externe | Risque légal et réputationnel trop élevé pour une autonomie totale |

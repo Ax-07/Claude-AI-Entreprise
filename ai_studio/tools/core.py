@@ -184,6 +184,53 @@ def fetch_url(ctx: ToolContext, url: str) -> str:
     return text[:9000]
 
 
+BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
+
+
+def brave_request(params: dict) -> dict:
+    """Appel brut à l'API Brave Search (remplacé par un faux dans les tests)."""
+    import json, os
+    req = urllib.request.Request(BRAVE_URL + "?" + urllib.parse.urlencode(params),
+                                 headers={"Accept": "application/json",
+                                          "X-Subscription-Token": os.environ.get("BRAVE_API_KEY", "")})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def _clean(s: str) -> str:
+    return html.unescape(re.sub(r"<[^>]+>", "", s or "")).strip()
+
+
+@tool("brave_search",
+      "Recherche sur le web (Brave Search). Renvoie titres, URL et extraits : cite les URL que tu utilises "
+      "et ouvre les pages importantes avec fetch_url avant d'en tirer des chiffres. Requêtes courtes et précises.",
+      {"query": {"type": "string", "description": "La requête, 2 à 8 mots."},
+       "count": {"type": "integer", "description": "Nombre de résultats (1 à 10).", "default": 5},
+       "country": {"type": "string", "description": "Code pays (FR, US, GB…), FR par défaut.", "default": "FR"}},
+      ["query"])
+def brave_search(ctx: ToolContext, query: str, count: int = 5, country: str = "FR") -> str:
+    import os
+    if not os.environ.get("BRAVE_API_KEY"):
+        return "Recherche indisponible : BRAVE_API_KEY absente du fichier .env."
+    limit = int(ctx.cfg["budget"]["web_searches_per_day"])
+    if ctx.db.searches_today() >= limit:
+        return f"Refusé : limite de {limit} recherches web par jour atteinte. Utilise la mémoire ou fetch_url."
+    country = (country or "FR").upper()[:2]
+    params = {"q": query[:300], "count": max(1, min(int(count or 5), 10)), "country": country,
+              "search_lang": "fr" if country == "FR" else "en"}
+    data = brave_request(params)
+    price = float(ctx.cfg["prices"].get("brave_search_per_call", 0.005))
+    ctx.db.add_cost(ctx.agent, ctx.task["id"] if ctx.task is not None else None, "brave-search", 0, 0, 1, price)
+    results = (data.get("web") or {}).get("results") or []
+    if not results:
+        return "Aucun résultat."
+    lines = []
+    for i, r in enumerate(results, 1):
+        extra = " ".join(_clean(x) for x in (r.get("extra_snippets") or [])[:2])
+        lines.append(f"{i}. {_clean(r.get('title'))}\n   {r.get('url')}\n   {_clean(r.get('description'))} {extra}".rstrip())
+    return "\n".join(lines)[:6000]
+
+
 # ---------------------------------------------------------------- propriétaire
 @tool("request_owner_decision",
       "Demande une décision au propriétaire (humain) quand une action est risquée, coûteuse, engage l'entreprise "

@@ -4,9 +4,16 @@
     "owner_name": "Propriétaire",
     "description": "Micro-entreprise française de services numériques opérée par une équipe d'agents IA. Objectif : générer des revenus réels, de façon légale et rentable, avec un minimum d'intervention du propriétaire."
   },
+  "provider": "auto",
   "models": {
-    "default": "claude-haiku-5-5",
-    "strong": "claude-sonnet-5-5"
+    "anthropic": {
+      "default": "claude-haiku-5-5",
+      "strong": "claude-sonnet-5-5"
+    },
+    "openai": {
+      "default": "gpt-6-luna",
+      "strong": "gpt-6.1-terra"
+    }
   },
   "budget": {
     "monthly_usd": 20.0,

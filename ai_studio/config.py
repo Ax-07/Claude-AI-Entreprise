@@ -19,17 +19,25 @@ DEFAULTS: dict = {
         "language": "fr",
         "description": "Micro-entreprise française de services numériques opérée par des agents IA.",
     },
+    # "auto" : Anthropic si ANTHROPIC_API_KEY est dans .env, sinon OpenAI si OPENAI_API_KEY y est.
+    "provider": "auto",
     "models": {
-        # Modèle économique pour le travail courant, modèle plus fort pour l'agent PDG.
-        "default": "claude-haiku-5-5",
-        "strong": "claude-sonnet-5-5",
+        # Par fournisseur : modèle économique pour le travail courant, modèle plus fort pour l'agent PDG.
+        "anthropic": {"default": "claude-haiku-5-5", "strong": "claude-sonnet-5-5"},
+        "openai": {"default": "gpt-6-luna", "strong": "gpt-6.1-terra"},
     },
-    # Prix en USD par million de tokens (à mettre à jour si Anthropic change ses tarifs).
+    # Prix en USD par million de tokens (à mettre à jour si les fournisseurs changent leurs tarifs).
     "prices": {
         "claude-haiku-5-5": {"input": 0.10, "output": 0.50, "long_input": 0.50, "long_output": 2.50, "long_threshold": 100000},
         "claude-sonnet-5-5": {"input": 2.0, "output": 10.0},
         "claude-opus-5-5": {"input": 4.0, "output": 20.0},
-        "web_search_per_call": 0.01,
+        "gpt-6-luna": {"input": 0.10, "cached_input": 0.01, "output": 0.50},
+        "gpt-6.1-terra": {"input": 1.0, "cached_input": 0.05, "output": 5.0},
+        "gpt-6.2-sol": {"input": 2.0, "cached_input": 0.10, "output": 10.0},
+        "gpt-5-nano": {"input": 0.05, "cached_input": 0.005, "output": 0.40},
+        "gpt-5-mini": {"input": 0.25, "cached_input": 0.025, "output": 2.0},
+        "web_search_per_call": 0.01,          # recherche web serveur Anthropic
+        "brave_search_per_call": 0.005,       # Brave Search API (5 $ / 1 000 requêtes)
     },
     "budget": {
         "monthly_usd": 20.0,

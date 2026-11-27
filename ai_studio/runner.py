@@ -2,21 +2,30 @@
 from __future__ import annotations
 
 import json
+import os
 
 from .agents import ROLES, system_prompt
-from .llm import BudgetExceeded, LLMError
+from .llm import BudgetExceeded, LLMError, models_for, resolve_provider
 from .tools import REGISTRY, ToolContext, run_tool
 
 
 def _model_for(cfg, role) -> str:
-    return cfg["models"]["strong"] if role.model == "strong" else cfg["models"]["default"]
+    m = models_for(cfg)
+    return m["strong"] if role.model == "strong" else m["default"]
 
 
 def _tools_for(cfg, role, guard) -> list[dict]:
     specs = [REGISTRY[n].spec() for n in role.all_tools() if n in REGISTRY]
     if role.web_search:
-        ws = cfg.get("server_tools", "web_search", default={}) or {}
         left = guard.searches_left()
+        if os.environ.get("BRAVE_API_KEY"):
+            # Brave en priorité : moins cher, et disponible quel que soit le fournisseur LLM.
+            if left > 0:
+                specs.append(REGISTRY["brave_search"].spec())
+            return specs
+        if resolve_provider(cfg) != "anthropic":
+            return specs                      # pas d'outil serveur hors Anthropic
+        ws = cfg.get("server_tools", "web_search", default={}) or {}
         if ws.get("enabled") and left > 0:
             specs.append({"type": ws["type"], "name": "web_search", "max_uses": min(int(ws.get("max_uses", 3)), left)})
         wf = cfg.get("server_tools", "web_fetch", default={}) or {}
