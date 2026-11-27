@@ -106,6 +106,8 @@ La phase de test utilise OpenAI (crédits déjà disponibles chez le propriétai
 
 **Agents envisagés plus tard** : juridique (conformité, CGV), production (exécution des services vendus), contrôle qualité (relecture avant validation).
 
+**Atelier (ajouté le 27/11/2026)** : agent de production des livrables clients (modèle fort, 16 étapes, 0,40 $ par tâche au maximum). Il fabrique ce qui est vendu selon la fiche d'offre, puis passe la main au support pour la livraison. Les autres pôles gardent leurs fonctions internes (veille, communication, ventes…).
+
 ## 6. Catalogue des outils
 
 Chaque agent n'accède qu'aux outils de son rôle ; les outils marqués « validation » créent une demande au lieu d'agir. Un outil qui dépend d'une clé absente du `.env` (Stripe, Brave) n'est pas proposé aux agents, pour éviter des appels inutiles.

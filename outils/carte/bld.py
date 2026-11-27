@@ -464,6 +464,44 @@ def fi_c(s):
     s.raw('<g class="pulse" style="animation-duration: 3s"><g transform="matrix(1 0.5 0 1 %.1f %.1f)"><circle cx="0" cy="0" r="22" fill="#FBBF24" stroke="#FFF1B8" stroke-width="3" filter="url(#nf%s)"/><circle cx="0" cy="0" r="14" fill="none" stroke="#B45309" stroke-width="2"/></g></g>' % (x, y, s.uid))
     s.beam(-40, 40, 0, 60); s.beam(40, -40, 0, 60)
 
+def at_a(s):
+    """Manufacture : halle de production et cheminées qui fument."""
+    s.slab()
+    f = rect(-40, 40, -32, 32); s.prism(f, 0, 36, "office"); s.cornice(f, 36)
+    for (u, v, r, h) in [(-22, -14, 7, 104), (-4, -18, 6, 86)]:
+        c = circ(u, v, r); s.prism(c, 38.5, h, "bands", smooth=True); s.cornice(c, h, 2, smooth=True)
+        x, y = s.p(u, v, h)
+        for k in range(3):
+            s.raw('<ellipse class="pulse" cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="#FFFFFF" fill-opacity=".14" '
+                  'style="animation-delay: %.1fs"/>' % (x + k*6, y - 10 - k*12, 7 + k*3, 4 + k*1.5, k*.6))
+    s.sign((40, -24), (40, 24), .3, .7, 8, 30, s.c)
+    s.beam(-40, 32, 0, 60); s.beam(40, -32, 0, 60)
+def at_b(s):
+    """Atelier à sheds : toits en dents de scie vitrés et pont roulant."""
+    s.slab()
+    def inside():
+        for (u, v) in [(-20, -12), (4, 6), (22, -8)]:
+            x, y = s.p(u, v, 6); s.raw('<rect x="%.1f" y="%.1f" width="14" height="9" rx="2" fill="%s" filter="url(#nf%s)"/>' % (x-7, y-9, s.c, s.uid))
+    f = rect(-40, 40, -34, 34); s.prism(f, 0, 32, "glass", inside=inside); s.cornice(f, 32, 2)
+    for v0 in (-34, -11, 12):
+        s.prism(rect(-40, 40, v0, v0 + 22), 34, 46, "ribs"); s.crown(rect(-40, 40, v0 + 18, v0 + 22), 46)
+    a, b = s.p(-46, -30, 66), s.p(46, -30, 66)
+    s.line(s.p(-46, -30, 0), a, 3, mix(s.c, .6)); s.line(s.p(46, -30, 0), b, 3, mix(s.c, .6)); s.line(a, b, 4, s.c)
+    x, y = s.p(6, -30, 66); s.line((x, y), (x, y + 26), 1.5, s.hi); s.raw('<rect x="%.1f" y="%.1f" width="10" height="7" fill="%s"/>' % (x-5, y+26, mixw(s.c, .3)))
+    s.beacon(46, -30, 68)
+def at_c(s):
+    """Tour-atelier : socle, fût vitré et engrenage lumineux au sommet."""
+    s.slab()
+    f0 = cham(-34, 34, -34, 34, 8); s.prism(f0, 0, 18, "office"); s.cornice(f0, 18, 2.5)
+    f1 = circ(0, 0, 20); s.prism(f1, 20.5, 104, "bands", smooth=True); s.cornice(f1, 104, smooth=True)
+    x, y = s.p(0, 0, 134)
+    teeth = "".join('<rect x="-3" y="-30" width="6" height="9" rx="1" fill="%s" transform="rotate(%d)"/>' % (s.c, a) for a in range(0, 360, 30))
+    s.raw('<g class="pulse" style="animation-duration: 3s"><g transform="translate(%.1f %.1f) matrix(1 0.5 0 1 0 0)" filter="url(#nf%s)">'
+          '%s<circle r="23" fill="%s" fill-opacity=".35" stroke="%s" stroke-width="4"/><circle r="9" fill="#FFFFFF"/></g></g>'
+          % (x, y, s.uid, teeth, mix(s.c, .5), s.c))
+    s.line(s.p(0, 0, 106), (x, y + 18), 3, mix(s.c, .6))
+    s.beam(-34, 34, 0, 56); s.beam(34, -34, 0, 56)
+
 POLES = [
  ("hq", "Command HQ", "Orchestration", "#818CF8", [("A", "Spire de commandement", "Tour à pans coupés, bandeaux vitrés lumineux et couronne qui brille.", hq_a), ("B", "Citadelle", "Deux tours noires à enseignes néon reliées par une passerelle de verre.", hq_b), ("C", "Anneau orbital", "Tour cylindrique vitrée entourée d’anneaux de données en orbite.", hq_c)]),
  ("research", "Labo Recherche", "Veille et opportunités", "#34D399", [("A", "Observatoire", "Rotonde nervurée, coupole et télescope pointé vers les marchés.", re_a), ("B", "Serre de verre", "Laboratoire transparent : on voit les idées pousser à l’intérieur.", re_b), ("C", "Labo à antenne", "Labo vitré aux écrans allumés et tour équipée d’une parabole.", re_c)]),
@@ -471,6 +509,7 @@ POLES = [
  ("sales", "Centre Ventes", "Revenus", "#A78BFA", [("A", "Tour de verre", "Gradins vitrés, corniches dorées et flèche de croissance.", ve_a), ("B", "Ziggurat des deals", "Pyramide à étages : chaque niveau est une étape du pipeline.", ve_b), ("C", "Tours jumelles", "Deux tours de bureaux illuminées reliées par un pont de verre.", ve_c)]),
  ("support", "Zone Support", "Clients", "#FBBF24", [("A", "Centre d’écoute", "Rotonde à bandeaux lumineux surmontée d’une parabole.", su_a), ("B", "Phare", "Le phare qui guide les clients, 24 h/24.", su_b), ("C", "Hub en anneau", "Bâtiment circulaire autour d’une tour relais qui émet.", su_c)]),
  ("data", "Data Core", "Mémoire et données", "#22D3EE", [("A", "Réacteur de données", "Cœur lumineux sous verre, entouré d’anneaux d’énergie.", da_a), ("B", "Ferme de serveurs", "Rangées de baies noires et leurs voyants qui clignotent.", da_b), ("C", "Cristal de mémoire", "Cristal flottant au-dessus de son socle : la mémoire partagée.", da_c)]),
+ ("atelier", "Atelier", "Production", "#FB923C", [("A", "Manufacture", "Halle de production et cheminées qui fument : on fabrique les livrables.", at_a), ("B", "Atelier à sheds", "Toits vitrés en dents de scie et pont roulant au-dessus des postes.", at_b), ("C", "Tour-atelier", "Fût vitré surmonté d’un engrenage lumineux qui tourne.", at_c)]),
  ("finance", "Trésorerie", "Finances", "#F472B6", [("A", "Coffre-fort", "Bloc noir, porte de coffre circulaire et lames dorées.", fi_a), ("B", "Temple financier", "Colonnade dorée et fronton : la solidité des comptes.", fi_b), ("C", "Tour des pièces", "Pile de pièces géante et pièce d’or flottante.", fi_c)]),
 ]
 
@@ -544,6 +583,10 @@ def _holo(s, u, v, kind, col, size=1.0):
     elif kind == "headset":
         g += '<path d="M%.1f %.1f A%.1f %.1f 0 0 1 %.1f %.1f" fill="none" stroke="%s" stroke-width="2.2"/>' % (x - R, cy + R*.3, R, R, x + R, cy + R*.3, hc)
         g += '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="2" fill="%s"/><rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="2" fill="%s"/>' % (x - R*1.2, cy, R*.5, R*.8, hc, x + R*.7, cy, R*.5, R*.8, hc)
+    elif kind == "gear":
+        for a in range(0, 360, 45):
+            g += '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="1" fill="%s" transform="rotate(%d %.1f %.1f)"/>' % (x - R*.18, cy - R*1.25, R*.36, R*.4, hc, a, x, cy)
+        g += '<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s" fill-opacity=".3" stroke="%s" stroke-width="2"/><circle cx="%.1f" cy="%.1f" r="%.1f" fill="#FFFFFF"/>' % (x, cy, R*.95, col, hc, x, cy, R*.3)
     elif kind == "coin":
         g += '<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="#FBBF24" stroke="#FFF1B8" stroke-width="1.5"/><ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="none" stroke="#B45309" stroke-width="1.2"/>' % (x, cy, R*.9, R*1.1, x, cy, R*.55, R*.7)
     g += '</g>'
@@ -584,4 +627,4 @@ def office(s, R, kind, hq=False):
         elif t == "bot": s.raw(_bot(s, u, v, 0, col, 1.0))
         elif t == "holo": _holo(s, u, v, kind, col, 1.25 if hq else .9)
 
-OFFICE_KIND = {"hq": "globe", "research": "chart", "marketing": "target", "sales": "bars", "support": "headset", "data": "city", "finance": "coin"}
+OFFICE_KIND = {"hq": "globe", "research": "chart", "marketing": "target", "sales": "bars", "support": "headset", "data": "city", "finance": "coin", "atelier": "gear"}

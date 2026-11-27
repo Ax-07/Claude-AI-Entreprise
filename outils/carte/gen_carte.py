@@ -58,8 +58,9 @@ D = [
  dict(id="support", name="Zone Support", col="#FBBF24", x=840, y=340, ag=6),
  dict(id="data", name="Data Core", col="#22D3EE", x=330, y=425, ag=2),
  dict(id="finance", name="Trésorerie", col="#F472B6", x=670, y=425, ag=2),
+ dict(id="atelier", name="Atelier", col="#FB923C", x=500, y=510, ag=3),
 ]
-DEFAULT = {"hq": "A", "research": "A", "marketing": "A", "sales": "A", "support": "B", "data": "A", "finance": "A"}
+DEFAULT = {"hq": "A", "research": "A", "marketing": "A", "sales": "A", "support": "B", "data": "A", "finance": "A", "atelier": "A"}
 VARS = {p[0]: p[4] for p in POLES}
 RU = {d["id"]: (56 if d["id"] == "hq" else 46) for d in D}
 TH = 8
@@ -164,6 +165,7 @@ desc = {
  "support": ("Clients", "Réponses aux clients 24 h/24, gestion des retours et satisfaction.", ["Tickets en attente : 3", "FAQ mise à jour"]),
  "data": ("Mémoire et données", "Base de connaissances partagée, métriques et apprentissage des agents.", ["Indexation des rapports", "Tableau de bord des KPI"]),
  "finance": ("Finances", "Suivi des revenus, contrôle des coûts API et rentabilité par activité.", ["Contrôle du plafond API", "Rapport de rentabilité"]),
+ "atelier": ("Production", "Fabrique les livrables vendus aux clients, selon la fiche d’offre, avec une méthode de qualité.", ["Rapports clients", "Contrôle qualité"]),
 }
 for d in D:
     ru = RU[d["id"]]
@@ -174,7 +176,7 @@ for d in D:
 DEFAULT_JS = json.dumps(DEFAULT)
 
 
-AGENT = {"hq": "pdg", "research": "recherche", "marketing": "marketing", "sales": "ventes", "support": "support", "data": "data", "finance": "finance"}
+AGENT = {"hq": "pdg", "research": "recherche", "marketing": "marketing", "sales": "ventes", "support": "support", "data": "data", "finance": "finance", "atelier": "atelier"}
 SVG_OUT = SVG.replace('<svg viewBox="0 0 1000 620" width="100%" style="display: block" aria-hidden="true">',
                       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="100%" style="display:block" aria-hidden="true">', 1)
 assert "{{" not in SVG_OUT, "trou de gabarit restant"

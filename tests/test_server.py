@@ -70,7 +70,7 @@ class ServerTest(unittest.TestCase):
         self.assertFalse(s["engine"]["running"])
         st, ag, _ = self.req("GET", "/api/agents")
         by = {a["name"]: a for a in ag}
-        self.assertEqual(len(ag), 7)
+        self.assertEqual(len(ag), 8)
         self.assertEqual(by["recherche"]["done"], 1)
         self.assertEqual(by["ventes"]["state"], "waiting")
 
@@ -163,14 +163,15 @@ class MaquetteTest(ServerTest):
         svg = gz.decompress(raw).decode("utf-8")
         self.assertLess(len(raw), len(svg) / 3)
         self.assertNotIn("{{", svg)
-        for pole in ("hq", "research", "marketing", "sales", "support", "data", "finance"):
+        for pole in ("hq", "research", "marketing", "sales", "support", "data", "finance", "atelier"):
             for v in "ABC":
                 self.assertIn(f'class="bld" data-pole="{pole}" data-variant="{v}"', svg)
             self.assertIn(f'class="office" data-pole="{pole}"', svg)
         st, meta, _ = self.req("GET", "/carte.json")
         self.assertEqual(st, 200)
         self.assertEqual(meta["agent_of_pole"]["sales"], "ventes")
-        self.assertEqual(len(meta["poles"]), 7)
+        self.assertEqual(len(meta["poles"]), 8)
+        self.assertEqual(meta["agent_of_pole"]["atelier"], "atelier")
 
     def test_page_follows_mockup_sections(self):
         _, html, _ = self.req("GET", "/")

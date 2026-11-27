@@ -66,6 +66,13 @@ _Mis à jour le 27/11/2026_
 - `set_order_status(attente_client)` refusé si aucun email n'a été envoyé au client ou s'il a déjà répondu au dernier.
 - Règles : les consignes du propriétaire font foi ; avancer avec une hypothèse raisonnable signalée plutôt que bloquer. 101 tests.
 
+## Atelier de production (27/11/2026)
+- Constat du propriétaire : le rapport client était produit par le Labo Recherche, dont la mission est la veille, pas la production. Il manquait la fonction « métier ».
+- 8e agent `atelier` (pôle Atelier, #FB923C) : produit les livrables clients selon la fiche d'offre, méthode de qualité (faits vérifiables, hypothèses signalées, relecture), puis délègue la livraison au support. Modèle fort, 16 étapes, plafond 0,40 $ par tâche (champs `Role.max_steps` et `Role.task_budget_usd`).
+- Producteur par défaut des offres et des commandes sans fiche : l'atelier.
+- Carte : 8e district au coin avant du plateau (Manufacture / Atelier à sheds / Tour-atelier, open-space avec engrenage holographique).
+- Première commande (test) livrée par le propriétaire le 27/11/2026, rapport produit par le Labo Recherche. 102 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

@@ -182,6 +182,26 @@ class OrdersTest(Base):
         db.conn.close()
 
 
+class AtelierTest(Base):
+    def test_role_limits_and_default_producer(self):
+        from ai_studio.agents import ROLES
+        from ai_studio.llm import BudgetExceeded, BudgetGuard
+        a = ROLES["atelier"]
+        self.assertEqual((a.model, a.max_steps), ("strong", 16))
+        self.assertIn("deliver_order", a.mission)
+        g = BudgetGuard(self.cfg, self.db)
+        t1 = self.db.add_task("rapport", "atelier"); t2 = self.db.add_task("étude", "recherche")
+        for t in (t1, t2):
+            self.db.add_cost("x", t, "m", 1, 1, 0, 0.20)
+        g.check(t1)                                   # 0,20 $ < plafond de l'atelier (0,40 $)
+        with self.assertRaises(BudgetExceeded):
+            g.check(t2)                               # plafond général (0,15 $)
+        from ai_studio.agents import ROLES as R
+        ctx = ToolContext(self.cfg, self.db, "pdg", None, list(R))
+        run_tool("save_offer", ctx, {"name": "Audit", "price_eur": 90, "summary": "s", "deliverable": "d", "delay_hours": 24})
+        self.assertEqual(self.db.one("SELECT producer FROM offers")[0], "atelier")
+
+
 class MigrationTest(Base):
     def test_old_database_is_upgraded_without_loss(self):
         path = self.dir / "ancienne.db"

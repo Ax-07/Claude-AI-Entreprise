@@ -259,8 +259,15 @@ class BudgetGuard:
             raise BudgetExceeded(f"Budget mensuel atteint ({b['monthly_usd']} $)")
         if self.db.spent("day") >= b["daily_usd"]:
             raise BudgetExceeded(f"Budget du jour atteint ({b['daily_usd']} $)")
-        if task_id is not None and self.db.task_cost(task_id) >= b["per_task_usd"]:
-            raise BudgetExceeded(f"Plafond par tâche atteint ({b['per_task_usd']} $)")
+        if task_id is not None:
+            cap = b["per_task_usd"]
+            row = self.db.one("SELECT agent FROM tasks WHERE id=?", (task_id,))
+            if row:
+                from .agents import ROLES
+                role = ROLES.get(row[0])
+                cap = (role.task_budget_usd if role and role.task_budget_usd else cap)
+            if self.db.task_cost(task_id) >= cap:
+                raise BudgetExceeded(f"Plafond par tâche atteint ({cap} $)")
 
     def searches_left(self) -> int:
         return max(0, int(self.cfg["budget"]["web_searches_per_day"]) - self.db.searches_today())

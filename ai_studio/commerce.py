@@ -192,7 +192,7 @@ def delivery_brief(db, n: int, nudge: str = "") -> str:
         "Tu es responsable de cette commande jusqu'à sa livraison. Le moteur te relancera tant qu'elle n'est pas livrée.\n"
         "1. Vérifie où en est la commande : list_orders, list_tasks, fichiers dans livraisons/ (un plan ou un cahier des "
         "charges n'est PAS un livrable).\n"
-        f"2. Si le livrable n'existe pas : délègue sa production à l'agent {o['producer'] if o else 'compétent'} avec un "
+        f"2. Si le livrable n'existe pas : délègue sa production à l'agent {o['producer'] if o else 'atelier'} avec un "
         f"fichier attendu précis (livraisons/commande-{n}/…) et la consigne de déléguer ensuite la livraison à l'agent "
         f"support (deliver_order, order={n}).\n"
         f"3. Si le livrable existe : délègue au support la livraison (deliver_order, order={n}, avec le fichier en pièce jointe).\n"

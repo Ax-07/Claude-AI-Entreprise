@@ -6,7 +6,8 @@
   "sales": "A",
   "support": "B",
   "data": "A",
-  "finance": "A"
+  "finance": "A",
+  "atelier": "A"
  },
  "agent_of_pole": {
   "hq": "pdg",
@@ -15,7 +16,8 @@
   "sales": "ventes",
   "support": "support",
   "data": "data",
-  "finance": "finance"
+  "finance": "finance",
+  "atelier": "atelier"
  },
  "poles": [
   {
@@ -206,6 +208,33 @@
     }
    ],
    "agent": "finance"
+  },
+  {
+   "id": "atelier",
+   "name": "Atelier",
+   "color": "#FB923C",
+   "left": "50.00%",
+   "top": "91.94%",
+   "role": "Production",
+   "desc": "Fabrique les livrables vendus aux clients, selon la fiche d’offre, avec une méthode de qualité.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Manufacture",
+     "text": "Halle de production et cheminées qui fument : on fabrique les livrables."
+    },
+    {
+     "L": "B",
+     "name": "Atelier à sheds",
+     "text": "Toits vitrés en dents de scie et pont roulant au-dessus des postes."
+    },
+    {
+     "L": "C",
+     "name": "Tour-atelier",
+     "text": "Fût vitré surmonté d’un engrenage lumineux qui tourne."
+    }
+   ],
+   "agent": "atelier"
   }
  ]
 }
