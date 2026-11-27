@@ -18,6 +18,8 @@ DEFAULTS: dict = {
         "owner_name": "Propriétaire",
         "language": "fr",
         "description": "Micro-entreprise française de services numériques opérée par des agents IA.",
+        # Mentions légales affichées en pied de toutes les pages publiques (obligatoires pour une page de vente).
+        "legal": {"name": "", "siret": "", "address": "", "email": "", "vat_exempt": True, "cgv_url": ""},
     },
     # "auto" : Anthropic si ANTHROPIC_API_KEY est dans .env, sinon OpenAI si OPENAI_API_KEY y est.
     "provider": "auto",
@@ -67,7 +69,9 @@ DEFAULTS: dict = {
         "web_fetch": {"enabled": False, "type": "web_fetch_20260209", "max_uses": 3, "max_content_tokens": 6000},
     },
     # Notifications Windows : nouvelle validation à faire, budget atteint, erreur bloquante.
-    "notifications": {"windows": True, "approvals": True, "budget": True, "errors": True},
+    "notifications": {"windows": True, "approvals": True, "budget": True, "errors": True, "sales": True},
+    # Boucle commerciale : fréquence de lecture de Stripe et de la boîte mail, plafond de réponses par jour.
+    "commerce": {"stripe_sync_minutes": 10, "inbox_sync_minutes": 5, "inbox_tasks_per_day": 10},
     # Sauvegarde quotidienne de la base et des livrables dans data/sauvegardes (les N plus récentes sont gardées).
     "backup": {"enabled": True, "keep": 14},
     "email": {

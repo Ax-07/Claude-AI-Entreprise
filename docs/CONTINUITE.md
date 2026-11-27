@@ -40,13 +40,19 @@ _Mis à jour le 27/11/2026_
 - `demarrage-auto [--retirer]` : lancement à l'ouverture de session Windows (fichier dans le dossier Démarrage, fenêtre réduite, sans navigateur).
 - Réglages : `notifications` et `backup` dans config.json. 69 tests.
 
+## Boucle commerciale (27/11/2026)
+- `ai_studio/commerce.py` : synchro Stripe (sessions de paiement → table `sales`, tâche de livraison prioritaire pour le PDG, notification), lecture Gmail IMAP en lecture seule (table `inbox`, tâche de réponse ventes/support, filtres newsletters/automatiques, 10 par jour), publication GitHub Pages (API contents) après validation.
+- Outils : `list_sales`, `list_inbox`, `read_email`, `propose_page` ; `draft_email` accepte `in_reply_to` et `attachment`. Le contenu des emails reçus est délimité comme donnée externe (anti-injection) et toute réponse repasse par la validation.
+- Tableau de bord : revenus du mois réels, pipeline (emails reçus, pages publiées, ventes) cliquable, aperçu isolé (CSP sandbox) des pages avant publication. Source de la page : `outils/tableau/index_source.html` + `build.py`.
+- Choix du propriétaire : site sur GitHub Pages dans un dépôt public séparé ; boîte Gmail dédiée avec mot de passe d'application.
+- 85 tests. Non testé avec les vrais Stripe, Gmail et GitHub (simulés dans les tests).
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.
 
 ## Prochaines étapes
-1. Vérification par le propriétaire : tableau de bord sur ses vraies données, `notifier-test`, `demarrage-auto`.
-2. Boucle commerciale complète dans l'app : page d'offre (GitHub Pages), lecture des réponses (IMAP), détection des paiements Stripe (revenus dans le tableau de bord), livraison.
+1. Configuration chez le propriétaire : Gmail (mot de passe d'application), dépôt public du site + jeton GitHub, clé Stripe (lecture Checkout Sessions), mentions légales dans config.json.
 3. Notes du propriétaire sur les livrables, pour l'amélioration des agents.
 4. Phase « Prêt à vendre » : domaine, email pro, CGV, n8n.
 3. Choisir l'activité (piste : diagnostic SEO local) et viser le premier paiement Stripe.

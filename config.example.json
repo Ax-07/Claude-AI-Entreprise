@@ -2,7 +2,15 @@
   "company": {
     "name": "AI Enterprise Studio",
     "owner_name": "Propriétaire",
-    "description": "Micro-entreprise française de services numériques opérée par une équipe d'agents IA. Objectif : générer des revenus réels, de façon légale et rentable, avec un minimum d'intervention du propriétaire."
+    "description": "Micro-entreprise française de services numériques opérée par une équipe d'agents IA. Objectif : générer des revenus réels, de façon légale et rentable, avec un minimum d'intervention du propriétaire.",
+    "legal": {
+      "name": "",
+      "siret": "",
+      "address": "",
+      "email": "",
+      "vat_exempt": true,
+      "cgv_url": ""
+    }
   },
   "provider": "auto",
   "models": {
@@ -26,5 +34,10 @@
     "max_tasks_per_cycle": 3,
     "max_steps_per_task": 8,
     "ceo_review_minutes": 180
+  },
+  "commerce": {
+    "stripe_sync_minutes": 10,
+    "inbox_sync_minutes": 5,
+    "inbox_tasks_per_day": 10
   }
 }

@@ -26,7 +26,8 @@ PS_SCRIPT = (
     "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($env:AI_STUDIO_APPID).Show($t)"
 )
 
-ACTIONS = {"send_email": "Envoi d'email", "stripe_payment_link": "Lien de paiement Stripe", "decision": "Décision demandée"}
+ACTIONS = {"send_email": "Envoi d'email", "stripe_payment_link": "Lien de paiement Stripe", "decision": "Décision demandée",
+           "publish_page": "Publication d'une page"}
 
 
 def toast_xml(title: str, message: str, url: str) -> str:
