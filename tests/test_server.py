@@ -184,10 +184,9 @@ class MaquetteTest(ServerTest):
                 self.assertIn(f'class="bld" data-pole="{p["id"]}" data-variant="{v}"', svg)
             self.assertIn(f'class="office" data-pole="{p["id"]}"', svg)
         q = {x["id"]: x for x in meta["quarters"]}
-        self.assertEqual(q["commercial"]["poles"], ["marketing", "sales", "support"])
+        self.assertEqual(q["commercial"]["poles"], ["marketing", "sales", "support", "ecommerce"])
         self.assertEqual(sorted(q["administration"]["poles"]), ["finance", "legal"])
         self.assertEqual(sorted(q["direction"]["poles"]), ["data", "hq", "security"])
-        self.assertTrue(q["video"]["planned"] and q["ecommerce"]["planned"])
         # plateau « ville » : enseigne à l'avant de chaque îlot, pas de nom de code (rester professionnel)
         for p in meta["poles"]:
             self.assertNotIn("code", p)
@@ -197,7 +196,9 @@ class MaquetteTest(ServerTest):
         self.assertEqual(data["left"], "50.00%")
         # chaque pôle occupe un coin de 4 emplacements (le Data Core est au centre)
         slots = {k: len([p for p in q[k]["poles"] if p != "data"]) + q[k]["free"] for k in ("direction", "commercial", "production", "administration")}
-        slots["production"] += 1; slots["commercial"] += 1   # chantiers Studio vidéo et E-commerce
+        planned = {p["id"] for p in meta["poles"] if p["planned"]}
+        self.assertEqual(planned, {"video", "ecommerce"})                     # bâtiments des divisions en préparation
+        self.assertEqual((meta["agents_of_pole"]["video"], "video" in meta["agent_of_pole"]), ([], False))
         self.assertEqual(set(slots.values()), {4})
 
     def test_static_files_revalidated_not_stale(self):

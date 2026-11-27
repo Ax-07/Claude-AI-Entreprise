@@ -70,9 +70,10 @@ LOTS = {"data": (2, 2, "direction"), "hq": (1, 1, "direction"),
         "marketing": (0, 4, "commercial"), "sales": (1, 3, "commercial"), "support": (1, 4, "commercial"),
         "research": (3, 0, "production"), "atelier": (3, 1, "production"), "dev": (4, 1, "production"),
         "legal": (3, 4, "administration"), "finance": (4, 4, "administration"),
-        "security": (1, 0, "direction")}   # Cybersécurité avec la Direction et le Data Core : pôle Tech
-PLOTS = [dict(id="video", name="Studio vidéo", col="#F43F5E", ij=(4, 0)),
-         dict(id="ecommerce", name="E-commerce", col="#A3E635", ij=(0, 3))]   # E-commerce = canal de vente : Pôle commercial
+        "security": (1, 0, "direction"),   # Cybersécurité avec la Direction et le Data Core : pôle Tech
+        # divisions en préparation : bâtiment déjà construit, sans agent pour l'instant
+        "video": (4, 0, "production"), "ecommerce": (0, 3, "commercial")}   # E-commerce = canal de vente
+PLOTS = []          # plus de chantier : les futures divisions ont leur bâtiment
 PARKS = {(i, j) for i in range(N) for j in range(N) if (i == 2) != (j == 2)}   # la croix entre les 4 coins
 used = {(i, j) for (i, j, d) in LOTS.values()} | {a["ij"] for a in PLOTS} | PARKS
 FREE = {(i, j): d for d, (i0, j0) in ZONES.items() for i in (i0, i0 + 1) for j in (j0, j0 + 1) if (i, j) not in used}
@@ -86,14 +87,16 @@ INFO = {  # nom, couleur, agent, rôle affiché, description, échelle du bâtim
  "research": ("Labo Recherche", "#34D399", "recherche", "R&D et veille", "Marchés, niches, concurrence et nouvelles offres pour toutes les activités.", .56),
  "atelier": ("Atelier", "#FB923C", "atelier", "Production", "Fabrique les livrables vendus aux clients, selon la fiche d’offre.", .56),
  "dev": ("Développement", "#22D3EE", "developpement", "Sites et applications", "Conçoit et livre les sites web, applications et outils sur mesure vendus aux clients.", .56),
+ "video": ("Studio vidéo", "#F43F5E", None, "En préparation", "Future division vidéo : une chaîne YouTube de promotion de l’entreprise, puis des chaînes de contenu monétisées, à l’international.", .56),
+ "ecommerce": ("E-commerce", "#A3E635", None, "En préparation", "Future division de vente en ligne (dropshipping international) : boutique, fournisseurs, commandes et retours.", .56),
  "legal": ("Juridique", "#CBD5E1", "juridique", "Conformité", "CGV, mentions, RGPD, factures : relit les actions avant ta décision.", .56),
  "finance": ("Trésorerie", "#F472B6", "finance", "Finances", "Revenus, coûts d’API et rentabilité de chaque activité.", .56),
  "security": ("Cybersécurité", "#F87171", "securite", "Protection", "Configuration, anomalies et emails piégés : veille défensive quotidienne.", .56),
 }
 KIND = {"hq": "globe", "data": "city", "marketing": "target", "sales": "bars", "support": "headset", "research": "chart",
-        "atelier": "gear", "dev": "code", "legal": "scale", "finance": "coin", "security": "shield"}
+        "atelier": "gear", "dev": "code", "video": "play", "ecommerce": "cart", "legal": "scale", "finance": "coin", "security": "shield"}
 VARS = {p[0]: p[4] for p in POLES}
-DEFAULT = {"hq": "A", "data": "A", "marketing": "A", "sales": "A", "support": "B", "research": "A", "atelier": "A", "dev": "A",
+DEFAULT = {"hq": "A", "data": "A", "marketing": "A", "sales": "A", "support": "B", "research": "A", "atelier": "A", "dev": "A", "video": "A", "ecommerce": "A",
            "legal": "A", "finance": "A", "security": "A"}
 FOOT = 25
 
@@ -288,6 +291,7 @@ for pid, (x, y, d) in B.items():
     groups += '<g class="office" data-pole="%s" style="display:none" transform="translate(%.1f %.1f)"><defs>%s</defs>%s</g>' % (pid, x, y, so.defs, "".join(so.o))
     objs.append((y, groups))
     foot = FOOT
+    if agent is None: continue      # division en préparation : pas encore de robots
     bots = "".join('<g class="bot" data-pole="%s" data-i="%d" style="display:none">%s</g>' % (pid, i, robot(*iso(x, y, 2*foot, u, v), c)) for i, (u, v) in enumerate(SPOTS))
     objs.append((y + foot * .9, '<g class="bots">%s</g>' % bots))
 objs.sort(key=lambda o: o[0])
@@ -301,7 +305,7 @@ poles_js = []
 for pid, (x, y, d) in B.items():
     name, c, agent, role, desc, k = INFO[pid]
     ly = y - 4          # voyant posé sur le bâtiment (les îlots de devant masqueraient le pied)
-    poles_js.append(dict(id=pid, name=name, color=c, agent=agent, quarter=d, division=d,
+    poles_js.append(dict(id=pid, name=name, color=c, agent=agent, planned=agent is None, quarter=d, division=d,
                          left="%.2f%%" % (x / W * 100), top="%.2f%%" % (ly / H * 100),
                          role=DIVS[d][0] + " · " + role, desc=desc,
                          variants=[dict(L=v[0], name=v[1], text=v[2]) for v in VARS[pid]]))
@@ -312,12 +316,12 @@ for a in PLOTS:
     u, v = lot_center(*a["ij"]); x, y = p(u, v, TH)
     quarters_js.append(dict(id=a["id"], name=a["name"], color=a["col"], planned=True, poles=[],
                             left="%.2f%%" % (x / W * 100), top="%.2f%%" % ((y + 8) / H * 100)))
-AGENT = {pid: INFO[pid][2] for pid in B}
+AGENT = {pid: INFO[pid][2] for pid in B if INFO[pid][2]}
 SVG_OUT = SVG.replace('<svg viewBox="0 0 1000 620" width="100%" style="display: block" aria-hidden="true">',
                       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="100%" style="display:block" aria-hidden="true">', 1)
 assert "{{" not in SVG_OUT, "trou de gabarit restant"
 (OUT / "carte.svg").write_text(SVG_OUT, encoding="utf-8")
-meta = {"default_variants": DEFAULT, "agent_of_pole": AGENT, "agents_of_pole": {p_: [a] for p_, a in AGENT.items()},
+meta = {"default_variants": DEFAULT, "agent_of_pole": AGENT, "agents_of_pole": {p_: ([INFO[p_][2]] if INFO[p_][2] else []) for p_ in B},
         "quarters": quarters_js, "divisions": [], "poles": poles_js}
 (OUT / "carte.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
 print("carte.svg :", len(SVG_OUT) // 1024, "Ko")

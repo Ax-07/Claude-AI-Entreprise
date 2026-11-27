@@ -8,6 +8,8 @@
   "research": "A",
   "atelier": "A",
   "dev": "A",
+  "video": "A",
+  "ecommerce": "A",
   "legal": "A",
   "finance": "A",
   "security": "A"
@@ -58,7 +60,9 @@
   ],
   "security": [
    "securite"
-  ]
+  ],
+  "video": [],
+  "ecommerce": []
  },
  "quarters": [
   {
@@ -83,7 +87,8 @@
    "poles": [
     "marketing",
     "sales",
-    "support"
+    "support",
+    "ecommerce"
    ],
    "free": 0,
    "left": "13.00%",
@@ -97,7 +102,8 @@
    "poles": [
     "research",
     "atelier",
-    "dev"
+    "dev",
+    "video"
    ],
    "free": 0,
    "left": "90.50%",
@@ -115,24 +121,6 @@
    "free": 2,
    "left": "50.00%",
    "top": "96.77%"
-  },
-  {
-   "id": "video",
-   "name": "Studio vidéo",
-   "color": "#F43F5E",
-   "planned": true,
-   "poles": [],
-   "left": "90.40%",
-   "top": "53.71%"
-  },
-  {
-   "id": "ecommerce",
-   "name": "E-commerce",
-   "color": "#A3E635",
-   "planned": true,
-   "poles": [],
-   "left": "19.80%",
-   "top": "45.48%"
   }
  ],
  "divisions": [],
@@ -142,6 +130,7 @@
    "name": "Data Core",
    "color": "#F1F5F9",
    "agent": "data",
+   "planned": false,
    "quarter": "direction",
    "division": "direction",
    "left": "50.00%",
@@ -186,6 +175,7 @@
    "name": "Command HQ",
    "color": "#818CF8",
    "agent": "pdg",
+   "planned": false,
    "quarter": "direction",
    "division": "direction",
    "left": "50.00%",
@@ -215,6 +205,7 @@
    "name": "Hub Marketing",
    "color": "#60A5FA",
    "agent": "marketing",
+   "planned": false,
    "quarter": "commercial",
    "division": "commercial",
    "left": "9.60%",
@@ -244,6 +235,7 @@
    "name": "Centre Ventes",
    "color": "#A78BFA",
    "agent": "ventes",
+   "planned": false,
    "quarter": "commercial",
    "division": "commercial",
    "left": "30.00%",
@@ -273,6 +265,7 @@
    "name": "Service Client",
    "color": "#FBBF24",
    "agent": "support",
+   "planned": false,
    "quarter": "commercial",
    "division": "commercial",
    "left": "19.80%",
@@ -302,6 +295,7 @@
    "name": "Labo Recherche",
    "color": "#34D399",
    "agent": "recherche",
+   "planned": false,
    "quarter": "production",
    "division": "production",
    "left": "80.20%",
@@ -331,6 +325,7 @@
    "name": "Atelier",
    "color": "#FB923C",
    "agent": "atelier",
+   "planned": false,
    "quarter": "production",
    "division": "production",
    "left": "70.00%",
@@ -360,6 +355,7 @@
    "name": "Développement",
    "color": "#22D3EE",
    "agent": "developpement",
+   "planned": false,
    "quarter": "production",
    "division": "production",
    "left": "80.20%",
@@ -389,6 +385,7 @@
    "name": "Juridique",
    "color": "#CBD5E1",
    "agent": "juridique",
+   "planned": false,
    "quarter": "administration",
    "division": "administration",
    "left": "39.80%",
@@ -418,6 +415,7 @@
    "name": "Trésorerie",
    "color": "#F472B6",
    "agent": "finance",
+   "planned": false,
    "quarter": "administration",
    "division": "administration",
    "left": "50.00%",
@@ -447,6 +445,7 @@
    "name": "Cybersécurité",
    "color": "#F87171",
    "agent": "securite",
+   "planned": false,
    "quarter": "direction",
    "division": "direction",
    "left": "60.20%",
@@ -468,6 +467,66 @@
      "L": "C",
      "name": "Centre de veille",
      "text": "Salle d’écrans et radar qui balaie l’horizon 24 h/24."
+    }
+   ]
+  },
+  {
+   "id": "video",
+   "name": "Studio vidéo",
+   "color": "#F43F5E",
+   "agent": null,
+   "planned": true,
+   "quarter": "production",
+   "division": "production",
+   "left": "90.40%",
+   "top": "51.77%",
+   "role": "Pôle production · En préparation",
+   "desc": "Future division vidéo : une chaîne YouTube de promotion de l’entreprise, puis des chaînes de contenu monétisées, à l’international.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Studio de tournage",
+     "text": "Grand plateau, écran géant et projecteurs."
+    },
+    {
+     "L": "B",
+     "name": "Tour média",
+     "text": "Tour vitrée, voyant REC et lecteur vidéo flottant."
+    },
+    {
+     "L": "C",
+     "name": "Plateau de diffusion",
+     "text": "Coupole, antenne d’émission et ondes."
+    }
+   ]
+  },
+  {
+   "id": "ecommerce",
+   "name": "E-commerce",
+   "color": "#A3E635",
+   "agent": null,
+   "planned": true,
+   "quarter": "commercial",
+   "division": "commercial",
+   "left": "19.80%",
+   "top": "43.55%",
+   "role": "Pôle commercial · En préparation",
+   "desc": "Future division de vente en ligne (dropshipping international) : boutique, fournisseurs, commandes et retours.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Entrepôt logistique",
+     "text": "Halle, quais de chargement et colis empilés."
+    },
+    {
+     "L": "B",
+     "name": "Boutique en ligne",
+     "text": "Tour vitrée et caddie lumineux au sommet."
+    },
+    {
+     "L": "C",
+     "name": "Hub de livraison",
+     "text": "Centre de tri, tapis de colis et drone de livraison."
     }
    ]
   }
