@@ -75,7 +75,7 @@ PLOTS = [dict(id="video", name="Studio vidéo", col="#F43F5E", ij=(4, 0)),
 PARKS = {(i, j) for i in range(N) for j in range(N) if (i == 2) != (j == 2)}   # la croix entre les 4 coins
 used = {(i, j) for (i, j, d) in LOTS.values()} | {a["ij"] for a in PLOTS} | PARKS
 FREE = {(i, j): d for d, (i0, j0) in ZONES.items() for i in (i0, i0 + 1) for j in (j0, j0 + 1) if (i, j) not in used}
-FILL = {ij: "park" for ij in PARKS}
+FILL = {**{ij: "park" for ij in PARKS}, **{ij: "towers" for ij in FREE}}   # emplacements libres : immeubles éclairés
 INFO = {  # nom, couleur, agent, rôle affiché, description, échelle du bâtiment
  "hq": ("Command HQ", "#818CF8", "pdg", "Orchestration", "Le PDG IA répartit les missions, arbitre les budgets et fait remonter les décisions sensibles.", .62),
  "data": ("Data Core", "#22D3EE", "data", "Mémoire et données", "Le cœur de l’entreprise : mémoire partagée, mesures et amélioration des agents.", .6),
@@ -224,14 +224,8 @@ for pid, (i, j, d) in LOTS.items():
     u, v = lot_center(i, j); x, y = p(u, v, TH); B[pid] = (x, y, d)
 for a in PLOTS:
     ground.append(sidewalk(*a["ij"], a["col"], dashed=True))
-for (i, j), kind in FILL.items():
-    ground.append(sidewalk(i, j, "#22c58f"))
-for (i, j), d in FREE.items():   # emplacement libre du pôle : contour en pointillés et repère « + »
-    col = DIVS[d][1]
-    ground.append(sidewalk(i, j, col, dashed=True))
-    x0, y0 = p(*lot_center(i, j), TH)
-    ground.append('<g stroke="%s" stroke-opacity=".7" stroke-width="2" stroke-linecap="round"><line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"/><line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"/></g>' % (
-        col, x0 - 7, y0, x0 + 7, y0, x0, y0 - 4, x0, y0 + 4))
+for (i, j), kind in FILL.items():   # parcs en vert ; emplacements libres bordés à la couleur de leur pôle
+    ground.append(sidewalk(i, j, "#22c58f" if kind == "park" else DIVS[FREE[(i, j)]][1]))
 svg.append("".join(ground))
 # chantiers : grue et palissade
 for a in PLOTS:
@@ -263,7 +257,7 @@ for (i, j), kind in FILL.items():
     hmax = 30 if cy_ > 400 else 44 if cy_ < 160 else 62   # bas au premier plan, pour ne rien masquer
     cells = [(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b) for a in (.28, .72) for b in (.28, .72)]
     for (u, v) in cells:
-        if rnd.random() < .2:
+        if rnd.random() < .08:
             x, y = p(u, v, TH); objs.append((y, tree(x, y))); continue
         a_, b_ = rnd.uniform(9, 13), rnd.uniform(9, 13); h = rnd.uniform(20, hmax)
         G2 = tower(rnd, u, v, a_, b_, h, rnd.choice(["#334155", "#3b3363", "#1e3a5f", "#3f3f46"]))
