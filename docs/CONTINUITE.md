@@ -23,6 +23,9 @@ _Mis à jour le 27/11/2026_
 - Corrigé : envoi de `reasoning_effort: "none"` ; erreurs de configuration affichées et sans perte de tâches ; pas de nouvel essai dans le même cycle ; commandes `relancer`, `objectifs`, `archiver`.
 - 2e lancement : **premier cycle réel réussi** (0,063 $). PDG → Recherche (3 pistes : diagnostic SEO local, réécriture de fiches produits, automatisation no-code) → Finance (grille de rentabilité) → 4 tâches de suite créées. Agents honnêtes (faits / hypothèses séparés, sources réelles).
 - Défauts corrigés ensuite : rapport de la Recherche non écrit (arguments write_file coupés par la limite de 2 000 tokens → limite portée à 6 000, `append` pour écrire en plusieurs parties, message d'aide) ; outils Stripe proposés sans clé (désormais masqués) ; `run --once` affichait d'anciens échecs.
+- 3e lancement : rapport des 3 offres écrit et sourcé (La Fabrique du Net, NOIISE, Zapier). Offre jugée la plus adaptée : **diagnostic SEO local** (données publiques, très automatisable). Défaut : l'agent raisonnait en heures humaines.
+- Ajustements : règle « coût d'API et temps de validation, pas heures humaines », 30 recherches par jour (couvertes par les crédits Brave), compactage de l'historique envoyé au modèle.
+- Décision du propriétaire : on reste sur la **construction de l'app** ; les agents gardent un objectif d'entraînement sans action externe.
 - Piste d'évolution : passer à l'API Responses d'OpenAI pour garder le raisonnement avec les outils (PDG).
 
 ## Non vérifié
@@ -30,7 +33,6 @@ _Mis à jour le 27/11/2026_
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.
 
 ## Prochaines étapes
-1. Premier lancement réel (OpenAI + Brave) et corrections.
-2. API locale (127.0.0.1:8765) et branchement du tableau de bord.
-3. Phase « Prêt à vendre » : domaine, email pro, CGV, n8n.
-4. Choisir l'activité et viser le premier paiement Stripe.
+1. API locale (127.0.0.1:8765) et branchement du tableau de bord.
+2. Phase « Prêt à vendre » : domaine, email pro, CGV, n8n.
+3. Choisir l'activité (piste : diagnostic SEO local) et viser le premier paiement Stripe.

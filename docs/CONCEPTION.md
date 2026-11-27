@@ -102,7 +102,7 @@ La phase de test utilise OpenAI (crédits déjà disponibles chez le propriétai
 
 **Comment un agent est défini** : un nom, un pôle, une mission rédigée, une liste d'outils autorisés, un niveau de modèle (économique ou fort) et l'accès ou non à la recherche web. Le prompt système assemble l'identité de l'entreprise, la mission, la liste de l'équipe et les règles permanentes.
 
-**Règles permanentes communes** : pas de chiffres inventés, concision (chaque appel coûte), respect du droit français et européen (RGPD, consommation, propriété intellectuelle), validation pour tout engagement externe, livrables écrits dans des fichiers, vérification de la mémoire avant de commencer, fin systématique par un résultat clair.
+**Règles permanentes communes** : pas de chiffres inventés, estimation de l'effort en coût d'API et en temps de validation du propriétaire (pas en heures humaines), concision (chaque appel coûte), respect du droit français et européen (RGPD, consommation, propriété intellectuelle), validation pour tout engagement externe, livrables écrits dans des fichiers, vérification de la mémoire avant de commencer, fin systématique par un résultat clair.
 
 **Agents envisagés plus tard** : juridique (conformité, CGV), production (exécution des services vendus), contrôle qualité (relecture avant validation).
 
@@ -120,7 +120,7 @@ Chaque agent n'accède qu'aux outils de son rôle ; les outils marqués « valid
 | list_objectives | Lit les objectifs de l'entreprise | Tous | Non | — |
 | delegate_task | Crée une tâche pour un autre agent | Tous (profondeur max. 3) | Non | — |
 | set_objective_status | Clôture ou met en pause un objectif | pdg | Non | — |
-| brave_search (principal) / web_search Anthropic (secours, fournisseur Anthropic uniquement) | Recherche web avec sources | recherche, marketing, ventes | Non | Brave 0,005 $ par requête (crédits offerts) ; Anthropic 0,01 $ ; 15 par jour au total |
+| brave_search (principal) / web_search Anthropic (secours, fournisseur Anthropic uniquement) | Recherche web avec sources | recherche, marketing, ventes | Non | Brave 0,005 $ par requête (crédits offerts) ; Anthropic 0,01 $ ; 30 par jour au total |
 | fetch_url | Lit le texte d'une page publique | recherche, marketing, ventes | Non | Tokens uniquement |
 | draft_email | Prépare un email, envoyé en SMTP après accord | ventes, support | Oui | — |
 | propose_payment_link | Propose un lien de paiement Stripe | ventes, finance | Oui | — |
@@ -137,7 +137,7 @@ Brave devient le moteur de recherche principal des agents : il coûte deux fois 
 | --- | --- | --- |
 | Prix | 5 $ pour 1 000 requêtes, avec 5 $ de crédits offerts chaque mois ([Brave](https://brave.com/search/api)) | 10 $ pour 1 000 recherches |
 | Coût en tokens | Nous choisissons le nombre de résultats et la longueur des extraits envoyés au modèle | Les résultats sont facturés en tokens d'entrée, dans le tour et les suivants |
-| Volume de test (15 par jour, environ 450 par mois) | Environ 2,25 $, couverts par les crédits offerts | Environ 4,50 $ plus les tokens |
+| Volume prévu (30 par jour, environ 900 par mois) | Environ 4,50 $, couverts par les 5 $ de crédits offerts | Environ 9 $ plus les tokens |
 | Intégration | Outil local `brave_search` : appel HTTP, clé `BRAVE_API_KEY` dans `.env` | Outil serveur, aucune clé supplémentaire |
 | Rôle prévu | Principal | Secours si Brave est indisponible ou sans clé |
 
@@ -166,7 +166,7 @@ Le propriétaire donne des objectifs, le PDG les transforme en tâches, et le mo
 2. Revue des objectifs actifs : une tâche « Revue de l'objectif » est créée pour le PDG si la dernière date de plus de 3 h et qu'aucune n'est en cours.
 3. Exécution : la tâche la plus prioritaire est confiée à son agent, puis la suivante, jusqu'à 3 tâches.
 
-**Déroulement d'une tâche** : l'agent reçoit un briefing (titre, description, tâche parente, objectif, souvenirs utiles), puis alterne réflexion et appels d'outils jusqu'à `complete_task`, dans la limite de 8 étapes. Une erreur d'API est retentée une fois. Au redémarrage, les tâches restées « en cours » repassent en attente.
+**Déroulement d'une tâche** : l'agent reçoit un briefing (titre, description, tâche parente, objectif, souvenirs utiles), puis alterne réflexion et appels d'outils jusqu'à `complete_task`, dans la limite de 8 étapes. À chaque étape, tout l'historique est renvoyé au modèle : les résultats d'outils anciens (pages lues, résultats de recherche) sont donc raccourcis, seuls les 2 derniers restent entiers. Lors du premier test réel, l'agent Recherche avait lu 428 000 tokens pour en écrire 18 000. Une erreur d'API est retentée une fois. Au redémarrage, les tâches restées « en cours » repassent en attente.
 
 ## 8. Garde-fous
 
@@ -179,7 +179,7 @@ Quatre familles de protections encadrent les agents : budget, validations, sécu
 | Mensuel | 20 $ | Moteur en pause jusqu'au mois suivant |
 | Journalier | 0,65 $ | Moteur en pause jusqu'au lendemain |
 | Par tâche | 0,15 $ | Tâche close avec un résultat partiel |
-| Recherches web | 15 par jour | Outil retiré aux agents pour la journée |
+| Recherches web | 30 par jour | Outil retiré aux agents pour la journée |
 | Étapes par tâche | 8 | L'agent est sommé de conclure |
 | Tâches ouvertes | 30 | Toute nouvelle délégation est refusée |
 

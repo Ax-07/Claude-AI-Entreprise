@@ -47,10 +47,12 @@ DEFAULTS: dict = {
         "monthly_usd": 20.0,
         "daily_usd": 0.65,
         "per_task_usd": 0.15,
-        "web_searches_per_day": 15,
+        "web_searches_per_day": 30,
     },
     "runtime": {
         "cycle_seconds": 60,
+        "keep_full_tool_results": 2,          # derniers échanges d'outils gardés en entier ; les plus anciens sont résumés
+        "old_tool_result_chars": 600,
         "max_tasks_per_cycle": 3,
         "max_steps_per_task": 8,
         "max_output_tokens": 6000,
