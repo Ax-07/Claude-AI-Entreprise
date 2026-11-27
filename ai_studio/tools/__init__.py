@@ -51,8 +51,11 @@ def tool(name: str, description: str, properties: dict, required: list[str] | No
     return deco
 
 
+ALIASES = {"draft_email": "send_email"}   # ancien nom, gardé pour les tâches en cours
+
+
 def run_tool(name: str, ctx: ToolContext, args: dict) -> str:
-    t = REGISTRY.get(name)
+    t = REGISTRY.get(ALIASES.get(name, name))
     if not t:
         return f"Erreur : outil inconnu « {name} »."
     if isinstance(args, dict) and "_arguments_invalides" in args:

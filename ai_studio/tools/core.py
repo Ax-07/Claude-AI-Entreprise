@@ -240,7 +240,9 @@ def brave_search(ctx: ToolContext, query: str, count: int = 5, country: str = "F
 # ---------------------------------------------------------------- propriétaire
 @tool("request_owner_decision",
       "Demande une décision au propriétaire (humain) quand une action est risquée, coûteuse, engage l'entreprise "
-      "ou sort de ton périmètre. Le propriétaire répondra plus tard ; continue ou termine ta tâche en attendant.",
+      "ou sort de ton périmètre. Le propriétaire répondra plus tard ; continue ou termine ta tâche en attendant. "
+      "Jamais pour faire valider un email, une page ou un lien de paiement (send_email, propose_page et "
+      "propose_payment_link s'en chargent), ni pour demander au propriétaire de faire une action à ta place.",
       {"question": {"type": "string"}, "context": {"type": "string"}},
       ["question"])
 def request_owner_decision(ctx: ToolContext, question: str, context: str = "") -> str:

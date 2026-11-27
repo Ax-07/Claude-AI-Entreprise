@@ -317,7 +317,11 @@ def decide_approval(cfg, db, approval_id: int, body: dict) -> dict:
         raise ApiError(400, "decision doit valoir 'approve' ou 'reject'")
     if not db.approval(approval_id):
         raise ApiError(404, "Demande introuvable")
-    msg = decide(cfg, db, approval_id, decision == "approve", str(body.get("note") or "")[:1000])
+    from .approvals import NotReady
+    try:
+        msg = decide(cfg, db, approval_id, decision == "approve", str(body.get("note") or "")[:1000])
+    except NotReady as e:
+        raise ApiError(409, str(e))
     return {"ok": True, "message": msg}
 
 
