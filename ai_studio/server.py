@@ -142,6 +142,7 @@ def agents(cfg, db) -> list[dict]:
                     "division": DIVISION_OF.get(r.name, ""),
                     "model": m["strong"] if r.model == "strong" else m["default"], "state": state,
                     "current": _row(running) if running else None, "pending": pending, "done": done, "failed": failed,
+                    "level": 1 + done // 10,   # même barème que l'entreprise : 10 XP par tâche réussie, 100 XP par niveau
                     "last": _row(last) if last else None, "cost_month": round(float(cost), 4),
                     "success_rate": round(100 * done / (done + failed)) if done + failed else None})
     return out
