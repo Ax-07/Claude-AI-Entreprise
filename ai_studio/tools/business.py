@@ -18,16 +18,18 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 # ---------------------------------------------------------------- emails (validation requise)
-@tool("draft_email",
-      "Prépare un email à envoyer (prospect, client, partenaire). L'email est mis en attente de validation par le "
-      "propriétaire avant envoi. Pour la prospection B2B : message personnalisé, lié à l'activité du destinataire, "
-      "avec une phrase permettant de refuser les prochains messages.",
+@tool("send_email",
+      "Envoie un email (prospect, client, partenaire). C'est le moyen d'envoyer un email, et il suffit : l'email part "
+      "AUTOMATIQUEMENT dès que le propriétaire clique sur « Valider » dans le tableau de bord. Ne passe pas par un "
+      "brouillon dans un fichier ni par request_owner_decision pour le faire valider, et ne demande jamais au "
+      "propriétaire de l'envoyer lui-même. Pour la prospection B2B : message personnalisé, lié à l'activité du "
+      "destinataire, avec une phrase permettant de refuser les prochains messages.",
       {"to": {"type": "string"}, "subject": {"type": "string"}, "body": {"type": "string"},
        "reason": {"type": "string", "description": "Pourquoi cet email (contexte pour le propriétaire)."},
        "in_reply_to": {"type": "integer", "description": "numéro de l'email reçu auquel on répond (garde le fil de discussion)"},
        "attachment": {"type": "string", "description": "fichier de l'espace de travail à joindre (ex. livraisons/rapport.pdf)"}},
       ["to", "subject", "body", "reason"], sensitive=True)
-def draft_email(ctx: ToolContext, to: str, subject: str, body: str, reason: str, in_reply_to: int = 0, attachment: str = "") -> str:
+def send_email(ctx: ToolContext, to: str, subject: str, body: str, reason: str, in_reply_to: int = 0, attachment: str = "") -> str:
     if not EMAIL_RE.match(to.strip()):
         return "Adresse email invalide."
     extra = {}
@@ -50,7 +52,12 @@ def draft_email(ctx: ToolContext, to: str, subject: str, body: str, reason: str,
     aid = ctx.db.add_approval(ctx.agent, ctx.task["id"] if ctx.task is not None else None, "send_email",
                               {"to": to.strip(), "subject": subject, "body": body, **extra}, reason)
     ctx.db.log(ctx.agent, "approval", f"Email pour {to} en attente de validation (#{aid})")
-    return f"Email #{aid} en attente de validation par le propriétaire."
+    from ..approvals import missing_setup
+    later = missing_setup("send_email")
+    note = (f" La boîte d'envoi n'est pas encore configurée ({later}) : l'email partira dès que le propriétaire "
+            "l'aura configurée et validé l'email.") if later else ""
+    return (f"Email #{aid} en attente de validation : il partira automatiquement dès que le propriétaire le validera. "
+            f"Rien d'autre à faire pour l'envoyer, ni relance ni demande au propriétaire.{note}")
 
 
 # ---------------------------------------------------------------- Stripe

@@ -174,10 +174,10 @@ class InboxTest(Base):
         iid = self.db.run("INSERT INTO inbox(uid, message_id, from_addr, subject, body, status, recorded_at) VALUES (1,'<q@x>','marie@cafe.fr','Question','?','queued','t')")
         (self.cfg.workspace / "livraisons").mkdir()
         (self.cfg.workspace / "livraisons" / "rapport.pdf").write_bytes(b"%PDF-1.4 test")
-        out = run_tool("draft_email", self.ctx(), {"to": "marie@cafe.fr", "subject": "Re: Question", "body": "Voici",
+        out = run_tool("send_email", self.ctx(), {"to": "marie@cafe.fr", "subject": "Re: Question", "body": "Voici",
                                                   "reason": "r", "in_reply_to": iid, "attachment": "livraisons/rapport.pdf"})
         self.assertIn("en attente", out)
-        bad = run_tool("draft_email", self.ctx(), {"to": "a@b.fr", "subject": "s", "body": "b", "reason": "r", "attachment": "../../etc/passwd"})
+        bad = run_tool("send_email", self.ctx(), {"to": "a@b.fr", "subject": "s", "body": "b", "reason": "r", "attachment": "../../etc/passwd"})
         self.assertIn("hors de l'espace de travail", bad)
         self.assertEqual(self.db.one("SELECT COUNT(*) FROM approvals")[0], 1)
         aid = self.db.one("SELECT id FROM approvals WHERE action='send_email'")[0]
@@ -202,6 +202,30 @@ class InboxTest(Base):
         out = run_tool("read_email", self.ctx(), {"id": iid})
         self.assertIn(commerce.UNTRUSTED_START, out)
         self.assertIn("corps", out)
+
+
+class AgentGuidanceTest(Base):
+    def test_email_tool_says_it_sends(self):
+        from ai_studio.agents import RULES
+        out = run_tool("send_email", self.ctx(), {"to": "a@b.fr", "subject": "s", "body": "b", "reason": "r"})
+        self.assertIn("partira automatiquement", out)
+        self.assertIn("pas encore configurée", out)             # SMTP absent : l'agent le sait, sans paniquer
+        self.assertIn("en attente", run_tool("draft_email", self.ctx(), {"to": "a@b.fr", "subject": "s", "body": "b", "reason": "r"}))
+        self.assertIn("ne lui demande jamais de faire lui-même", RULES)
+        self.assertIn("Jamais pour faire valider un email", REGISTRY["request_owner_decision"].description)
+
+    def test_approval_waits_for_setup_then_runs(self):
+        from ai_studio.approvals import NotReady, decide
+        run_tool("send_email", self.ctx(), {"to": "a@b.fr", "subject": "s", "body": "b", "reason": "r"})
+        aid = self.db.pending_approvals()[0]["id"]
+        with self.assertRaises(NotReady):
+            decide(self.cfg, self.db, aid, True)
+        self.assertEqual(self.db.approval(aid)["status"], "pending")
+        os.environ.update(SMTP_HOST="smtp.gmail.com", SMTP_USER="u@gmail.com", SMTP_PASSWORD="p")
+        with unittest.mock.patch.object(approvals, "send_email", return_value="Email envoyé"), \
+             unittest.mock.patch.dict(approvals.EXECUTORS, {"send_email": lambda c, p: "Email envoyé"}):
+            self.assertIn("VALIDÉ et exécuté", decide(self.cfg, self.db, aid, True))
+        self.assertEqual(self.db.approval(aid)["status"], "executed")
 
 
 class PageTest(Base):
@@ -303,6 +327,13 @@ class ServerCommerceTest(Base):
         self.assertIn("default-src 'none'", r.getheader("Content-Security-Policy"))
         self.assertEqual(json.loads(get("/api/sales")[1])[0]["amount"], 49)
         self.assertEqual(json.loads(get("/api/inbox")[1]), [])
+        self.db.add_approval("ventes", None, "send_email", {"to": "a@b.fr", "subject": "s", "body": "b"}, "r")
+        c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        c.request("POST", "/api/approvals/2", body=json.dumps({"decision": "approve"}),
+                  headers={"Host": f"127.0.0.1:{port}", "X-AI-Studio": "1", "Content-Type": "application/json"})
+        r = c.getresponse(); err = json.loads(r.read()); c.close()
+        self.assertEqual(r.status, 409)
+        self.assertIn("SMTP_HOST", err["error"])
         names = {i["name"] for i in json.loads(get("/api/integrations")[1])}
         self.assertIn("Site (GitHub Pages)", names)
         stages = {s["stage"] for s in json.loads(get("/api/insights")[1])["pipeline"]}

@@ -122,11 +122,11 @@ Chaque agent n'accède qu'aux outils de son rôle ; les outils marqués « valid
 | set_objective_status | Clôture ou met en pause un objectif | pdg | Non | — |
 | brave_search (principal) / web_search Anthropic (secours, fournisseur Anthropic uniquement) | Recherche web avec sources | recherche, marketing, ventes | Non | Brave 0,005 $ par requête (crédits offerts) ; Anthropic 0,01 $ ; 30 par jour au total |
 | fetch_url | Lit le texte d'une page publique | recherche, marketing, ventes | Non | Tokens uniquement |
-| draft_email | Prépare un email, envoyé en SMTP après accord | ventes, support | Oui | — |
+| send_email | Prépare un email, envoyé en SMTP après accord | ventes, support | Oui | — |
 | propose_payment_link | Propose un lien de paiement Stripe | ventes, finance | Oui | — |
 | stripe_balance / stripe_recent_payments | Lit le solde et les paiements | finance | Non | — |
 | budget_status / company_stats | Dépenses et statistiques internes | pdg, data, finance | Non | — |
-| draft_email (in_reply_to, attachment) | Réponse dans le fil d'un email reçu, pièce jointe de l'espace de travail (10 Mo max.) | ventes, support | Oui | — |
+| send_email (in_reply_to, attachment) | Réponse dans le fil d'un email reçu, pièce jointe de l'espace de travail (10 Mo max.) | ventes, support | Oui | — |
 | list_inbox / read_email | Emails reçus ; contenu délimité comme donnée externe | ventes, support (pdg : liste) | Non | — |
 | list_sales | Ventes encaissées et chiffre du mois (sans appel Stripe) | pdg, marketing, ventes, support, finance | Non | — |
 | propose_page | Publication d'une page HTML sur GitHub Pages (pied de page légal ajouté, ni script ni formulaire) | marketing, ventes | Oui (aperçu) | — |

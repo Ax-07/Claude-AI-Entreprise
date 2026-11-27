@@ -42,10 +42,15 @@ _Mis à jour le 27/11/2026_
 
 ## Boucle commerciale (27/11/2026)
 - `ai_studio/commerce.py` : synchro Stripe (sessions de paiement → table `sales`, tâche de livraison prioritaire pour le PDG, notification), lecture Gmail IMAP en lecture seule (table `inbox`, tâche de réponse ventes/support, filtres newsletters/automatiques, 10 par jour), publication GitHub Pages (API contents) après validation.
-- Outils : `list_sales`, `list_inbox`, `read_email`, `propose_page` ; `draft_email` accepte `in_reply_to` et `attachment`. Le contenu des emails reçus est délimité comme donnée externe (anti-injection) et toute réponse repasse par la validation.
+- Outils : `list_sales`, `list_inbox`, `read_email`, `propose_page` ; `send_email` accepte `in_reply_to` et `attachment`. Le contenu des emails reçus est délimité comme donnée externe (anti-injection) et toute réponse repasse par la validation.
 - Tableau de bord : revenus du mois réels, pipeline (emails reçus, pages publiées, ventes) cliquable, aperçu isolé (CSP sandbox) des pages avant publication. Source de la page : `outils/tableau/index_source.html` + `build.py`.
 - Choix du propriétaire : site sur GitHub Pages dans un dépôt public séparé ; boîte Gmail dédiée avec mot de passe d'application.
 - 85 tests. Non testé avec les vrais Stripe, Gmail et GitHub (simulés dans les tests).
+
+## Premier test réel de la boucle (27/11/2026)
+- Vente de test Stripe détectée (commande #18) et livraison lancée par le PDG : la synchro Stripe fonctionne en réel.
+- Problème : l'outil `draft_email` (« prépare un email ») a fait croire aux agents qu'ils ne pouvaient qu'écrire un brouillon. Ils ont fait valider le texte par `request_owner_decision`, puis demandé au propriétaire de l'envoyer à la main.
+- Corrections : outil renommé `send_email` (alias de l'ancien nom), description et résultat explicites (« part automatiquement à la validation »), règle « ne jamais demander au propriétaire de faire une action à ta place », `request_owner_decision` interdit pour valider un email ; une validation dont le réglage manque (SMTP, Stripe, GitHub) est refusée avec un message clair et reste en attente au lieu d'échouer. 87 tests.
 
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.

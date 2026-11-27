@@ -156,8 +156,11 @@ def cmd_validations(cfg, db, a):
 
 
 def cmd_decide(cfg, db, a, approve):
-    from .approvals import decide
-    _out(decide(cfg, db, a.id, approve, a.note or ""))
+    from .approvals import NotReady, decide
+    try:
+        _out(decide(cfg, db, a.id, approve, a.note or ""))
+    except NotReady as e:
+        _out(str(e))
 
 
 def cmd_relancer(cfg, db, a):

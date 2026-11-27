@@ -61,6 +61,19 @@ def publish_page(cfg, payload: dict) -> str:
 
 EXECUTORS = {"send_email": send_email, "stripe_payment_link": create_payment_link, "publish_page": publish_page}
 
+# Réglages nécessaires à chaque action : s'ils manquent, la validation est refusée et la demande reste en attente,
+# au lieu d'échouer (ce qui faisait croire aux agents qu'aucun moyen d'envoi n'existait).
+SETUP = {"send_email": ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"), "stripe_payment_link": ("STRIPE_SECRET_KEY",),
+         "publish_page": ("GITHUB_PAGES_REPO", "GITHUB_TOKEN")}
+
+
+class NotReady(Exception):
+    """L'action ne peut pas encore être exécutée : un réglage manque dans .env."""
+
+
+def missing_setup(action: str) -> str:
+    return ", ".join(k for k in SETUP.get(action, ()) if not os.environ.get(k))
+
 
 def decide(cfg, db, approval_id: int, approve: bool, note: str = "") -> str:
     a = db.approval(approval_id)
@@ -73,6 +86,10 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "") -> str:
         db.set_approval(approval_id, status="rejected", decided_at=iso(), result=note or "Refusé")
         outcome = f"REFUSÉ par le propriétaire. {note}".strip()
     elif a["action"] in EXECUTORS:
+        missing = missing_setup(a["action"])
+        if missing:
+            raise NotReady(f"Impossible d'exécuter la demande #{approval_id} : {missing} manquant(s) dans .env. "
+                           "Elle reste en attente : complète .env, redémarre le moteur, puis valide-la à nouveau.")
         try:
             res = EXECUTORS[a["action"]](cfg, payload)
             db.set_approval(approval_id, status="executed", decided_at=iso(), result=res)

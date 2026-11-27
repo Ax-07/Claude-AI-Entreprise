@@ -64,7 +64,7 @@ class ScriptedAPI:
             if step == 0:
                 return {"stop_reason": "tool_use", "usage": usage, "content": [
                     tool_use(i, "recall", {"query": "avis google"}),
-                    tool_use(i, "draft_email", {"to": "contact@boulangerie-exemple.fr", "subject": "Vos avis Google",
+                    tool_use(i, "send_email", {"to": "contact@boulangerie-exemple.fr", "subject": "Vos avis Google",
                                                 "body": "Bonjour… Si vous ne souhaitez plus recevoir de message, répondez STOP.",
                                                 "reason": "Test de l'offre réponses aux avis"})]}
             return {"stop_reason": "end_turn", "usage": usage, "content": [
@@ -105,11 +105,14 @@ class TestSimulation(unittest.TestCase):
         # livrable, mémoire, email en attente
         self.assertTrue((self.cfg.workspace / "recherche" / "besoins.md").exists())
         self.assertEqual(len(self.db.pending_approvals()), 1)
-        # le propriétaire valide : SMTP non configuré → erreur propre + tâche de suite pour l'agent ventes
-        out = decide(self.cfg, self.db, self.db.pending_approvals()[0]["id"], True)
-        self.assertIn("SMTP non configuré", out)
-        follow = self.db.q("SELECT * FROM tasks WHERE status='pending'")
-        self.assertEqual(follow[0]["agent"], "ventes")
+        # le propriétaire valide alors que SMTP n'est pas configuré : la demande reste en attente,
+        # sans tâche de suite (les agents ne doivent pas conclure qu'aucun moyen d'envoi n'existe)
+        from ai_studio.approvals import NotReady
+        with self.assertRaises(NotReady) as e:
+            decide(self.cfg, self.db, self.db.pending_approvals()[0]["id"], True)
+        self.assertIn("SMTP_HOST", str(e.exception))
+        self.assertEqual(len(self.db.pending_approvals()), 1)
+        self.assertEqual(self.db.q("SELECT COUNT(*) FROM tasks WHERE status='pending'")[0][0], 0)
         spent = self.db.spent("day")
         self.assertGreater(spent, 0.01)          # inclut la recherche web à 0,01 $
         self.assertLess(spent, 0.1)
