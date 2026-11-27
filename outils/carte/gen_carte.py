@@ -50,39 +50,32 @@ def iso(cx, cy, r, u, v): return (cx + (u-v)*r/2, cy + (u+v)*r/4)
 
 import math
 from bld import S, POLES, frange as _fr, office, OFFICE_KIND, mixw, mix
-# Plan par divisions, sur trois rangées : Direction sur l'axe central (Command HQ au fond, Data Core au milieu),
-# Commerciale à gauche, Production à droite (le coin droit reste libre pour un futur pôle), Administration devant.
-# Positions écran (x, y) ; le plateau va de x = 0 à 1000 et de y = 80 à 580.
-DIVISIONS = [
- dict(id="direction", name="Direction", col="#818CF8", poles=["hq", "data"]),
- dict(id="commerciale", name="Division commerciale", col="#38BDF8", poles=["marketing", "sales", "support"]),
- dict(id="production", name="Division production", col="#FB923C", poles=["atelier", "research"]),
- dict(id="administration", name="Administration", col="#E879F9", poles=["finance", "legal"]),
-]
-XY = {"hq": (500, 136), "data": (500, 330), "marketing": (330, 215), "sales": (300, 330), "support": (100, 330),
-      "research": (670, 215), "atelier": (700, 330), "legal": (400, 430), "finance": (600, 430)}
-def to_uv(x, y): dx, dy = x - 500, y - 330; return ((dx + 2*dy) / 2, (2*dy - dx) / 2)
-UV = {k: to_uv(*p) for k, p in XY.items()}
-LINKS = {"direction": [("hq", "data")], "commerciale": [("support", "sales"), ("sales", "marketing")],
-         "production": [("research", "atelier")], "administration": [("legal", "finance")]}
+# Un bâtiment par pôle (décision du propriétaire). Les agents d'un même pôle travaillent dans le même bâtiment.
+# Command HQ au fond, Data Core au centre (moyeu des routes), pôle commercial à gauche, pôle production à droite,
+# administration devant. Positions écran (x, y) ; le plateau va de x = 0 à 1000 et de y = 80 à 580.
+MEMBERS = {"hq": ["hq"], "data": ["data"], "commercial": ["marketing", "sales", "support"],
+           "production": ["atelier", "research"], "administration": ["finance", "legal"]}
+AGENTS = {"hq": ["pdg"], "data": ["data"], "commercial": ["marketing", "ventes", "support"],
+          "production": ["atelier", "recherche"], "administration": ["finance", "juridique"]}
+XY = {"hq": (500, 150), "data": (500, 330), "commercial": (238, 330), "production": (762, 330), "administration": (500, 494)}
 D = [
  dict(id="hq", name="Command HQ", col="#818CF8", ag=1),
  dict(id="data", name="Data Core", col="#22D3EE", ag=2),
- dict(id="marketing", name="Hub Marketing", col="#60A5FA", ag=5),
- dict(id="sales", name="Centre Ventes", col="#A78BFA", ag=4),
- dict(id="support", name="Zone Support", col="#FBBF24", ag=6),
- dict(id="atelier", name="Atelier", col="#FB923C", ag=3),
- dict(id="research", name="Labo Recherche", col="#34D399", ag=3),
- dict(id="finance", name="Trésorerie", col="#F472B6", ag=2),
- dict(id="legal", name="Juridique", col="#CBD5E1", ag=2),
+ dict(id="commercial", name="Pôle commercial", col="#38BDF8", ag=6),
+ dict(id="production", name="Pôle production", col="#FB923C", ag=4),
+ dict(id="administration", name="Administration", col="#E879F9", ag=3),
 ]
 for d in D:
     d["x"], d["y"] = XY[d["id"]]
-DIV_OF = {p: dv["id"] for dv in DIVISIONS for p in dv["poles"]}
-DEFAULT = {"hq": "A", "research": "A", "marketing": "A", "sales": "A", "support": "B", "data": "A", "finance": "A", "atelier": "A", "legal": "A"}
-VARS = {p[0]: p[4] for p in POLES}
-RU = {d["id"]: (56 if d["id"] == "hq" else 44 if d["id"] == "data" else 46) for d in D}
-PAD = 13          # marge de la dalle de division autour de chaque pôle
+DIV_OF = {"hq": "direction", "data": "direction", "commercial": "commerciale", "production": "production",
+          "administration": "administration"}
+KIND = {"hq": "globe", "data": "city", "commercial": "bars", "production": "gear", "administration": "scale"}
+DEFAULT = {"hq": "A", "data": "A", "commercial": "A", "production": "A", "administration": "D"}
+_V = {p[0]: p[4] for p in POLES}
+# chaque pôle regroupé propose tous les bâtiments de ses anciens pôles (lettres A, B, C… dans l'ordre)
+VARS = {pid: [(chr(65 + i), n, txt, fn) for i, (_, n, txt, fn) in enumerate(v for m in mem for v in _V[m])]
+        for pid, mem in MEMBERS.items()}
+RU = {"hq": 56, "data": 48, "commercial": 66, "production": 62, "administration": 56}
 TH = 8
 CX, CY, GR = 500, 330, 250
 
@@ -101,9 +94,7 @@ G.slab(r=GR, t=22, road=True, lamps=True, col="#C084FC")
 rnd = random.Random(11); traces = []
 pal = ["#22D3EE", "#C084FC", "#FB923C", "#60A5FA"]
 def near_district(x, y, pad=1.25):
-    if any(abs(x-d["x"])/(2*RU[d["id"]]*pad) + abs(y-d["y"])/(RU[d["id"]]*pad) < 1 for d in D):
-        return True
-    return any(seg_dist(x, y, XY[a], XY[b]) < 26 for links in LINKS.values() for a, b in links)
+    return any(abs(x-d["x"])/(2*RU[d["id"]]*pad) + abs(y-d["y"])/(RU[d["id"]]*pad) < 1 for d in D)
 for _ in range(60):
     u, v = rnd.uniform(-225, 225), rnd.uniform(-225, 225)
     pts = [(u, v)]; ax = rnd.random() < .5
@@ -122,23 +113,6 @@ for scr, c in traces:
     tr += '<circle cx="%.1f" cy="%.1f" r="2" fill="%s"/>' % (scr[-1] + (c,))
 svg += G.o; G.o = []
 svg.append('<g filter="url(#nfcity)">%s</g>' % tr)
-# dalles des divisions : sous les pôles d'une même division, une plateforme commune (losanges élargis reliés par
-# des passerelles), dessinée deux fois — contour lumineux puis intérieur sombre — pour n'en garder que le bord extérieur
-def div_shapes(dv, grow, fill, extra=""):
-    out = []
-    for p in dv["poles"]:
-        r = RU[p] + grow; u, v = UV[p]
-        out.append('<polygon points="%s" fill="%s"%s/>' % (G.P([G.p(u - r, v - r), G.p(u + r, v - r), G.p(u + r, v + r), G.p(u - r, v + r)]), fill, extra))
-    for a, b in LINKS[dv["id"]]:
-        (ua, va), (ub, vb) = UV[a], UV[b]
-        pts = [G.p(ua, va), G.p(ub, va), G.p(ub, vb)]
-        out.append('<polyline points="%s" fill="none" stroke="%s" stroke-width="%d" stroke-linejoin="round"%s/>' % (G.P(pts), fill, 2 * (18 + grow - PAD), extra))
-    return "".join(out)
-for dv in DIVISIONS:
-    c = dv["col"]
-    svg.append('<g opacity=".95" filter="url(#nfcity)">%s</g>' % div_shapes(dv, PAD + 2, c))
-    svg.append('<g>%s</g>' % div_shapes(dv, PAD, "#0a0f2a"))
-    svg.append('<g opacity=".25">%s</g>' % div_shapes(dv, PAD, mix(c, .5)))
 # routes : en L le long des axes, depuis le Data Core (le cœur de l'entreprise) vers chaque pôle
 hub = [d for d in D if d["id"] == "data"][0]
 hu, hv = uv(hub["x"], hub["y"])
@@ -177,13 +151,13 @@ SPOTS = [(.85, .35), (.35, .85), (.8, .8), (.95, -.35), (-.35, .95), (.55, .95),
 for d in D:
     cx, cy, c, pid = d["x"], d["y"], d["col"], d["id"]
     ishq = pid == "hq"; ru = RU[pid]
-    k = 0.86 if ishq else 0.7
+    k = {"hq": .86, "data": .72}.get(pid, .82)
     pl = S(c, "pl" + pid, cx=cx, cy=cy); pl.slab(r=ru, t=TH, road=True, lamps=True)
     groups = '<defs>%s</defs>%s' % (pl.defs, "".join(pl.o))
     for (Lt, vn, vd, fn) in VARS[pid]:
         s = S(c, "m" + pid + Lt, cx=0, cy=0); s.noground = True; fn(s)
         groups += '<g class="bld" data-pole="%s" data-variant="%s" style="display:none" transform="translate(%d %d) scale(%.2f)"><defs>%s</defs>%s</g>' % (pid, Lt, cx, cy, k, s.defs, "".join(s.o))
-    so = S(c, "o" + pid, cx=0, cy=0); office(so, ru - 14, OFFICE_KIND[pid], hq=ishq)
+    so = S(c, "o" + pid, cx=0, cy=0); office(so, ru - 14, KIND[pid], hq=ishq)
     groups += '<g class="office" data-pole="%s" style="display:none" transform="translate(%d %d)"><defs>%s</defs>%s</g>' % (pid, cx, cy, so.defs, "".join(so.o))
     objs.append((cy, groups))
     n_ag = 5 if ishq else d["ag"]
@@ -196,10 +170,9 @@ svg.append('</svg>')
 SVG = "".join(svg)
 
 # étiquettes déplacées quand elles tomberaient sur un bâtiment voisin
-LABEL_DX = {"hq": -280}
-LABEL_DY = {"hq": -110}
+LABEL_DX = {"hq": -230, "data": 175}
+LABEL_DY = {"hq": -120, "data": -40}
 # position du nom de chaque division (x, y écran ; alignement géré par la page)
-DIV_POS = {"direction": (575, 80), "commerciale": (30, 238), "production": (900, 318), "administration": (500, 548)}
 districts_js = []
 desc = {
  "hq": ("Orchestration", "Le PDG IA répartit les missions, arbitre les budgets et valide les décisions sensibles.", ["Priorisation des missions du jour", "Validation du budget API"]),
@@ -211,7 +184,12 @@ desc = {
  "finance": ("Finances", "Suivi des revenus, contrôle des coûts API et rentabilité par activité.", ["Contrôle du plafond API", "Rapport de rentabilité"]),
  "legal": ("Conformité", "CGV, mentions légales, RGPD, factures : relit les actions avant ta décision.", ["Relecture des pages", "Documents légaux"]),
  "atelier": ("Production", "Fabrique les livrables vendus aux clients, selon la fiche d’offre, avec une méthode de qualité.", ["Rapports clients", "Contrôle qualité"]),
+ "commercial": ("Division commerciale", "Marketing, ventes et support réunis : attirer les clients, leur vendre, puis s’en occuper.", []),
+ "production": ("Division production", "L’Atelier fabrique ce qui est vendu ; le Labo Recherche trouve les nouvelles offres et méthodes.", []),
+ "administration": ("Contrôle", "Trésorerie et Juridique : l’argent, le droit et les factures de l’entreprise.", []),
 }
+desc["hq"] = ("Direction", desc["hq"][1], [])
+desc["data"] = ("Direction · cœur de l’entreprise", desc["data"][1], [])
 for d in D:
     ru = RU[d["id"]]
     districts_js.append(dict(id=d["id"], name=d["name"], color=d["col"], agents=d["ag"] if d["id"] != "hq" else 1,
@@ -220,19 +198,15 @@ for d in D:
         role=desc[d["id"]][0], desc=desc[d["id"]][1], tasks=desc[d["id"]][2],
         variants=[dict(L=v[0], name=v[1], text=v[2]) for v in VARS[d["id"]]]))
 DEFAULT_JS = json.dumps(DEFAULT)
-DIV_JS = []
-for dv in DIVISIONS:
-    ax, ay = DIV_POS[dv["id"]]
-    DIV_JS.append(dict(id=dv["id"], name=dv["name"], color=dv["col"], poles=dv["poles"],
-                       left="%.2f%%" % (ax / W * 100), top="%.2f%%" % (ay / H * 100)))
+DIV_JS = []          # un pôle = une division : plus de noms de division séparés sur la carte
 
 
-AGENT = {"hq": "pdg", "research": "recherche", "marketing": "marketing", "sales": "ventes", "support": "support", "data": "data", "finance": "finance", "atelier": "atelier", "legal": "juridique"}
+AGENT = {pid: agents[0] for pid, agents in AGENTS.items()}       # compatibilité : premier agent du pôle
 SVG_OUT = SVG.replace('<svg viewBox="0 0 1000 620" width="100%" style="display: block" aria-hidden="true">',
                       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="100%" style="display:block" aria-hidden="true">', 1)
 assert "{{" not in SVG_OUT, "trou de gabarit restant"
 (OUT / "carte.svg").write_text(SVG_OUT, encoding="utf-8")
-meta = {"default_variants": DEFAULT, "agent_of_pole": AGENT, "divisions": DIV_JS,
+meta = {"default_variants": DEFAULT, "agent_of_pole": AGENT, "agents_of_pole": AGENTS, "divisions": DIV_JS,
         "poles": [{**{k: v for k, v in d.items() if k not in ("agents", "tasks")}, "agent": AGENT[d["id"]]} for d in districts_js]}
 (OUT / "carte.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
 print("carte.svg :", len(SVG_OUT) // 1024, "Ko")

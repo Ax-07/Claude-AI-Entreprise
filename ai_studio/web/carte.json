@@ -1,82 +1,49 @@
 {
  "default_variants": {
   "hq": "A",
-  "research": "A",
-  "marketing": "A",
-  "sales": "A",
-  "support": "B",
   "data": "A",
-  "finance": "A",
-  "atelier": "A",
-  "legal": "A"
+  "commercial": "A",
+  "production": "A",
+  "administration": "D"
  },
  "agent_of_pole": {
   "hq": "pdg",
-  "research": "recherche",
-  "marketing": "marketing",
-  "sales": "ventes",
-  "support": "support",
   "data": "data",
-  "finance": "finance",
-  "atelier": "atelier",
-  "legal": "juridique"
+  "commercial": "marketing",
+  "production": "atelier",
+  "administration": "finance"
  },
- "divisions": [
-  {
-   "id": "direction",
-   "name": "Direction",
-   "color": "#818CF8",
-   "poles": [
-    "hq",
-    "data"
-   ],
-   "left": "57.50%",
-   "top": "12.90%"
-  },
-  {
-   "id": "commerciale",
-   "name": "Division commerciale",
-   "color": "#38BDF8",
-   "poles": [
-    "marketing",
-    "sales",
-    "support"
-   ],
-   "left": "3.00%",
-   "top": "38.39%"
-  },
-  {
-   "id": "production",
-   "name": "Division production",
-   "color": "#FB923C",
-   "poles": [
-    "atelier",
-    "research"
-   ],
-   "left": "90.00%",
-   "top": "51.29%"
-  },
-  {
-   "id": "administration",
-   "name": "Administration",
-   "color": "#E879F9",
-   "poles": [
-    "finance",
-    "legal"
-   ],
-   "left": "50.00%",
-   "top": "88.39%"
-  }
- ],
+ "agents_of_pole": {
+  "hq": [
+   "pdg"
+  ],
+  "data": [
+   "data"
+  ],
+  "commercial": [
+   "marketing",
+   "ventes",
+   "support"
+  ],
+  "production": [
+   "atelier",
+   "recherche"
+  ],
+  "administration": [
+   "finance",
+   "juridique"
+  ]
+ },
+ "divisions": [],
  "poles": [
   {
    "id": "hq",
    "name": "Command HQ",
    "color": "#818CF8",
-   "left": "22.00%",
-   "top": "15.48%",
+   "left": "27.00%",
+   "top": "16.13%",
    "division": "direction",
-   "role": "Orchestration",
+   "role": "Direction",
    "desc": "Le PDG IA répartit les missions, arbitre les budgets et valide les décisions sensibles.",
    "variants": [
     {
@@ -101,10 +68,10 @@
    "id": "data",
    "name": "Data Core",
    "color": "#22D3EE",
-   "left": "50.00%",
-   "top": "62.58%",
+   "left": "67.50%",
+   "top": "56.77%",
    "division": "direction",
-   "role": "Mémoire et données",
+   "role": "Direction · cœur de l’entreprise",
    "desc": "Base de connaissances partagée, métriques et apprentissage des agents.",
    "variants": [
     {
@@ -141,14 +108,14 @@
    "agent": "data"
   },
   {
-   "id": "marketing",
-   "name": "Hub Marketing",
-   "color": "#60A5FA",
-   "left": "33.00%",
-   "top": "44.35%",
+   "id": "commercial",
+   "name": "Pôle commercial",
+   "color": "#38BDF8",
+   "left": "23.80%",
+   "top": "66.13%",
    "division": "commerciale",
-   "role": "Acquisition",
-   "desc": "Création de contenus, campagnes et pages de vente dans plusieurs langues.",
+   "role": "Division commerciale",
+   "desc": "Marketing, ventes et support réunis : attirer les clients, leur vendre, puis s’en occuper.",
    "variants": [
     {
      "L": "A",
@@ -164,75 +131,49 @@
      "L": "C",
      "name": "Place des panneaux",
      "text": "Panneaux publicitaires flottants au-dessus d’un studio."
+    },
+    {
+     "L": "D",
+     "name": "Tour de verre",
+     "text": "Gradins vitrés, corniches dorées et flèche de croissance."
+    },
+    {
+     "L": "E",
+     "name": "Ziggurat des deals",
+     "text": "Pyramide à étages : chaque niveau est une étape du pipeline."
+    },
+    {
+     "L": "F",
+     "name": "Tours jumelles",
+     "text": "Deux tours de bureaux illuminées reliées par un pont de verre."
+    },
+    {
+     "L": "G",
+     "name": "Centre d’écoute",
+     "text": "Rotonde à bandeaux lumineux surmontée d’une parabole."
+    },
+    {
+     "L": "H",
+     "name": "Phare",
+     "text": "Le phare qui guide les clients, 24 h/24."
+    },
+    {
+     "L": "I",
+     "name": "Hub en anneau",
+     "text": "Bâtiment circulaire autour d’une tour relais qui émet."
     }
    ],
    "agent": "marketing"
   },
   {
-   "id": "sales",
-   "name": "Centre Ventes",
-   "color": "#A78BFA",
-   "left": "30.00%",
-   "top": "62.90%",
-   "division": "commerciale",
-   "role": "Revenus",
-   "desc": "Prospection, qualification des leads et préparation des offres.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Tour de verre",
-     "text": "Gradins vitrés, corniches dorées et flèche de croissance."
-    },
-    {
-     "L": "B",
-     "name": "Ziggurat des deals",
-     "text": "Pyramide à étages : chaque niveau est une étape du pipeline."
-    },
-    {
-     "L": "C",
-     "name": "Tours jumelles",
-     "text": "Deux tours de bureaux illuminées reliées par un pont de verre."
-    }
-   ],
-   "agent": "ventes"
-  },
-  {
-   "id": "support",
-   "name": "Zone Support",
-   "color": "#FBBF24",
-   "left": "10.00%",
-   "top": "62.90%",
-   "division": "commerciale",
-   "role": "Clients",
-   "desc": "Réponses aux clients 24 h/24, gestion des retours et satisfaction.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Centre d’écoute",
-     "text": "Rotonde à bandeaux lumineux surmontée d’une parabole."
-    },
-    {
-     "L": "B",
-     "name": "Phare",
-     "text": "Le phare qui guide les clients, 24 h/24."
-    },
-    {
-     "L": "C",
-     "name": "Hub en anneau",
-     "text": "Bâtiment circulaire autour d’une tour relais qui émet."
-    }
-   ],
-   "agent": "support"
-  },
-  {
-   "id": "atelier",
-   "name": "Atelier",
+   "id": "production",
+   "name": "Pôle production",
    "color": "#FB923C",
-   "left": "70.00%",
-   "top": "62.90%",
+   "left": "76.20%",
+   "top": "65.48%",
    "division": "production",
-   "role": "Production",
-   "desc": "Fabrique les livrables vendus aux clients, selon la fiche d’offre, avec une méthode de qualité.",
+   "role": "Division production",
+   "desc": "L’Atelier fabrique ce qui est vendu ; le Labo Recherche trouve les nouvelles offres et méthodes.",
    "variants": [
     {
      "L": "A",
@@ -248,47 +189,34 @@
      "L": "C",
      "name": "Tour-atelier",
      "text": "Fût vitré surmonté d’un engrenage lumineux qui tourne."
+    },
+    {
+     "L": "D",
+     "name": "Observatoire",
+     "text": "Rotonde nervurée, coupole et télescope pointé vers les marchés."
+    },
+    {
+     "L": "E",
+     "name": "Serre de verre",
+     "text": "Laboratoire transparent : on voit les idées pousser à l’intérieur."
+    },
+    {
+     "L": "F",
+     "name": "Labo à antenne",
+     "text": "Labo vitré aux écrans allumés et tour équipée d’une parabole."
     }
    ],
    "agent": "atelier"
   },
   {
-   "id": "research",
-   "name": "Labo Recherche",
-   "color": "#34D399",
-   "left": "67.00%",
-   "top": "44.35%",
-   "division": "production",
-   "role": "Veille et opportunités",
-   "desc": "Analyse des marchés, détection de niches rentables et étude de la concurrence.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Observatoire",
-     "text": "Rotonde nervurée, coupole et télescope pointé vers les marchés."
-    },
-    {
-     "L": "B",
-     "name": "Serre de verre",
-     "text": "Laboratoire transparent : on voit les idées pousser à l’intérieur."
-    },
-    {
-     "L": "C",
-     "name": "Labo à antenne",
-     "text": "Labo vitré aux écrans allumés et tour équipée d’une parabole."
-    }
-   ],
-   "agent": "recherche"
-  },
-  {
-   "id": "finance",
-   "name": "Trésorerie",
-   "color": "#F472B6",
-   "left": "60.00%",
-   "top": "79.03%",
+   "id": "administration",
+   "name": "Administration",
+   "color": "#E879F9",
+   "left": "50.00%",
+   "top": "90.97%",
    "division": "administration",
-   "role": "Finances",
-   "desc": "Suivi des revenus, contrôle des coûts API et rentabilité par activité.",
+   "role": "Contrôle",
+   "desc": "Trésorerie et Juridique : l’argent, le droit et les factures de l’entreprise.",
    "variants": [
     {
      "L": "A",
@@ -304,37 +232,24 @@
      "L": "C",
      "name": "Tour des pièces",
      "text": "Pile de pièces géante et pièce d’or flottante."
-    }
-   ],
-   "agent": "finance"
-  },
-  {
-   "id": "legal",
-   "name": "Juridique",
-   "color": "#CBD5E1",
-   "left": "40.00%",
-   "top": "79.03%",
-   "division": "administration",
-   "role": "Conformité",
-   "desc": "CGV, mentions légales, RGPD, factures : relit les actions avant ta décision.",
-   "variants": [
+    },
     {
-     "L": "A",
+     "L": "D",
      "name": "Palais de justice",
      "text": "Colonnade, fronton et coupole de verre : le droit au cœur de la cité."
     },
     {
-     "L": "B",
+     "L": "E",
      "name": "Tour de la balance",
      "text": "Tour élancée surmontée d’une balance lumineuse."
     },
     {
-     "L": "C",
+     "L": "F",
      "name": "Archives scellées",
      "text": "Salle des registres sous un sceau officiel flottant."
     }
    ],
-   "agent": "juridique"
+   "agent": "finance"
   }
  ]
 }
