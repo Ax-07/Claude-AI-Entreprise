@@ -159,6 +159,7 @@ const put = (el, ...kids) => el.replaceChildren(...kids.flat().filter(k => k != 
 function ico(name, col="currentColor", size=18){ const s=document.createElementNS("http://www.w3.org/2000/svg","svg"); s.setAttribute("width",size); s.setAttribute("height",size); s.setAttribute("viewBox","0 0 24 24"); s.setAttribute("fill","none"); s.setAttribute("stroke",col); s.setAttribute("stroke-width","1.8"); s.setAttribute("stroke-linecap","round"); s.setAttribute("stroke-linejoin","round"); s.setAttribute("aria-hidden","true"); s.innerHTML = ICONS["I_"+name] || ""; return s; }
 document.querySelectorAll("[data-ico]").forEach(e => e.append(ico(e.dataset.ico, e.dataset.col, +e.dataset.size)));
 const money = v => (v||0).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2}) + " $";
+const eur = v => (v||0).toLocaleString("fr-FR",{style:"currency",currency:"EUR"});
 const money4 = v => (v||0).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:4}) + " $";
 const ago = ts => { if(!ts) return ""; const s=(Date.now()-new Date(ts))/1000; if(s<0) return "dans " + (s>-3600 ? Math.ceil(-s/60)+" min" : Math.ceil(-s/3600)+" h"); if(s<60) return "à l'instant"; if(s<3600) return "il y a "+Math.floor(s/60)+" min"; if(s<86400) return "il y a "+Math.floor(s/3600)+" h"; return new Date(ts).toLocaleDateString("fr-FR"); };
 const hhmm = ts => new Date(ts).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
@@ -192,7 +193,8 @@ function renderStatus(s){
     kpi("TREND","#60A5FA","Tâches en cours", String(t.pending + t.running), t.running ? `${t.running} en exécution` : "", t.blocked ? `${t.blocked} bloquée(s)` : "file d'attente des agents"),
     kpi("CHECK","#34D399","Tâches terminées", String(t.done), t.done_today ? `+${t.done_today}` : "", "dont aujourd'hui"),
     kpi("BOLT","#F472B6","Efficacité", rate===null ? "—" : rate+" %", "", t.failed ? `${t.failed} tâche(s) en échec` : "taux de réussite des tâches"),
-    kpi("COIN","#FBBF24","Revenus du mois", "— €", "", s.stripe ? "Lecture Stripe à venir" : "Connecte ton compte Stripe", false),
+    s.stripe ? kpi("COIN","#FBBF24","Revenus du mois", eur(s.revenue.month), s.revenue.count_month ? `${s.revenue.count_month} vente${s.revenue.count_month>1?"s":""}` : "", s.revenue.test_month ? "dont des paiements en mode test" : `Total : ${eur(s.revenue.total)}`)
+             : kpi("COIN","#FBBF24","Revenus du mois", "— €", "", "Connecte ton compte Stripe", false),
     kpi("CHIP","#22D3EE","Budget API", money(b.day), `/ ${money(b.day_limit)}`, `Mois : ${money(b.month)} / ${money(b.month_limit)}`, b.day < b.day_limit));
   const lvl = s.level, xpIn = s.level_progress;
   $("#lvl").textContent = lvl; $("#lvlname").textContent = LEVELS[Math.min(LEVELS.length-1, lvl-1)];
@@ -256,19 +258,21 @@ function renderDetail(){
 }
 
 // ------------------------------------------------ validations (en haut de la colonne de droite)
-const ACTION = {send_email:"Envoi d'email", stripe_payment_link:"Lien de paiement Stripe", decision:"Décision demandée"};
+const ACTION = {send_email:"Envoi d'email", stripe_payment_link:"Lien de paiement Stripe", decision:"Décision demandée", publish_page:"Publication d'une page"};
 function renderApprovals(list){
   const head = hd("Validations", "SHIELD", "#FBBF24", h("span",{style:{fontSize:"12px",fontWeight:"600",color:list.length?"#0B1029":"#C7CEF0",background:list.length?"#FBBF24":"rgba(255,255,255,.06)",borderRadius:"999px",padding:"3px 10px"}}, String(list.length)));
   if (!list.length) return put($("#validations"), head, h("div",{class:"empty"},"Rien à valider pour l’instant. Les emails et paiements préparés par les agents apparaîtront ici."));
   put($("#validations"), head, list.map(a => {
     const note = h("input",{type:"text",placeholder:a.action==="decision"?"Ta réponse…":"Note (facultative)",style:{width:"100%"},"aria-label":"Note"}), pl = a.payload, lines = [];
-    if (a.action==="send_email") lines.push(`À : ${pl.to}`, `Objet : ${pl.subject}`, "", pl.body);
+    if (a.action==="send_email") lines.push(`À : ${pl.to}`, `Objet : ${pl.subject}`, ...(pl.in_reply_to ? [`En réponse à l'email reçu #${pl.in_reply_to}`] : []), ...(pl.attachment ? [`Pièce jointe : ${pl.attachment}`] : []), "", pl.body);
+    else if (a.action==="publish_page") lines.push(`Adresse : ${pl.url}`, `Titre : ${pl.title}`, `Fichier : ${pl.file} (${Math.round((pl.size||0)/1024)} Ko)`);
     else if (a.action==="stripe_payment_link") lines.push(`Produit : ${pl.product_name}`, `Montant : ${pl.amount_eur} €` + (pl.recurring ? ` / ${pl.recurring==="month"?"mois":"an"}` : ""));
     else lines.push(pl.question || "", pl.context ? "\n" + pl.context : "");
     const act = async ok => { try { const r = await api("POST",`/api/approvals/${a.id}`,{decision: ok?"approve":"reject", note: note.value}); toast(r.message, ok); refresh(); } catch(e){ toast(e.message,false); } };
-    return h("div",{class:"appr"}, h("div",{style:{display:"flex",justifyContent:"space-between",gap:"8px"}}, h("b",{}, `#${a.id} · ${ACTION[a.action]||a.action}`), h("span",{style:{fontSize:"11px",color:C[a.agent],border:`1px solid ${C[a.agent]}88`,borderRadius:"999px",padding:"2px 9px"}}, a.agent)),
+    return h("div",{class:"appr"}, h("div",{style:{display:"flex",justifyContent:"space-between",gap:"8px"}}, h("b",{}, `#${a.id} · ${ACTION[a.action]||a.action}`), h("span",{style:{fontSize:"11px",color:C[a.agent],border:`1px solid ${C[a.agent]}88`,borderRadius:"999px",padding:"2px 9px",whiteSpace:"nowrap",alignSelf:"flex-start"}}, a.agent)),
       a.reason ? h("span",{class:"small muted"}, a.reason) : null, h("pre",{class:"pre",style:{maxHeight:"150px"}}, lines.join("\n")), note,
-      h("div",{style:{display:"flex",gap:"8px"}}, h("button",{class:"btn ok",onclick:()=>act(true)}, a.action==="decision"?"Répondre":"Valider"), h("button",{class:"btn no",onclick:()=>act(false)}, "Refuser")));
+      h("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}}, h("button",{class:"btn ok",onclick:()=>act(true)}, a.action==="decision"?"Répondre":a.action==="publish_page"?"Publier":"Valider"), h("button",{class:"btn no",onclick:()=>act(false)}, "Refuser"),
+        a.action==="publish_page" ? h("a",{class:"btn",href:`/api/approvals/${a.id}/preview`,target:"_blank",rel:"noopener",style:{textDecoration:"none",color:"#EEF1FF"}}, "Aperçu de la page") : null));
   }));
 }
 
@@ -288,9 +292,11 @@ function renderPerf(d){
 }
 function renderPipe(d){
   const max = Math.max(1, ...d.pipeline.map(p=>p.value)), cols = ["#34D399","#60A5FA","#A78BFA","#F472B6"];
-  put($("#pipe"), d.pipeline.map((p,i) => h("div",{style:{display:"flex",flexDirection:"column",gap:"6px"}}, h("span",{style:{display:"flex",justifyContent:"space-between"}}, h("span",{style:{fontSize:"13px",color:"#C7CEF0"}},p.stage), h("span",{class:"gro",style:{fontSize:"14px",fontWeight:"600",color:"#F4F6FF"}},String(p.value))),
-      h("span",{class:"bar",style:{height:"8px",borderRadius:"4px"}}, h("i",{style:{width:Math.max(p.value?4:0, pct(p.value,max))+"%",background:cols[i],boxShadow:`0 0 10px ${cols[i]}88`,borderRadius:"4px"}})))),
-    h("div",{style:{display:"flex",justifyContent:"space-between",paddingTop:"10px",borderTop:"1px solid rgba(130,150,255,.12)"}}, h("span",{style:{fontSize:"13px",color:"#C7CEF0"}},"Ventes encaissées"), h("span",{class:"gro",style:{fontWeight:"600"}}, ST.stripe ? "lecture à venir" : "— (Stripe non connecté)")));
+  const opener = {inbox: openInbox, sales: openSales};
+  put($("#pipe"), d.pipeline.map((p,i) => { const col = cols[i % cols.length], f = opener[p.open];
+    return h(f ? "button" : "div",{onclick:f||null,title:f?"Voir le détail":null,style:{display:"flex",flexDirection:"column",gap:"6px",background:"none",border:"0",padding:"0",textAlign:"left",color:"inherit",cursor:f?"pointer":"default"}}, h("span",{style:{display:"flex",justifyContent:"space-between"}}, h("span",{style:{fontSize:"13px",color:"#C7CEF0"}},p.stage + (f ? " →" : "")), h("span",{class:"gro",style:{fontSize:"14px",fontWeight:"600",color:"#F4F6FF"}},String(p.value))),
+      h("span",{class:"bar",style:{height:"8px",borderRadius:"4px"}}, h("i",{style:{width:Math.max(p.value?4:0, pct(p.value,max))+"%",background:col,boxShadow:`0 0 10px ${col}88`,borderRadius:"4px"}}))); }),
+    h("div",{style:{display:"flex",justifyContent:"space-between",paddingTop:"10px",borderTop:"1px solid rgba(130,150,255,.12)"}}, h("span",{style:{fontSize:"13px",color:"#C7CEF0"}},"Ventes encaissées ce mois"), h("span",{class:"gro",style:{fontWeight:"600"}}, ST.stripe ? eur(ST.revenue.month) : "— (Stripe non connecté)")));
 }
 function renderSched(d){
   const who = {pdg:"Agent PDG",systeme:"Moteur",finance:"Agent Finance"};
@@ -371,6 +377,19 @@ function openSettings(){
   const b = ST.budget || {};
   modal("Paramètres", h("div",{style:{display:"flex",flexDirection:"column",gap:"8px"}}, h("div",{}, h("b",{},"Fournisseur : "), `${ST.provider} (${Object.values(ST.models||{}).join(" / ")})`), h("div",{}, h("b",{},"Plafonds : "), `${money(b.day_limit)} par jour, ${money(b.month_limit)} par mois, ${b.searches_limit} recherches web par jour`),
     h("p",{class:"small muted"},"Ces réglages se modifient dans config.json, puis on redémarre le moteur. Les modifier depuis cette page viendra dans une prochaine version.")));
+}
+async function openSales(){
+  const list = await api("GET","/api/sales");
+  modal("Ventes encaissées", h("div",{style:{overflowX:"auto"}}, list.length ? h("table",{}, h("thead",{}, h("tr",{}, ["Date","Montant","Produit","Client","Livraison"].map(x=>h("th",{},x)))),
+    h("tbody",{}, list.map(s => h("tr",{class:s.task_id?"click":null,onclick:s.task_id?()=>openTask(s.task_id):null}, h("td",{class:"muted"}, new Date(s.created_at).toLocaleString("fr-FR")), h("td",{}, `${s.amount.toLocaleString("fr-FR",{minimumFractionDigits:2})} ${s.currency}` + (s.livemode ? "" : " (test)")),
+      h("td",{}, s.product||"—"), h("td",{}, [s.customer_name, s.customer_email].filter(Boolean).join(" · ")||"—"), h("td",{class:"muted"}, s.task_id ? `tâche #${s.task_id}` : "historique"))))) : h("div",{class:"empty"},"Aucune vente pour l’instant. Elles apparaîtront ici dans les 10 minutes qui suivent un paiement Stripe.")));
+}
+async function openInbox(){
+  const list = await api("GET","/api/inbox"), LBL = {new:"Nouveau",queued:"Confié à un agent",ignored:"Ignoré",replied:"Répondu"};
+  modal("Emails reçus", h("div",{}, list.length ? list.map(m => h("details",{class:"box",style:{marginBottom:"8px"}},
+    h("summary",{style:{cursor:"pointer",display:"flex",gap:"10px",flexWrap:"wrap",justifyContent:"space-between"}}, h("span",{}, h("b",{}, m.from_name || m.from_addr), " — ", m.subject), h("span",{class:"small muted"}, `${LBL[m.status]||m.status}${m.reason?" ("+m.reason+")":""} · ${ago(m.received_at)}`)),
+    h("div",{class:"small muted",style:{margin:"6px 0"}}, m.from_addr, m.task_id ? h("button",{class:"link",style:{marginLeft:"10px"},onclick:()=>openTask(m.task_id)}, `tâche #${m.task_id} →`) : null),
+    h("div",{class:"pre"}, m.body || "(vide)"))) : h("div",{class:"empty"},"Aucun email reçu depuis la connexion de la boîte. Seuls les messages arrivés après la connexion sont traités.")));
 }
 function openEvents(){ modal("Toute l’activité", h("div",{}, EVENTS.length ? EVENTS.map(evRow) : h("div",{class:"empty"},"Pas encore d’activité."))); }
 

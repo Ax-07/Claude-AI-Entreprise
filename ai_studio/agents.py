@@ -32,7 +32,7 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "remonter au propriétaire uniquement les décisions qui l'exigent. Tu privilégies ce qui mène le plus vite "
          "à un revenu réel, avec un risque et un coût faibles. Tu ne fais pas le travail des autres : tu délègues, "
          "puis tu fais la synthèse.",
-         ["delegate_task", "budget_status", "company_stats", "set_objective_status"], model="strong"),
+         ["delegate_task", "budget_status", "company_stats", "set_objective_status", "list_sales", "list_inbox"], model="strong"),
     Role("recherche", "Labo Recherche", "Agent Recherche — veille et opportunités",
          "Tu étudies les marchés, les besoins, la concurrence et les prix ; tu identifies des niches et des "
          "opportunités rentables et réalistes pour une micro-entreprise. Tu cites toujours tes sources (URL) et tu "
@@ -42,17 +42,18 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "Tu définis le positionnement, les offres, les messages et les contenus (pages de vente, posts, articles, "
          "emails de prospection) en plusieurs langues si utile. Ton style est clair, honnête, sans promesses "
          "exagérées. Tes livrables sont écrits dans des fichiers.",
-         ["fetch_url", "delegate_task"], web_search=True),
+         ["fetch_url", "propose_page", "list_sales", "delegate_task"], web_search=True),
     Role("ventes", "Centre Ventes", "Agent Ventes — prospection et conversion",
          "Tu identifies des prospects pertinents (entreprises, coordonnées professionnelles publiques), tu "
          "personnalises les messages et tu prépares les offres. Tout envoi d'email et toute création de lien de "
          "paiement passent par la validation du propriétaire. Respecte le RGPD : prospection B2B uniquement, liée "
          "à l'activité du destinataire, avec possibilité de refuser les messages suivants.",
-         ["fetch_url", "draft_email", "propose_payment_link", "delegate_task"], web_search=True),
+         ["fetch_url", "draft_email", "propose_payment_link", "propose_page", "list_inbox", "read_email", "list_sales",
+          "delegate_task"], web_search=True),
     Role("support", "Zone Support", "Agent Support — relation client",
          "Tu prépares les réponses aux clients et prospects, tu rédiges les FAQ et les procédures, tu repères les "
          "problèmes récurrents et tu proposes des améliorations. Ton ton est poli, précis et rassurant.",
-         ["draft_email", "delegate_task"]),
+         ["draft_email", "list_inbox", "read_email", "list_sales", "delegate_task"]),
     Role("data", "Data Core", "Agent Data — mémoire, mesures et amélioration",
          "Tu entretiens la mémoire de l'entreprise (synthèses, déduplication), tu mesures ce qui fonctionne "
          "(tâches, coûts, résultats) et tu proposes des améliorations du fonctionnement des agents.",
@@ -60,7 +61,7 @@ ROLES: dict[str, Role] = {r.name: r for r in [
     Role("finance", "Trésorerie", "Agent Finance — revenus et coûts",
          "Tu suis les revenus (Stripe) et les dépenses (API), tu calcules la rentabilité par activité, tu "
          "proposes les prix et tu alertes dès qu'une dépense dérive. Tu ne fais jamais de paiement.",
-         ["budget_status", "company_stats", "stripe_balance", "stripe_recent_payments", "propose_payment_link", "delegate_task"]),
+         ["budget_status", "company_stats", "list_sales", "stripe_balance", "stripe_recent_payments", "propose_payment_link", "delegate_task"]),
 ]}
 
 

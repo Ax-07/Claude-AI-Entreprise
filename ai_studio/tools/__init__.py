@@ -70,4 +70,4 @@ def run_tool(name: str, ctx: ToolContext, args: dict) -> str:
 
 
 # Enregistre les outils
-from . import core, business  # noqa: E402,F401
+from . import core, business, commerce  # noqa: E402,F401

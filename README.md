@@ -81,6 +81,14 @@ Pour le fonctionnement 24 h/24 : double-clique sur `demarrer.bat`. Il lance le m
 - Sauvegarde automatique chaque jour dans `data/sauvegardes` (14 jours gardés). `sauvegardes` pour la liste, `restaurer NOM` pour revenir en arrière, moteur arrêté.
 Pense à désactiver la mise en veille du PC.
 
+### Vendre : paiements, emails, site
+
+- **Ventes Stripe** : lues toutes les 10 minutes. Chaque paiement s'affiche dans le tableau de bord, déclenche une notification et une tâche de livraison pour les agents.
+- **Boîte Gmail** : avec Gmail dans `SMTP_*` (mot de passe d'application), les nouveaux emails sont lus toutes les 5 minutes, sans être marqués comme lus. Les agents préparent les réponses, que tu valides. Newsletters et envois automatiques sont ignorés.
+- **Site** : les agents proposent des pages d'offre ; tu les vois avec « Aperçu de la page » puis tu publies en un clic sur GitHub Pages (`GITHUB_PAGES_REPO`, `GITHUB_TOKEN`). Renseigne `company.legal` dans `config.json` (nom, SIRET, adresse, email) : ces mentions légales sont ajoutées en bas de chaque page.
+
+Le tableau de bord se reconstruit avec `python outils/tableau/build.py` après une modification de `outils/tableau/index_source.html`.
+
 Les livrables des agents sont dans `data/workspace/`, la base de données dans `data/studio.db`.
 
 ## Tests

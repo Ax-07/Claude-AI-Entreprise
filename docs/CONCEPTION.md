@@ -126,8 +126,14 @@ Chaque agent n'accède qu'aux outils de son rôle ; les outils marqués « valid
 | propose_payment_link | Propose un lien de paiement Stripe | ventes, finance | Oui | — |
 | stripe_balance / stripe_recent_payments | Lit le solde et les paiements | finance | Non | — |
 | budget_status / company_stats | Dépenses et statistiques internes | pdg, data, finance | Non | — |
+| draft_email (in_reply_to, attachment) | Réponse dans le fil d'un email reçu, pièce jointe de l'espace de travail (10 Mo max.) | ventes, support | Oui | — |
+| list_inbox / read_email | Emails reçus ; contenu délimité comme donnée externe | ventes, support (pdg : liste) | Non | — |
+| list_sales | Ventes encaissées et chiffre du mois (sans appel Stripe) | pdg, marketing, ventes, support, finance | Non | — |
+| propose_page | Publication d'une page HTML sur GitHub Pages (pied de page légal ajouté, ni script ni formulaire) | marketing, ventes | Oui (aperçu) | — |
 
-**Outils prévus** : lecture de la boîte mail (IMAP) pour le support, publication de contenus (site, réseaux), génération de documents (devis, factures conformes), recherche d'entreprises via des sources publiques (annuaire des entreprises de l'État), appel de workflows n8n (`run_workflow`).
+**Boucle commerciale automatique (sans coût d'API)** : à chaque cycle, le moteur lit les sessions de paiement Stripe (toutes les 10 min) et la boîte Gmail en IMAP lecture seule (toutes les 5 min). Une vente payée crée une tâche de livraison prioritaire pour le PDG et une notification ; un email reçu (hors newsletters, envois automatiques et nos propres messages) crée une tâche de réponse pour l'agent ventes (si on lui avait écrit) ou support, dans la limite de 10 par jour. Au premier passage, l'historique Stripe de 30 jours est importé sans tâche, et l'historique de la boîte n'est pas traité.
+
+**Outils prévus** : publication sur les réseaux, génération de documents (devis, factures conformes), recherche d'entreprises via des sources publiques (annuaire des entreprises de l'État), appel de workflows n8n (`run_workflow`).
 
 ### Recherche web : Brave Search API en priorité
 
@@ -217,7 +223,10 @@ Toutes les données tiennent dans un seul fichier SQLite, `data/studio.db`, en m
 
 **États d'une tâche** : pending, running, done, failed, blocked. **États d'une validation** : pending, approved, rejected, executed, error.
 
-**Évolutions prévues** : table des revenus (paiements Stripe rapprochés par activité), table des contacts (prospects et clients, avec base légale et date de consentement ou d'opposition), table des activités (offres, prix, rentabilité). Chaque évolution passera par une migration qui conserve les données existantes.
+| sales | Paiements Stripe encaissés | id (session Stripe), amount, currency, customer_email, product, livemode, task_id (livraison) |
+| inbox | Emails reçus | uid, message_id, from_addr, subject, body, status (new, queued, ignored, replied), reason, task_id |
+
+**Évolutions prévues** : rapprochement des ventes par activité, table des contacts (prospects et clients, avec base légale et date de consentement ou d'opposition), table des activités (offres, prix, rentabilité). Chaque évolution passera par une migration qui conserve les données existantes.
 
 ## 10. Interface : tableau de bord et API locale
 

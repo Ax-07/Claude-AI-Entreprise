@@ -21,6 +21,17 @@ def send_email(cfg, payload: dict) -> str:
     msg["To"] = payload["to"]
     msg["Subject"] = payload["subject"]
     msg.set_content(payload["body"])
+    if payload.get("reply_message_id"):
+        msg["In-Reply-To"] = payload["reply_message_id"]
+        msg["References"] = payload["reply_message_id"]
+    if payload.get("attachment"):
+        import mimetypes
+        base = cfg.workspace.resolve()
+        p = (base / payload["attachment"]).resolve()
+        if base not in p.parents or not p.is_file():
+            raise RuntimeError(f"Pièce jointe introuvable : {payload['attachment']}")
+        ctype = (mimetypes.guess_type(p.name)[0] or "application/octet-stream").split("/", 1)
+        msg.add_attachment(p.read_bytes(), maintype=ctype[0], subtype=ctype[1], filename=p.name)
     if port == 465:
         with smtplib.SMTP_SSL(host, port, timeout=30) as s:
             s.login(user, pwd); s.send_message(msg)
@@ -43,7 +54,12 @@ def create_payment_link(cfg, payload: dict) -> str:
     return f"Lien de paiement créé : {link['url']}"
 
 
-EXECUTORS = {"send_email": send_email, "stripe_payment_link": create_payment_link}
+def publish_page(cfg, payload: dict) -> str:
+    from .commerce import publish_page as publish
+    return publish(cfg, payload)
+
+
+EXECUTORS = {"send_email": send_email, "stripe_payment_link": create_payment_link, "publish_page": publish_page}
 
 
 def decide(cfg, db, approval_id: int, approve: bool, note: str = "") -> str:
@@ -60,6 +76,8 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "") -> str:
         try:
             res = EXECUTORS[a["action"]](cfg, payload)
             db.set_approval(approval_id, status="executed", decided_at=iso(), result=res)
+            if a["action"] == "send_email" and payload.get("in_reply_to"):
+                db.run("UPDATE inbox SET status='replied' WHERE id=?", (payload["in_reply_to"],))
             outcome = f"VALIDÉ et exécuté : {res}. {note}".strip()
         except Exception as e:
             db.set_approval(approval_id, status="error", decided_at=iso(), result=str(e))
@@ -69,7 +87,7 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "") -> str:
         outcome = f"Réponse du propriétaire : {note or 'OK, validé.'}"
     db.log("proprietaire", "decision", f"Demande #{approval_id} ({a['action']}) : {outcome}")
     # On informe l'agent demandeur via une nouvelle tâche pour qu'il poursuive le travail.
-    summary = payload.get("question") or payload.get("subject") or payload.get("product_name") or a["action"]
+    summary = payload.get("question") or payload.get("subject") or payload.get("product_name") or payload.get("title") or a["action"]
     db.add_task(f"Suite à la demande #{approval_id} : {summary}"[:120], a["agent"],
                 f"Ta demande #{approval_id} ({a['action']}) a reçu une réponse.\n{outcome}\n"
                 f"Contexte initial : {a['reason']}\nPoursuis le travail en conséquence, puis termine la tâche.",

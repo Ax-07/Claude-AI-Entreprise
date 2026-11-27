@@ -85,7 +85,29 @@ def status(cfg, db) -> dict:
         "objective": obj,
         "achievements": achievements(db, done),
         "stripe": bool(os.environ.get("STRIPE_SECRET_KEY")),
+        "revenue": revenue(db),
     }
+
+
+def revenue(db) -> dict:
+    from .commerce import revenue as rev
+    return rev(db)
+
+
+def sales(cfg, db) -> list[dict]:
+    return [_row(r) for r in db.q("SELECT * FROM sales ORDER BY created_at DESC LIMIT 100")]
+
+
+def inbox(cfg, db) -> list[dict]:
+    return [_row(r) for r in db.q("SELECT id, from_addr, from_name, subject, received_at, body, status, reason, task_id "
+                                  "FROM inbox ORDER BY id DESC LIMIT 100")]
+
+
+def page_preview(cfg, db, approval_id: int) -> bytes:
+    a = db.approval(approval_id)
+    if not a or a["action"] != "publish_page":
+        raise ApiError(404, "Aucune page à prévisualiser")
+    return json.loads(a["payload"])["html"].encode("utf-8")
 
 
 def achievements(db, done: int) -> list[dict]:
@@ -151,6 +173,8 @@ def approvals(cfg, db) -> list[dict]:
     for a in db.pending_approvals():
         d = _row(a)
         d["payload"] = json.loads(a["payload"])
+        if "html" in d["payload"]:                     # la page complète est servie à part (aperçu)
+            d["payload"]["size"] = len(d["payload"].pop("html").encode("utf-8"))
         out.append(d)
     return out
 
@@ -216,7 +240,10 @@ def insights(cfg, db, days: int = 7) -> dict:
         {"stage": "Pistes en mémoire", "value": count("SELECT COUNT(*) FROM memory")},
         {"stage": "Emails préparés", "value": count("SELECT COUNT(*) FROM approvals WHERE action='send_email'")},
         {"stage": "Emails envoyés", "value": count("SELECT COUNT(*) FROM approvals WHERE action='send_email' AND status='executed'")},
+        {"stage": "Emails reçus", "value": count("SELECT COUNT(*) FROM inbox WHERE status!='ignored'"), "open": "inbox"},
+        {"stage": "Pages publiées", "value": count("SELECT COUNT(DISTINCT json_extract(payload,'$.path')) FROM approvals WHERE action='publish_page' AND status='executed'")},
         {"stage": "Liens de paiement créés", "value": count("SELECT COUNT(*) FROM approvals WHERE action='stripe_payment_link' AND status='executed'")},
+        {"stage": "Ventes", "value": count("SELECT COUNT(*) FROM sales"), "open": "sales"},
     ]
     schedule = []
     every = timedelta(minutes=int(cfg["runtime"]["ceo_review_minutes"]))
@@ -259,15 +286,22 @@ def set_map(cfg, db, body: dict) -> dict:
     return {"ok": True, **map_settings(cfg, db)}
 
 
-def integrations(cfg) -> list[dict]:
+def integrations(cfg, db=None) -> list[dict]:
     import os
+    from .commerce import imap_settings, site_settings
     from .llm import resolve_provider
+    db_err = lambda name: (db.kv_get(f"sync_{name}_error") if db is not None else "") or ""
     p = resolve_provider(cfg)
     return [
         {"name": "Fournisseur d'IA", "ok": bool(os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")), "detail": p},
         {"name": "Brave Search", "ok": bool(os.environ.get("BRAVE_API_KEY")), "detail": "recherche web"},
-        {"name": "Stripe", "ok": bool(os.environ.get("STRIPE_SECRET_KEY")), "detail": "paiements"},
+        {"name": "Stripe", "ok": bool(os.environ.get("STRIPE_SECRET_KEY")),
+         "detail": db_err("stripe") or ("ventes lues toutes les 10 min" if os.environ.get("STRIPE_SECRET_KEY") else "paiements")},
         {"name": "Email (SMTP)", "ok": bool(os.environ.get("SMTP_HOST") and os.environ.get("SMTP_USER")), "detail": "envoi après validation"},
+        {"name": "Boîte mail (lecture)", "ok": bool(imap_settings()[1] and imap_settings()[2]),
+         "detail": (db_err("inbox") or f"{imap_settings()[1]} — réponses confiées aux agents") if imap_settings()[1] else "IMAP_* ou Gmail dans SMTP_*"},
+        {"name": "Site (GitHub Pages)", "ok": bool(site_settings()[0] and site_settings()[1]),
+         "detail": site_settings()[3] or "GITHUB_PAGES_REPO et GITHUB_TOKEN"},
         {"name": "Notifications Windows", "ok": sys.platform == "win32" and bool(cfg.get("notifications", "windows", default=True)),
          "detail": "validations, budget, erreurs" if sys.platform == "win32" else "disponibles seulement sous Windows"},
         {"name": "Sauvegarde quotidienne", "ok": bool(cfg.get("backup", "enabled", default=True)),
@@ -348,6 +382,17 @@ def make_handler(cfg):
             self.end_headers()
             self.wfile.write(body)
 
+        def _preview(self, body: bytes):
+            """Aperçu d'une page avant publication : aucun script, isolée (sandbox)."""
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; sandbox")
+            self.end_headers()
+            self.wfile.write(body)
+
         def _db(self):
             return DB(cfg.db_path)
 
@@ -382,12 +427,15 @@ def make_handler(cfg):
                         "status": lambda: status(cfg, db), "agents": lambda: agents(cfg, db),
                         "approvals": lambda: approvals(cfg, db), "costs": lambda: costs(cfg, db),
                         "objectives": lambda: objectives(cfg, db), "files": lambda: files(cfg, db),
-                        "map": lambda: map_settings(cfg, db), "integrations": lambda: integrations(cfg),
+                        "map": lambda: map_settings(cfg, db), "integrations": lambda: integrations(cfg, db),
+                        "sales": lambda: sales(cfg, db), "inbox": lambda: inbox(cfg, db),
                     }
                     if parts == ["tasks"]:
                         return self._send(200, tasks(cfg, db, q("status"), q("agent"), int(q("limit", "50") or 50)))
                     if len(parts) == 2 and parts[0] == "tasks" and parts[1].isdigit():
                         return self._send(200, task_detail(cfg, db, int(parts[1])))
+                    if len(parts) == 3 and parts[0] == "approvals" and parts[1].isdigit() and parts[2] == "preview":
+                        return self._preview(page_preview(cfg, db, int(parts[1])))
                     if parts == ["insights"]:
                         return self._send(200, insights(cfg, db, int(q("days", "7") or 7)))
                     if parts == ["events"]:

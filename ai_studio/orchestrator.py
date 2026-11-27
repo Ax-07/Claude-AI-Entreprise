@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 from datetime import datetime, timedelta, timezone
 
-from . import backup, notify
+from . import backup, commerce, notify
 from .db import iso, now
 from .llm import BudgetExceeded, BudgetGuard, LLMError
 from .runner import run_task
@@ -50,6 +50,7 @@ class Studio:
 
     def cycle(self) -> dict:
         backup.daily(self.cfg, self.db)
+        commerce.sync_all(self.cfg, self.db)        # ventes Stripe et emails reçus (sans coût d'API)
         stats = self._cycle()
         try:
             notify.check(self.cfg, self.db, stats)

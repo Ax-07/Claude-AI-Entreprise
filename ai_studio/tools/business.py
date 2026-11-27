@@ -23,16 +23,32 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
       "propriétaire avant envoi. Pour la prospection B2B : message personnalisé, lié à l'activité du destinataire, "
       "avec une phrase permettant de refuser les prochains messages.",
       {"to": {"type": "string"}, "subject": {"type": "string"}, "body": {"type": "string"},
-       "reason": {"type": "string", "description": "Pourquoi cet email (contexte pour le propriétaire)."}},
+       "reason": {"type": "string", "description": "Pourquoi cet email (contexte pour le propriétaire)."},
+       "in_reply_to": {"type": "integer", "description": "numéro de l'email reçu auquel on répond (garde le fil de discussion)"},
+       "attachment": {"type": "string", "description": "fichier de l'espace de travail à joindre (ex. livraisons/rapport.pdf)"}},
       ["to", "subject", "body", "reason"], sensitive=True)
-def draft_email(ctx: ToolContext, to: str, subject: str, body: str, reason: str) -> str:
+def draft_email(ctx: ToolContext, to: str, subject: str, body: str, reason: str, in_reply_to: int = 0, attachment: str = "") -> str:
     if not EMAIL_RE.match(to.strip()):
         return "Adresse email invalide."
+    extra = {}
+    if in_reply_to:
+        m = ctx.db.one("SELECT id, message_id, subject FROM inbox WHERE id=?", (int(in_reply_to),))
+        if not m:
+            return f"Email reçu #{in_reply_to} introuvable."
+        extra.update(in_reply_to=m["id"], reply_message_id=m["message_id"])
+    if attachment:
+        from .core import _safe_path
+        p = _safe_path(ctx, attachment)
+        if not p.is_file():
+            return f"Pièce jointe introuvable : {attachment}"
+        if p.stat().st_size > 10_000_000:
+            return "Pièce jointe trop lourde (10 Mo maximum)."
+        extra["attachment"] = attachment
     today = ctx.db.one("SELECT COUNT(*) FROM approvals WHERE action='send_email' AND substr(created_at,1,10)=substr(datetime('now'),1,10)")[0]
     if today >= int(ctx.cfg.get("email", "daily_limit", default=20)):
         return "Refusé : limite quotidienne de brouillons d'emails atteinte."
     aid = ctx.db.add_approval(ctx.agent, ctx.task["id"] if ctx.task is not None else None, "send_email",
-                              {"to": to.strip(), "subject": subject, "body": body}, reason)
+                              {"to": to.strip(), "subject": subject, "body": body, **extra}, reason)
     ctx.db.log(ctx.agent, "approval", f"Email pour {to} en attente de validation (#{aid})")
     return f"Email #{aid} en attente de validation par le propriétaire."
 

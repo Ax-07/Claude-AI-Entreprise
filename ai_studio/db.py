@@ -76,6 +76,34 @@ CREATE TABLE IF NOT EXISTS kv (
     k TEXT PRIMARY KEY,
     v TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sales (
+    id TEXT PRIMARY KEY,                             -- identifiant Stripe (session de paiement)
+    created_at TEXT NOT NULL,
+    amount REAL NOT NULL,
+    currency TEXT NOT NULL,
+    customer_email TEXT,
+    customer_name TEXT,
+    product TEXT,
+    payment_link TEXT,
+    livemode INTEGER NOT NULL DEFAULT 1,
+    task_id INTEGER,                                 -- tâche de livraison créée
+    recorded_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS inbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uid INTEGER,
+    message_id TEXT,
+    from_addr TEXT NOT NULL,
+    from_name TEXT,
+    subject TEXT,
+    received_at TEXT,
+    body TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'new',              -- new | queued | ignored | replied
+    reason TEXT,
+    task_id INTEGER,
+    recorded_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_inbox_msgid ON inbox(message_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status, priority, id);
 CREATE INDEX IF NOT EXISTS idx_costs_day ON costs(day);
 CREATE INDEX IF NOT EXISTS idx_memory_topic ON memory(topic);
