@@ -95,17 +95,31 @@ def stripe_recent_payments(ctx: ToolContext, limit: int = 10) -> str:
 
 
 @tool("propose_payment_link",
-      "Propose la création d'un lien de paiement Stripe pour une offre (soumis à validation du propriétaire).",
-      {"product_name": {"type": "string"}, "amount_eur": {"type": "number"},
+      "Propose la création d'un lien de paiement Stripe pour une offre du catalogue (soumis à validation du "
+      "propriétaire). Indique offer = nom de la fiche d'offre : le nom et le prix sont repris de la fiche, et chaque "
+      "vente sera rattachée à cette offre pour la livraison.",
+      {"offer": {"type": "string", "description": "nom de l'offre du catalogue (recommandé)"},
+       "product_name": {"type": "string"}, "amount_eur": {"type": "number"},
        "recurring": {"type": "string", "description": "vide = paiement unique, sinon 'month' ou 'year'"},
        "reason": {"type": "string"}},
-      ["product_name", "amount_eur", "reason"], sensitive=True, requires_env=("STRIPE_SECRET_KEY",))
-def propose_payment_link(ctx: ToolContext, product_name: str, amount_eur: float, reason: str, recurring: str = "") -> str:
+      ["reason"], sensitive=True, requires_env=("STRIPE_SECRET_KEY",))
+def propose_payment_link(ctx: ToolContext, reason: str, offer: str = "", product_name: str = "", amount_eur: float = 0,
+                         recurring: str = "") -> str:
+    offer_id = None
+    if offer:
+        o = ctx.db.one("SELECT * FROM offers WHERE lower(name)=lower(?) AND status='active'", (offer.strip(),))
+        if not o:
+            return f"Offre « {offer} » introuvable dans le catalogue (list_offers, save_offer)."
+        offer_id, product_name, amount_eur = o["id"], o["name"], o["price_eur"]
+    if not product_name:
+        return "Indique l'offre du catalogue (offer), ou à défaut product_name et amount_eur."
     if not 1 <= float(amount_eur) <= 5000:
         return "Montant hors limites (1 à 5000 €)."
     aid = ctx.db.add_approval(ctx.agent, ctx.task["id"] if ctx.task is not None else None, "stripe_payment_link",
-                              {"product_name": product_name, "amount_eur": float(amount_eur), "recurring": recurring}, reason)
-    return f"Lien de paiement #{aid} en attente de validation par le propriétaire."
+                              {"product_name": product_name, "amount_eur": float(amount_eur), "recurring": recurring,
+                               "offer_id": offer_id}, reason)
+    note = "" if offer_id else " Sans fiche d'offre, les agents ne sauront pas quoi livrer : crée-la avec save_offer."
+    return f"Lien de paiement #{aid} en attente de validation : il sera créé automatiquement dès que le propriétaire validera.{note}"
 
 
 # ---------------------------------------------------------------- statistiques internes

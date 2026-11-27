@@ -55,6 +55,10 @@ def sync_all(cfg, db) -> dict:
             if db.kv_get(f"sync_{name}_error") != msg:      # on ne journalise qu'une fois la même erreur
                 db.kv_set(f"sync_{name}_error", msg)
                 db.log("systeme", "synchro", f"Synchronisation {name} impossible : {msg}")
+    try:
+        out["orders"] = follow_orders(cfg, db)
+    except Exception as e:
+        db.log("systeme", "commande", f"Suivi des commandes impossible : {e}")
     return out
 
 
@@ -111,21 +115,134 @@ def sync_stripe(cfg, db, request=None) -> dict:
         label = f"{s['amount']:.2f} {s['currency']}{test} — {s['product'] or 'produit non précisé'}"
         db.log("finance", "vente", f"Paiement reçu : {label} de {s['customer_email'] or 'client inconnu'}")
         if first:
+            db.run("UPDATE sales SET stage='historique' WHERE id=?", (s["id"],))
             continue
-        tid = db.add_task(
-            f"Livrer la commande {s['product'] or ''} ({s['customer_email'] or 'client'})"[:120], "pdg",
-            f"Un client vient de payer : {label}.\nClient : {s['customer_name'] or ''} <{s['customer_email'] or 'email inconnu'}>\n"
-            f"Référence Stripe : {s['id']}\n\n"
-            "Organise la livraison au plus vite :\n"
-            "1. Retrouve dans la mémoire (recall) et les fichiers la description de l'offre et ce qui a été promis.\n"
-            "2. Délègue la production du livrable à l'agent compétent (fichier dans livraisons/).\n"
-            "3. Délègue à l'agent support l'email de livraison au client (send_email avec le livrable en pièce jointe).\n"
-            "4. S'il manque une information du client pour livrer, fais-la lui demander par email (agent support).\n"
-            "Termine en résumant le plan de livraison.", priority=1, created_by="systeme")
+        offer = match_offer(db, s)
+        due = None
+        if offer:
+            due = iso(datetime.fromisoformat(s["created_at"]) + timedelta(hours=int(offer["delay_hours"])))
+        db.run("UPDATE sales SET stage='a_livrer', offer_id=?, due_at=? WHERE id=?", (offer["id"] if offer else None, due, s["id"]))
+        n = order_number(db, s["id"])
+        tid = db.add_task(f"Commande n°{n} : livrer {s['product'] or 'la commande'} ({s['customer_email'] or 'client'})"[:120], "pdg",
+                          delivery_brief(db, n), priority=1, created_by="systeme", order_ref=n)
         db.run("UPDATE sales SET task_id=? WHERE id=?", (tid, s["id"]))
         _notify(cfg, db, f"Nouvelle vente : {s['amount']:.2f} {s['currency']}{test}",
                 f"{s['product'] or 'Produit'} — {s['customer_email'] or 'client'}. Les agents préparent la livraison.", "sales")
     return {"new": len(new_sales), "first_sync": first}
+
+
+# ============================================================================ Commandes : du paiement à la livraison
+STAGES = {"a_livrer": "à livrer", "attente_client": "en attente du client", "livree": "livrée", "historique": "historique"}
+
+
+def order_number(db, sale_id: str) -> int:
+    return db.one("SELECT rowid FROM sales WHERE id=?", (sale_id,))[0]
+
+
+def get_order(db, n: int):
+    return db.one("SELECT rowid AS n, * FROM sales WHERE rowid=?", (int(n),))
+
+
+def match_offer(db, sale: dict):
+    """Retrouve la fiche d'offre vendue : par le lien de paiement, sinon par le nom du produit."""
+    if sale.get("payment_link"):
+        o = db.one("SELECT * FROM offers WHERE payment_link_id=?", (sale["payment_link"],))
+        if o:
+            return o
+    if sale.get("product"):
+        return db.one("SELECT * FROM offers WHERE lower(name)=lower(?)", (sale["product"].strip(),))
+    return None
+
+
+def offer_sheet(o) -> str:
+    return (f"Offre « {o['name']} » — {o['price_eur']:.2f} €\n- Résumé : {o['summary']}\n- Livrable : {o['deliverable']}\n"
+            f"- Délai promis : {o['delay_hours']} h après le paiement\n- À demander au client : {o['required_info'] or 'rien'}\n"
+            f"- Agent qui produit : {o['producer']}")
+
+
+def delivery_brief(db, n: int, nudge: str = "") -> str:
+    s = get_order(db, n)
+    o = db.one("SELECT * FROM offers WHERE id=?", (s["offer_id"],)) if s["offer_id"] else None
+    test = " (paiement en mode test : essai volontaire du propriétaire, à traiter comme une vraie commande)" if not s["livemode"] else ""
+    head = (f"{nudge}Commande n°{n}{test} : {s['amount']:.2f} {s['currency']} — {s['product'] or 'produit non précisé'}.\n"
+            f"Client : {s['customer_name'] or ''} <{s['customer_email'] or 'email inconnu'}>. Payée le {s['created_at'][:16]}"
+            + (f" (première tâche de livraison : #{s['task_id']})" if s["task_id"] else "") + ". "
+            f"État : {STAGES.get(s['stage'], s['stage'])}." + (f" Livraison promise avant le {s['due_at'][:16]}." if s["due_at"] else "") + "\n\n")
+    offer = (offer_sheet(o) + "\n\n") if o else (
+        "Aucune fiche d'offre ne correspond à ce produit. Déduis ce qui a été vendu (mémoire, fichiers, pages publiées) ; "
+        "crée la fiche avec save_offer pour les prochaines ventes. Si c'est vraiment impossible à déterminer, fais demander "
+        "une précision courte au client.\n\n")
+    return head + offer + (
+        "Tu es responsable de cette commande jusqu'à sa livraison. Le moteur te relancera tant qu'elle n'est pas livrée.\n"
+        "1. Vérifie où en est la commande : list_orders, list_tasks, fichiers dans livraisons/ (un plan ou un cahier des "
+        "charges n'est PAS un livrable).\n"
+        f"2. Si le livrable n'existe pas : délègue sa production à l'agent {o['producer'] if o else 'compétent'} avec un "
+        f"fichier attendu précis (livraisons/commande-{n}/…) et la consigne de déléguer ensuite la livraison à l'agent "
+        f"support (deliver_order, order={n}).\n"
+        f"3. Si le livrable existe : délègue au support la livraison (deliver_order, order={n}, avec le fichier en pièce jointe).\n"
+        "4. S'il manque vraiment une information du client : fais-la demander par le support (send_email), puis "
+        f"set_order_status({n}, 'attente_client'). Ne redemande pas ce qui est déjà connu.\n"
+        "Annonce toujours au client le délai de l'offre, jamais « aucun délai confirmé ».")
+
+
+def order_files(cfg, s) -> list[str]:
+    """Fichiers de livraisons/ qui concernent la commande (par son numéro, ou par la tâche de livraison d'origine)."""
+    root = cfg.workspace / "livraisons"
+    if not root.exists():
+        return []
+    keys = [f"commande-{s['n']}"] + ([f"commande-{s['task_id']}"] if s["task_id"] else [])
+    pat = re.compile("|".join(re.escape(k) + r"(?!\d)" for k in keys))
+    return sorted(p.relative_to(cfg.workspace).as_posix() for p in root.rglob("*")
+                  if p.is_file() and pat.search(p.relative_to(root).as_posix()))
+
+
+def open_work(db, n: int) -> bool:
+    """Quelqu'un travaille-t-il sur la commande (tâche ouverte, ou validation en attente du propriétaire) ?"""
+    if db.one("SELECT 1 FROM tasks WHERE order_ref=? AND status IN ('pending','running','blocked')", (n,)):
+        return True
+    return bool(db.one("SELECT 1 FROM approvals a LEFT JOIN tasks t ON t.id=a.task_id WHERE a.status='pending' "
+                       "AND (t.order_ref=? OR json_extract(a.payload,'$.order')=?)", (n, n)))
+
+
+def follow_orders(cfg, db) -> dict:
+    """Relance le PDG tant qu'une commande payée n'est pas livrée et que plus personne n'y travaille."""
+    c = cfg["commerce"]
+    out = {"nudged": [], "late": [], "stuck": []}
+    for s in db.q("SELECT rowid AS n, * FROM sales WHERE stage IN ('a_livrer','attente_client')"):
+        n = s["n"]
+        if s["due_at"] and now() > datetime.fromisoformat(s["due_at"]) and db.kv_get(f"order_late_{n}") != "1":
+            db.kv_set(f"order_late_{n}", "1")
+            out["late"].append(n)
+            db.log("systeme", "commande", f"Commande n°{n} en retard (promise avant le {s['due_at'][:16]})")
+            _notify(cfg, db, f"Commande n°{n} en retard", f"{s['product'] or 'Commande'} pour {s['customer_email'] or 'client'} : "
+                    "le délai promis est dépassé.", "errors")
+        if open_work(db, n):
+            continue
+        wait = c["client_wait_hours"] if s["stage"] == "attente_client" else c["order_nudge_minutes"] / 60
+        since = s["last_nudge_at"] or db.one("SELECT MAX(updated_at) FROM tasks WHERE order_ref=?", (n,))[0] or s["recorded_at"]
+        if now() - datetime.fromisoformat(since) < timedelta(hours=wait):
+            continue
+        if s["nudges"] >= c["order_max_nudges"]:
+            if db.kv_get(f"order_stuck_{n}") != "1":
+                db.kv_set(f"order_stuck_{n}", "1")
+                out["stuck"].append(n)
+                db.log("systeme", "commande", f"Commande n°{n} bloquée après {s['nudges']} relances : intervention du propriétaire nécessaire")
+                _notify(cfg, db, f"Commande n°{n} bloquée", "Les agents n'arrivent pas à la livrer malgré les relances. "
+                        "Regarde le journal de la commande dans le tableau de bord.", "errors")
+            continue
+        why = ("Le client n'a pas répondu depuis longtemps : relance-le poliment ou livre avec les informations disponibles."
+               if s["stage"] == "attente_client" else "Plus aucune tâche n'est en cours sur cette commande alors qu'elle n'est pas livrée.")
+        tid = db.add_task(f"Commande n°{n} : relance {s['nudges'] + 1} — livraison non terminée"[:120], "pdg",
+                          delivery_brief(db, n, f"RELANCE AUTOMATIQUE : {why}\n\n"), priority=1, created_by="systeme", order_ref=n)
+        db.run("UPDATE sales SET nudges=nudges+1, last_nudge_at=? WHERE rowid=?", (iso(), n))
+        db.log("systeme", "commande", f"Commande n°{n} non livrée et sans travail en cours → relance du PDG (tâche #{tid})", tid)
+        out["nudged"].append(n)
+    return out
+
+
+def mark_delivered(db, n: int, note: str = ""):
+    db.run("UPDATE sales SET stage='livree', delivered_at=?, stage_note=? WHERE rowid=?", (iso(), note[:300], int(n)))
+    db.log("systeme", "commande", f"Commande n°{n} livrée. {note}".strip())
 
 
 def revenue(db) -> dict:
@@ -242,6 +359,10 @@ def sync_inbox(cfg, db, connect=None) -> dict:
                             f"Plafond de {cap} réponses par jour atteint : les autres messages attendent dans le tableau de bord.", "errors")
                 continue
             agent = _agent_for(db, addr)
+            order = db.one("SELECT rowid AS n FROM sales WHERE lower(customer_email)=lower(?) AND stage IN ('a_livrer','attente_client') "
+                           "ORDER BY created_at DESC LIMIT 1", (addr,))
+            if order:
+                db.run("UPDATE sales SET stage='a_livrer', nudges=0 WHERE rowid=?", (order["n"],))
             tid = db.add_task(
                 f"Répondre à {name or addr} : {subject}"[:120], agent,
                 f"Message reçu #{iid} de {name} <{addr}>, le {received}, objet : « {subject} ».\n\n"
@@ -250,8 +371,10 @@ def sync_inbox(cfg, db, connect=None) -> dict:
                 f"- Si une réponse est utile : prépare-la avec send_email (to = {addr}, in_reply_to = {iid}). Elle sera validée par le propriétaire.\n"
                 "- Vérifie la mémoire (recall) pour connaître l'offre, les prix et l'historique avec ce contact.\n"
                 "- Si le message n'appelle pas de réponse (spam, publicité, simple remerciement), termine la tâche en le disant.\n"
-                "- Si une décision du propriétaire est nécessaire (remboursement, devis particulier…), utilise request_owner_decision.",
-                priority=2, created_by="systeme")
+                "- Si une décision du propriétaire est nécessaire (remboursement, devis particulier…), utilise request_owner_decision."
+                + (f"\n- Ce client a la commande n°{order['n']} en cours : utilise ses réponses pour faire avancer la livraison "
+                   f"(list_orders ; délègue au PDG si la production doit reprendre)." if order else ""),
+                priority=1 if order else 2, created_by="systeme", order_ref=order["n"] if order else None)
             db.run("UPDATE inbox SET status='queued', task_id=? WHERE id=?", (tid, iid))
             db.log(agent, "email", f"Email reçu de {addr} (« {subject[:80]} ») → tâche #{tid}")
             queued_today += 1

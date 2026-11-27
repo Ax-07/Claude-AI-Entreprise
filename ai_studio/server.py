@@ -95,7 +95,7 @@ def revenue(db) -> dict:
 
 
 def sales(cfg, db) -> list[dict]:
-    return [_row(r) for r in db.q("SELECT * FROM sales ORDER BY created_at DESC LIMIT 100")]
+    return [_row(r) for r in db.q("SELECT rowid AS n, * FROM sales ORDER BY created_at DESC LIMIT 100")]
 
 
 def inbox(cfg, db) -> list[dict]:

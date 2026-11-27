@@ -291,13 +291,13 @@ class PageTest(Base):
 
 class SyncAllTest(Base):
     def test_only_configured_and_errors_logged_once(self):
-        self.assertEqual(commerce.sync_all(self.cfg, self.db), {})
+        self.assertEqual(set(commerce.sync_all(self.cfg, self.db)), {"orders"})
         os.environ["STRIPE_SECRET_KEY"] = "sk_test"
         def boom(cfg, db):
             raise RuntimeError("réseau")
         with unittest.mock.patch.object(commerce, "sync_stripe", boom):
             self.assertIn("error", commerce.sync_all(self.cfg, self.db)["stripe"])
-            self.assertEqual(commerce.sync_all(self.cfg, self.db), {})       # pas avant 10 min
+            self.assertNotIn("stripe", commerce.sync_all(self.cfg, self.db))   # pas avant 10 min
             self.db.kv_set("sync_stripe_at", "2000-01-01T00:00:00+00:00")
             commerce.sync_all(self.cfg, self.db)
         self.assertEqual(self.db.one("SELECT COUNT(*) FROM events WHERE kind='synchro'")[0], 1)

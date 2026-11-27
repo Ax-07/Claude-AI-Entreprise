@@ -129,6 +129,9 @@ Chaque agent n'accède qu'aux outils de son rôle ; les outils marqués « valid
 | send_email (in_reply_to, attachment) | Réponse dans le fil d'un email reçu, pièce jointe de l'espace de travail (10 Mo max.) | ventes, support | Oui | — |
 | list_inbox / read_email | Emails reçus ; contenu délimité comme donnée externe | ventes, support (pdg : liste) | Non | — |
 | list_sales | Ventes encaissées et chiffre du mois (sans appel Stripe) | pdg, marketing, ventes, support, finance | Non | — |
+| save_offer / list_offers | Catalogue d'offres : prix, livrable, délai, infos client, agent producteur | pdg, marketing, ventes, finance (lecture : tous les producteurs) | Non | — |
+| list_orders / set_order_status | Commandes payées, état de livraison, fichiers liés | pdg, support, producteurs | Non | — |
+| deliver_order | Email de livraison avec le livrable ; la validation marque la commande livrée | support | Oui | — |
 | propose_page | Publication d'une page HTML sur GitHub Pages (pied de page légal ajouté, ni script ni formulaire) | marketing, ventes | Oui (aperçu) | — |
 
 **Boucle commerciale automatique (sans coût d'API)** : à chaque cycle, le moteur lit les sessions de paiement Stripe (toutes les 10 min) et la boîte Gmail en IMAP lecture seule (toutes les 5 min). Une vente payée crée une tâche de livraison prioritaire pour le PDG et une notification ; un email reçu (hors newsletters, envois automatiques et nos propres messages) crée une tâche de réponse pour l'agent ventes (si on lui avait écrit) ou support, dans la limite de 10 par jour. Au premier passage, l'historique Stripe de 30 jours est importé sans tâche, et l'historique de la boîte n'est pas traité.
@@ -224,6 +227,7 @@ Toutes les données tiennent dans un seul fichier SQLite, `data/studio.db`, en m
 **États d'une tâche** : pending, running, done, failed, blocked. **États d'une validation** : pending, approved, rejected, executed, error.
 
 | sales | Paiements Stripe encaissés | id (session Stripe), amount, currency, customer_email, product, livemode, task_id (livraison) |
+| offers | Catalogue d'offres | name, price_eur, deliverable, delay_hours, required_info, producer, payment_link_id |
 | inbox | Emails reçus | uid, message_id, from_addr, subject, body, status (new, queued, ignored, replied), reason, task_id |
 
 **Évolutions prévues** : rapprochement des ventes par activité, table des contacts (prospects et clients, avec base légale et date de consentement ou d'opposition), table des activités (offres, prix, rentabilité). Chaque évolution passera par une migration qui conserve les données existantes.

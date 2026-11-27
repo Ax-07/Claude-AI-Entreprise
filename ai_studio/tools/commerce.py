@@ -76,3 +76,111 @@ def propose_page(ctx: ToolContext, file: str, page_path: str, title: str, reason
                               reason + note)
     ctx.db.log(ctx.agent, "approval", f"Page {url} en attente de validation (#{aid})")
     return f"Page #{aid} ({url}) en attente de validation par le propriétaire.{note}"
+
+
+# ============================================================================ Catalogue d'offres et commandes
+@tool("save_offer",
+      "Crée ou met à jour une fiche d'offre du catalogue (par son nom). C'est la référence pour vendre (lien de paiement, "
+      "page) et pour livrer : ce que reçoit le client, le délai promis, ce qu'il faut lui demander, l'agent qui produit.",
+      {"name": {"type": "string"}, "price_eur": {"type": "number"}, "summary": {"type": "string"},
+       "deliverable": {"type": "string", "description": "ce que reçoit concrètement le client (format, contenu)"},
+       "delay_hours": {"type": "integer", "description": "délai de livraison promis après paiement, en heures"},
+       "required_info": {"type": "string", "description": "informations à obtenir du client pour livrer (vide si aucune)"},
+       "producer": {"type": "string", "description": "agent qui produit le livrable (recherche, marketing, data…)"}},
+      ["name", "price_eur", "summary", "deliverable", "delay_hours", "producer"])
+def save_offer(ctx: ToolContext, name: str, price_eur: float, summary: str, deliverable: str, delay_hours: int,
+               producer: str, required_info: str = "") -> str:
+    from ..db import iso
+    producer = producer.strip().lower()
+    if producer not in ctx.agent_names:
+        return f"Agent inconnu pour la production. Choix : {', '.join(ctx.agent_names)}"
+    if not 1 <= float(price_eur) <= 5000 or not 1 <= int(delay_hours) <= 24 * 60:
+        return "Prix (1 à 5000 €) ou délai (1 h à 60 jours) hors limites."
+    old = ctx.db.one("SELECT id FROM offers WHERE lower(name)=lower(?)", (name.strip(),))
+    vals = (float(price_eur), summary[:1000], deliverable[:1000], int(delay_hours), required_info[:600], producer, iso())
+    if old:
+        ctx.db.run("UPDATE offers SET price_eur=?, summary=?, deliverable=?, delay_hours=?, required_info=?, producer=?, "
+                   "updated_at=?, status='active' WHERE id=?", (*vals, old["id"]))
+        ctx.db.log(ctx.agent, "offre", f"Offre mise à jour : {name}")
+        return f"Offre « {name} » mise à jour (#{old['id']})."
+    oid = ctx.db.run("INSERT INTO offers(name, price_eur, summary, deliverable, delay_hours, required_info, producer, updated_at, "
+                     "created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)", (name.strip()[:120], *vals, ctx.agent, iso()))
+    ctx.db.log(ctx.agent, "offre", f"Nouvelle offre au catalogue : {name}")
+    return f"Offre « {name} » ajoutée au catalogue (#{oid}). Pour la vendre : propose_payment_link avec offer=\"{name}\"."
+
+
+@tool("list_offers", "Catalogue des offres de l'entreprise (prix, livrable, délai, lien de paiement).", {})
+def list_offers(ctx: ToolContext) -> str:
+    from ..commerce import offer_sheet
+    rows = ctx.db.q("SELECT * FROM offers WHERE status='active' ORDER BY id")
+    if not rows:
+        return "Catalogue vide. Crée une fiche avec save_offer avant de vendre."
+    return "\n\n".join(f"#{o['id']} " + offer_sheet(o) + f"\n- Lien de paiement : {o['payment_link_url'] or 'aucun'}" for o in rows)
+
+
+@tool("list_orders", "Commandes payées et leur état de livraison (à livrer, en attente du client, livrée).",
+      {"status": {"type": "string", "description": "a_livrer, attente_client, livree, ou vide pour les commandes en cours"}})
+def list_orders(ctx: ToolContext, status: str = "") -> str:
+    from ..commerce import STAGES
+    if status:
+        rows = ctx.db.q("SELECT rowid AS n, * FROM sales WHERE stage=? ORDER BY created_at DESC LIMIT 20", (status,))
+    else:
+        rows = ctx.db.q("SELECT rowid AS n, * FROM sales WHERE stage IN ('a_livrer','attente_client') ORDER BY created_at LIMIT 20")
+    if not rows:
+        return "Aucune commande dans cet état."
+    from ..commerce import order_files
+    out = []
+    for s in rows:
+        files = order_files(ctx.cfg, s)
+        out.append(f"Commande n°{s['n']} | {STAGES.get(s['stage'], s['stage'])} | {s['amount']:.2f} {s['currency']}"
+                   f"{'' if s['livemode'] else ' (test)'} | {s['product'] or '?'} | {s['customer_email'] or '?'} | "
+                   f"promise avant {s['due_at'][:16] if s['due_at'] else '—'}"
+                   + (f" | note : {s['stage_note']}" if s["stage_note"] else "")
+                   + (f"\n   fichiers : {', '.join(files[:8])}" if files else ""))
+    return "\n".join(out)
+
+
+@tool("set_order_status", "Indique l'état d'une commande : 'attente_client' quand on attend une réponse du client, "
+      "'a_livrer' quand la production reprend. (La livraison se déclare avec deliver_order.)",
+      {"order": {"type": "integer"}, "status": {"type": "string"}, "note": {"type": "string"}}, ["order", "status"])
+def set_order_status(ctx: ToolContext, order: int, status: str, note: str = "") -> str:
+    from ..commerce import get_order
+    if status not in ("attente_client", "a_livrer"):
+        return "État possible : attente_client ou a_livrer."
+    s = get_order(ctx.db, order)
+    if not s or s["stage"] in ("livree", "historique"):
+        return "Commande introuvable ou déjà livrée."
+    from ..db import iso
+    ctx.db.run("UPDATE sales SET stage=?, stage_note=?, last_nudge_at=? WHERE rowid=?", (status, note[:300], iso(), int(order)))
+    ctx.db.log(ctx.agent, "commande", f"Commande n°{order} → {status}. {note}".strip())
+    return f"Commande n°{order} : {status}."
+
+
+@tool("deliver_order",
+      "Livre une commande au client : email avec le livrable en pièce jointe. Il part automatiquement dès que le "
+      "propriétaire valide, et la commande est alors marquée livrée. Le livrable doit être le travail final, pas un plan.",
+      {"order": {"type": "integer"}, "attachment": {"type": "string", "description": "fichier livrable (ex. livraisons/commande-3/rapport.md)"},
+       "subject": {"type": "string"}, "body": {"type": "string"}},
+      ["order", "attachment", "subject", "body"], sensitive=True)
+def deliver_order(ctx: ToolContext, order: int, attachment: str, subject: str, body: str) -> str:
+    from ..commerce import get_order
+    s = get_order(ctx.db, order)
+    if not s:
+        return "Commande introuvable."
+    if s["stage"] == "livree":
+        return "Cette commande est déjà livrée."
+    if not s["customer_email"]:
+        return "Email du client inconnu : impossible de livrer par email. Signale-le dans le résultat de ta tâche."
+    p = _safe_path(ctx, attachment)
+    if not p.is_file():
+        return f"Livrable introuvable : {attachment}. Il faut d'abord le produire."
+    if p.stat().st_size < 400:
+        return "Ce fichier est trop court pour être un livrable final. Produis le travail complet avant de livrer."
+    if ctx.db.one("SELECT 1 FROM approvals WHERE status='pending' AND action='send_email' AND json_extract(payload,'$.order')=?", (int(order),)):
+        return "Une livraison de cette commande attend déjà la validation du propriétaire. Rien d'autre à faire."
+    aid = ctx.db.add_approval(ctx.agent, ctx.task["id"] if ctx.task is not None else None, "send_email",
+                              {"to": s["customer_email"], "subject": subject, "body": body, "attachment": attachment,
+                               "order": int(order)}, f"Livraison de la commande n°{order} ({s['product'] or 'commande'})")
+    ctx.db.log(ctx.agent, "approval", f"Livraison de la commande n°{order} en attente de validation (#{aid})")
+    return (f"Livraison #{aid} en attente de validation : l'email partira automatiquement dès que le propriétaire la "
+            "validera, et la commande sera marquée livrée. Rien d'autre à faire.")

@@ -81,6 +81,13 @@ Pour le fonctionnement 24 h/24 : double-clique sur `demarrer.bat`. Il lance le m
 - Sauvegarde automatique chaque jour dans `data/sauvegardes` (14 jours gardés). `sauvegardes` pour la liste, `restaurer NOM` pour revenir en arrière, moteur arrêté.
 Pense à désactiver la mise en veille du PC.
 
+### Offres et commandes
+
+Chaque offre a une fiche (prix, livrable, délai, informations à demander, agent qui produit) : `python -m ai_studio offres`.
+Chaque paiement devient une commande suivie jusqu'à la livraison : `python -m ai_studio commandes`. Le moteur relance
+le PDG tant qu'une commande n'est pas livrée, et te prévient si elle est bloquée ou en retard. `livree N` marque une
+commande livrée si tu l'as livrée toi-même.
+
 ### Mémoire des agents
 
 Les agents gardent une mémoire partagée. Si une information fausse s'y est glissée :

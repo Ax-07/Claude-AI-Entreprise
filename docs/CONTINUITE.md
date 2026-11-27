@@ -52,6 +52,14 @@ _Mis à jour le 27/11/2026_
 - Problème : l'outil `draft_email` (« prépare un email ») a fait croire aux agents qu'ils ne pouvaient qu'écrire un brouillon. Ils ont fait valider le texte par `request_owner_decision`, puis demandé au propriétaire de l'envoyer à la main.
 - Corrections : outil renommé `send_email` (alias de l'ancien nom), description et résultat explicites (« part automatiquement à la validation »), règle « ne jamais demander au propriétaire de faire une action à ta place », `request_owner_decision` interdit pour valider un email ; une validation dont le réglage manque (SMTP, Stripe, GitHub) est refusée avec un message clair et reste en attente au lieu d'échouer. 87 tests.
 
+## Catalogue d'offres et suivi des commandes (27/11/2026)
+- Constat du test réel : le support a écrit le cahier des charges du diagnostic puis s'est arrêté ; personne n'était responsable de la commande jusqu'à la livraison, et les agents ne savaient pas ce qu'était le produit « Test diagnostic » (lien créé à la main).
+- Table `offers` (nom, prix, livrable, délai, infos à demander, agent producteur, lien de paiement) ; outils `save_offer`, `list_offers` ; `propose_payment_link(offer=…)` relie le lien Stripe à la fiche.
+- Commandes = ventes avec un état (`a_livrer`, `attente_client`, `livree`, `historique`), un numéro (n°N), une échéance (délai de l'offre) ; `tasks.order_ref` rattache toutes les tâches (héritée par délégation). Migration automatique des bases existantes.
+- Brief de livraison détaillé pour le PDG (fiche d'offre, producteur, fichier attendu, « un plan n'est pas un livrable », délai à annoncer). Outils `list_orders`, `set_order_status`, `deliver_order` (pièce jointe obligatoire et non triviale ; la validation marque la commande livrée).
+- Suivi automatique (`follow_orders`, à chaque cycle, sans coût) : relance du PDG si plus aucune tâche ni validation en cours depuis 30 min (48 h en attente client), 3 relances puis notification « commande bloquée » ; notification si le délai promis est dépassé ; une réponse du client relance la commande.
+- CLI : `offres`, `commandes [-t]`, `livree N`. 99 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.
