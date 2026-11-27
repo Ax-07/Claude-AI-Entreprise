@@ -265,6 +265,26 @@ def cmd_offres(cfg, db, a):
         _out(f"#{o['id']} {offer_sheet(o)}\n- Lien de paiement : {o['payment_link_url'] or 'aucun'}\n")
 
 
+def cmd_importer_offres(cfg, db, a):
+    from .commerce import import_offers
+    path = Path(a.fichier) if a.fichier else Path(__file__).resolve().parents[1] / "catalogue" / "offres.json"
+    try:
+        names = import_offers(db, path)
+    except (OSError, ValueError, KeyError) as e:
+        _out(f"Import impossible : {e}"); return
+    _out(f"{len(names)} offre(s) à jour : " + ", ".join(names) + ". Voir le détail avec : python -m ai_studio offres")
+
+
+def cmd_commande_test(cfg, db, a):
+    from .commerce import test_order
+    try:
+        n = test_order(cfg, db, a.offre, a.email, a.infos or "")
+    except ValueError as e:
+        _out(str(e)); return
+    _out(f"Commande d'essai n°{n} créée (sans paiement). Le PDG organise la production ; la livraison partira vers "
+         f"{a.email} après ta validation. Suivi : python -m ai_studio commandes")
+
+
 def cmd_commandes(cfg, db, a):
     from .commerce import STAGES
     sql = "SELECT rowid AS n, * FROM sales" + ("" if a.toutes else " WHERE stage IN ('a_livrer','attente_client')")
@@ -409,6 +429,8 @@ def main(argv=None):
     s = sub.add_parser("relancer"); s.add_argument("id", type=int, nargs="?")
     s = sub.add_parser("archiver"); s.add_argument("id", type=int)
     sub.add_parser("offres")
+    s = sub.add_parser("importer-offres"); s.add_argument("fichier", nargs="?")
+    s = sub.add_parser("commande-test"); s.add_argument("offre"); s.add_argument("-e", "--email", required=True); s.add_argument("-i", "--infos")
     s = sub.add_parser("commandes"); s.add_argument("-t", "--toutes", action="store_true")
     s = sub.add_parser("consigne"); s.add_argument("n", type=int); s.add_argument("texte")
     s = sub.add_parser("livree"); s.add_argument("n", type=int); s.add_argument("-n", "--note")
@@ -426,7 +448,7 @@ def main(argv=None):
                 "validations": cmd_validations, "taches": cmd_taches, "voir": cmd_voir, "journal": cmd_journal,
                 "couts": cmd_couts, "agents": cmd_agents, "relancer": cmd_relancer, "objectifs": cmd_objectifs, "activites": cmd_activites,
                 "archiver": cmd_archiver, "serveur": cmd_serveur, "notifier-test": cmd_notifier_test,
-                "offres": cmd_offres, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne,
+                "offres": cmd_offres, "importer-offres": cmd_importer_offres, "commande-test": cmd_commande_test, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne,
                 "memoire": cmd_memoire, "oublier": cmd_oublier, "retenir": cmd_retenir,
                 "sauvegarder": cmd_sauvegarder, "sauvegardes": cmd_sauvegardes, "restaurer": cmd_restaurer,
                 "demarrage-auto": cmd_demarrage_auto,
