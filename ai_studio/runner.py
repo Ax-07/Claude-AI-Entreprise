@@ -110,6 +110,11 @@ def run_task(cfg, db, llm, guard, task) -> str:
         raise
     except LLMError as e:
         cost = db.task_cost(task["id"])
+        if e.fatal:
+            # Problème de configuration (modèle, clé, paramètre) : la tâche n'y est pour rien, elle reste en attente.
+            db.set_task(task["id"], status="pending", cost_usd=cost, attempts=task["attempts"])
+            db.log(role.name, "error", f"Configuration à corriger — tâche #{task['id']} remise en attente : {e}", task["id"])
+            raise
         status = "failed" if task["attempts"] + 1 >= int(rt["max_attempts"]) else "pending"
         db.set_task(task["id"], status=status, cost_usd=cost, result=f"Erreur API : {e}")
         db.log(role.name, "error", f"Tâche #{task['id']} : {e}", task["id"])

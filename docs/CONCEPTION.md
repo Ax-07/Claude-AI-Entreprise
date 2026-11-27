@@ -275,7 +275,9 @@ L'installation prend une dizaine de minutes sur Windows et ne demande que Python
 
 **Prérequis du PC** : mise en veille désactivée, connexion internet stable, redémarrage automatique du moteur au démarrage de Windows (Planificateur de tâches, à configurer).
 
-**En cas de problème** : `journal` montre les dernières actions et erreurs ; une tâche échouée est relancée une fois, puis marquée failed avec le message d'erreur.
+**En cas de problème** : `run --once` affiche l'erreur ; `journal` montre les dernières actions. Une erreur temporaire (surcharge, réseau) est retentée au cycle suivant, puis la tâche passe en échec. Une erreur de configuration (requête refusée, clé, modèle) arrête le cycle sans toucher aux tâches, qui restent en attente ; en continu, le moteur réessaie toutes les 10 minutes. `relancer` remet les tâches en échec en attente, `archiver` met un objectif en pause.
+
+**OpenAI et raisonnement** : avec Chat Completions, les modèles à raisonnement refusent les outils si le raisonnement est actif. Le moteur envoie `reasoning_effort: "none"` (réglable dans `config.json`, section `openai`) et retire le paramètre automatiquement pour les modèles qui ne le connaissent pas.
 
 ## 12. Tests et qualité
 

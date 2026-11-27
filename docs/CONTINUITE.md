@@ -18,8 +18,13 @@ _Mis à jour le 27/11/2026_
 - Phase de test avec OpenAI (crédits du propriétaire) : gpt-6-luna (agents) et gpt-6.1-terra (PDG).
 - n8n (auto-hébergé, gratuit) servira de couche d'intégrations à partir de la phase 4 ; le moteur Python garde budget, validations et journal.
 
+## Premier lancement réel (27/11/2026)
+- Configuration lue correctement (OpenAI + Brave), mais chaque appel refusé : `Function tools with reasoning_effort are not supported for gpt-6.1-terra in /v1/chat/completions`.
+- Corrigé : envoi de `reasoning_effort: "none"` ; erreurs de configuration affichées et sans perte de tâches ; pas de nouvel essai dans le même cycle ; commandes `relancer`, `objectifs`, `archiver`.
+- Piste d'évolution : passer à l'API Responses d'OpenAI pour garder le raisonnement avec les outils (PDG).
+
 ## Non vérifié
-- Aucun lancement réel n'a encore été fait (OpenAI, Brave). Premier test chez le propriétaire : `python -m ai_studio run --once`.
+- Aucun cycle réel complet n'a encore réussi. Prochain test chez le propriétaire : `python -m ai_studio run --once`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.
 
 ## Prochaines étapes

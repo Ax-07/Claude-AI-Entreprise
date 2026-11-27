@@ -18,7 +18,14 @@ OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 
 
 class LLMError(Exception):
-    pass
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
+
+    @property
+    def fatal(self) -> bool:
+        """Erreur de configuration (requête refusée, clé, modèle) : réessayer ne sert à rien."""
+        return self.status in (400, 401, 403, 404)
 
 
 class BudgetExceeded(Exception):
@@ -44,7 +51,7 @@ def _post_with_retries(url: str, body: dict, headers: dict, timeout: int, transp
             if e.code in (429, 500, 502, 503, 529) and attempt < 3:
                 time.sleep(delay); delay *= 2
                 continue
-            raise LLMError(f"API {e.code} : {detail}") from None
+            raise LLMError(f"API {e.code} : {detail}", status=e.code) from None
         except (urllib.error.URLError, TimeoutError) as e:
             if attempt < 3:
                 time.sleep(delay); delay *= 2
@@ -150,8 +157,12 @@ def from_openai_response(resp: dict) -> dict:
 class OpenAIClient:
     provider = "openai"
 
-    def __init__(self, api_key: str | None = None, timeout: int = 120, transport=None, base_url: str | None = None):
+    def __init__(self, api_key: str | None = None, timeout: int = 120, transport=None, base_url: str | None = None,
+                 reasoning_effort: str | None = "none"):
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
+        # Les modèles à raisonnement refusent les outils dans Chat Completions si le raisonnement est actif :
+        # on envoie "none" par défaut ; si le modèle ne connaît pas ce paramètre, on le retire automatiquement.
+        self.reasoning_effort = reasoning_effort or None
         self.url = (base_url or os.environ.get("OPENAI_BASE_URL") or "").rstrip("/")
         self.url = f"{self.url}/chat/completions" if self.url else OPENAI_URL
         self.timeout, self.transport = timeout, transport
@@ -165,7 +176,20 @@ class OpenAIClient:
         oa_tools = to_openai_tools(tools)
         if oa_tools:
             body["tools"] = oa_tools
-        resp = _post_with_retries(self.url, body, {"authorization": f"Bearer {self.api_key}"}, self.timeout, self.transport)
+        if self.reasoning_effort:
+            body["reasoning_effort"] = self.reasoning_effort
+        headers = {"authorization": f"Bearer {self.api_key}"}
+        try:
+            resp = _post_with_retries(self.url, body, headers, self.timeout, self.transport)
+        except LLMError as e:
+            msg = str(e).lower()
+            if e.status == 400 and "reasoning_effort" in msg and ("unsupported" in msg or "not supported" in msg or "unrecognized" in msg) \
+                    and "function tools" not in msg and "reasoning_effort" in body:
+                self.reasoning_effort = None          # modèle sans raisonnement : on retire le paramètre
+                body.pop("reasoning_effort")
+                resp = _post_with_retries(self.url, body, headers, self.timeout, self.transport)
+            else:
+                raise
         return from_openai_response(resp)
 
 
@@ -199,7 +223,9 @@ def models_for(cfg) -> dict:
 
 def make_llm(cfg):
     timeout = int(cfg["runtime"]["request_timeout_seconds"])
-    return OpenAIClient(timeout=timeout) if resolve_provider(cfg) == "openai" else AnthropicClient(timeout=timeout)
+    if resolve_provider(cfg) == "openai":
+        return OpenAIClient(timeout=timeout, reasoning_effort=cfg.get("openai", "reasoning_effort", default="none"))
+    return AnthropicClient(timeout=timeout)
 
 
 # ====================================================================== coûts et budget

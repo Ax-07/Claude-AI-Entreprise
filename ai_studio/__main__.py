@@ -15,6 +15,9 @@ Commandes principales :
   journal [-n 30]              derniers événements
   couts                        dépenses API par jour, par agent et par modèle
   agents                       liste l'équipe et ses outils
+  objectifs                    liste les objectifs
+  archiver ID                  met un objectif en pause (et annule ses tâches en attente)
+  relancer [ID]                remet en attente les tâches en échec (toutes, ou une seule)
 """
 from __future__ import annotations
 
@@ -71,6 +74,13 @@ def cmd_run(cfg, db, a):
         s = st.cycle()
         _out(f"Cycle terminé : {s['ran']} tâche(s) exécutée(s), {s['reviews']} revue(s) planifiée(s)."
              + (f" Pause : {s['paused']}" if s["paused"] else ""))
+        if s["error"]:
+            _out(f"\nERREUR (configuration à corriger, les tâches restent en attente) :\n{s['error']}")
+        failed = db.q("SELECT id, title, result FROM tasks WHERE status='failed' ORDER BY id DESC LIMIT 5")
+        for t in failed:
+            _out(f"Tâche en échec #{t['id']} {t['title']} : {(t['result'] or '')[:200]}")
+        if failed:
+            _out("→ python -m ai_studio relancer   pour remettre les tâches en échec en attente")
         _out(f"Dépense du jour : {db.spent('day'):.4f} $")
     else:
         st.run_forever(_out)
@@ -108,6 +118,36 @@ def cmd_validations(cfg, db, a):
 def cmd_decide(cfg, db, a, approve):
     from .approvals import decide
     _out(decide(cfg, db, a.id, approve, a.note or ""))
+
+
+def cmd_relancer(cfg, db, a):
+    if a.id:
+        n = db.conn.execute("UPDATE tasks SET status='pending', attempts=0 WHERE id=? AND status IN ('failed','blocked')", (a.id,)).rowcount
+    else:
+        n = db.conn.execute("UPDATE tasks SET status='pending', attempts=0 WHERE status IN ('failed','blocked')").rowcount
+    db.conn.commit()
+    _out(f"{n} tâche(s) remise(s) en attente.")
+
+
+def cmd_objectifs(cfg, db, a):
+    rows = db.q("SELECT * FROM objectives ORDER BY id")
+    if not rows:
+        _out("Aucun objectif."); return
+    for o in rows:
+        _out(f"#{o['id']} [{o['status']}] {o['text']}")
+    _out("\nMettre en pause : python -m ai_studio archiver ID   (les tâches de revue en attente sont annulées)")
+
+
+def cmd_archiver(cfg, db, a):
+    o = db.one("SELECT * FROM objectives WHERE id=?", (a.id,))
+    if not o:
+        _out("Objectif introuvable."); return
+    db.run("UPDATE objectives SET status='paused' WHERE id=?", (a.id,))
+    n = db.conn.execute("UPDATE tasks SET status='blocked', result='Objectif mis en pause par le propriétaire' "
+                        "WHERE objective_id=? AND status='pending'", (a.id,)).rowcount
+    db.conn.commit()
+    db.log("proprietaire", "objective", f"Objectif #{a.id} mis en pause ({n} tâche(s) en attente annulée(s))")
+    _out(f"Objectif #{a.id} mis en pause, {n} tâche(s) en attente annulée(s).")
 
 
 def cmd_taches(cfg, db, a):
@@ -166,14 +206,17 @@ def main(argv=None):
     s = sub.add_parser("taches"); s.add_argument("-s", "--statut")
     s = sub.add_parser("voir"); s.add_argument("id", type=int)
     s = sub.add_parser("journal"); s.add_argument("-n", type=int, default=30)
-    sub.add_parser("couts"); sub.add_parser("agents")
+    sub.add_parser("couts"); sub.add_parser("agents"); sub.add_parser("objectifs")
+    s = sub.add_parser("relancer"); s.add_argument("id", type=int, nargs="?")
+    s = sub.add_parser("archiver"); s.add_argument("id", type=int)
     a = p.parse_args(argv)
 
     cfg = load_config()
     db = DB(cfg.db_path)
     handlers = {"init": cmd_init, "objectif": cmd_objectif, "tache": cmd_tache, "run": cmd_run, "status": cmd_status,
                 "validations": cmd_validations, "taches": cmd_taches, "voir": cmd_voir, "journal": cmd_journal,
-                "couts": cmd_couts, "agents": cmd_agents,
+                "couts": cmd_couts, "agents": cmd_agents, "relancer": cmd_relancer, "objectifs": cmd_objectifs,
+                "archiver": cmd_archiver,
                 "valider": lambda c, d, x: cmd_decide(c, d, x, True), "refuser": lambda c, d, x: cmd_decide(c, d, x, False)}
     try:
         handlers[a.cmd](cfg, db, a)

@@ -163,5 +163,85 @@ class TestBrave(Base):
         self.assertIn("fetch_url", names)
 
 
+class TestOpenAIErrors(Base):
+    def _http_error(self, code, message):
+        import io, urllib.error
+        body = json.dumps({"error": {"message": message, "param": "reasoning_effort"}}).encode()
+        return urllib.error.HTTPError("u", code, "err", {}, io.BytesIO(body))
+
+    def test_reasoning_effort_none_is_sent(self):
+        sent = []
+        ok = {"choices": [{"finish_reason": "stop", "message": {"content": "ok"}}], "usage": {}}
+        client = OpenAIClient(api_key="k", transport=lambda u, b, h, t: sent.append(b) or ok)
+        client.complete("gpt-6.1-terra", "sys", [{"role": "user", "content": "x"}],
+                        [{"name": "recall", "description": "", "input_schema": {"type": "object", "properties": {}}}])
+        self.assertEqual(sent[0]["reasoning_effort"], "none")
+
+    def test_reasoning_effort_dropped_when_unsupported(self):
+        sent = []
+        ok = {"choices": [{"finish_reason": "stop", "message": {"content": "ok"}}], "usage": {}}
+        def transport(u, b, h, t):
+            sent.append(dict(b))
+            if "reasoning_effort" in b:
+                raise self._http_error(400, "Unsupported parameter: 'reasoning_effort' is not supported with this model.")
+            return ok
+        client = OpenAIClient(api_key="k", transport=transport)
+        r = client.complete("gpt-4o-mini", "sys", [{"role": "user", "content": "x"}])
+        self.assertEqual(r["content"][0]["text"], "ok")
+        self.assertNotIn("reasoning_effort", sent[-1])
+        self.assertIsNone(client.reasoning_effort)
+
+    def test_fatal_error_stops_cycle_and_keeps_tasks(self):
+        from ai_studio.orchestrator import Studio
+        self.make()
+        os.environ["OPENAI_API_KEY"] = "k"
+        calls = []
+        def transport(u, b, h, t):
+            calls.append(1)
+            raise self._http_error(400, "Function tools with reasoning_effort are not supported for gpt-6.1-terra.")
+        st = Studio(self.cfg, self.db, OpenAIClient(api_key="k", transport=transport))
+        self.db.add_task("A", "data"); self.db.add_task("B", "data")
+        s = st.cycle()
+        self.assertIn("API 400", s["error"])
+        self.assertEqual(len(calls), 1)                       # pas de nouvel essai, pas de tâche suivante
+        self.assertEqual(self.db.one("SELECT COUNT(*) FROM tasks WHERE status='pending'")[0], 2)
+
+    def test_transient_error_not_retried_in_same_cycle(self):
+        from ai_studio.orchestrator import Studio
+        from ai_studio.llm import LLMError
+        self.make()
+        class Boom:
+            n = 0
+            def complete(self, *a, **k):
+                Boom.n += 1
+                raise LLMError("API 529 : surchargé", status=529)
+        st = Studio(self.cfg, self.db, Boom())
+        self.db.add_task("A", "data")
+        s = st.cycle()
+        self.assertEqual(Boom.n, 1)
+        self.assertEqual(self.db.task(1)["status"], "pending")
+        st.cycle()
+        self.assertEqual(self.db.task(1)["status"], "failed")  # 2e essai, au cycle suivant
+
+
+class TestCli(Base):
+    def test_relancer_and_archiver(self):
+        from ai_studio.__main__ import main
+        self.make()
+        os.environ["AI_STUDIO_HOME"] = str(self.dir)
+        import ai_studio.__main__ as m
+        with unittest.mock.patch.object(m, "load_config", lambda: self.cfg):
+            oid = self.db.add_objective("Objectif test")
+            t1 = self.db.add_task("Revue", "pdg", objective_id=oid)
+            t2 = self.db.add_task("Autre", "data")
+            self.db.set_task(t2, status="failed", attempts=2)
+            main(["relancer"])
+            self.assertEqual(self.db.task(t2)["status"], "pending")
+            self.assertEqual(self.db.task(t2)["attempts"], 0)
+            main(["archiver", str(oid)])
+            self.assertEqual(self.db.one("SELECT status FROM objectives WHERE id=?", (oid,))[0], "paused")
+            self.assertEqual(self.db.task(t1)["status"], "blocked")
+
+
 if __name__ == "__main__":
     unittest.main()

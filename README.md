@@ -62,6 +62,9 @@ python -m ai_studio validations                     # actions en attente de ta d
 python -m ai_studio valider 2 -n "OK"               # valider
 python -m ai_studio refuser 2 -n "trop tôt"         # refuser
 python -m ai_studio couts                           # dépenses détaillées
+python -m ai_studio objectifs                       # liste des objectifs
+python -m ai_studio archiver 2                      # met l'objectif 2 en pause
+python -m ai_studio relancer                        # remet en attente les tâches en échec
 python -m ai_studio tache "Rédiger une FAQ" -a support -d "FAQ pour l'offre X"
 ```
 

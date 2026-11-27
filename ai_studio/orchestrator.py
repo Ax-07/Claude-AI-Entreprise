@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from .db import iso, now
-from .llm import BudgetExceeded, BudgetGuard
+from .llm import BudgetExceeded, BudgetGuard, LLMError
 from .runner import run_task
 
 REVIEW_TEMPLATE = (
@@ -48,7 +48,7 @@ class Studio:
         return created
 
     def cycle(self) -> dict:
-        stats = {"ran": 0, "paused": None, "reviews": 0}
+        stats = {"ran": 0, "paused": None, "reviews": 0, "error": None}
         try:
             self.guard.check()
         except BudgetExceeded as e:
@@ -59,11 +59,14 @@ class Studio:
             return stats
         self._paused_reason = None
         stats["reviews"] = self.schedule_reviews()
+        tried: set[int] = set()
         for _ in range(int(self.cfg["runtime"]["max_tasks_per_cycle"])):
-            nxt = self.db.next_tasks(1)
+            # Une tâche n'est tentée qu'une fois par cycle (pas de nouvel essai immédiat après une erreur).
+            nxt = [t for t in self.db.next_tasks(50) if t["id"] not in tried]
             if not nxt:
                 break
             t = nxt[0]
+            tried.add(t["id"])
             try:
                 run_task(self.cfg, self.db, self.llm, self.guard, t)
                 stats["ran"] += 1
@@ -71,6 +74,10 @@ class Studio:
                 self.db.log("finance", "budget", f"Pause : {e}")
                 self._paused_reason = str(e)
                 stats["paused"] = str(e)
+                break
+            except LLMError as e:
+                # Erreur de configuration : inutile d'essayer les autres tâches, on s'arrête pour ce cycle.
+                stats["error"] = str(e)
                 break
         return stats
 
@@ -84,6 +91,10 @@ class Studio:
                 if s["ran"] or s["reviews"]:
                     echo(f"[{datetime.now():%H:%M:%S}] {s['ran']} tâche(s) exécutée(s), {s['reviews']} revue(s) planifiée(s). "
                          f"Dépense du jour : {self.db.spent('day'):.4f} $")
+                if s["error"]:
+                    echo(f"[{datetime.now():%H:%M:%S}] ERREUR de configuration, nouvel essai dans 10 min : {s['error'][:400]}")
+                    time.sleep(600)
+                    continue
                 elif s["paused"]:
                     echo(f"[{datetime.now():%H:%M:%S}] En pause : {s['paused']}")
                     time.sleep(max(pause, 600))
