@@ -286,5 +286,50 @@ class TestLongDeliverables(Base):
         self.assertIn("stripe_balance", [t.get("name") for t in llm.calls[0]["tools"]])
 
 
+class TestHistoryCompaction(Base):
+    def test_old_tool_results_are_shortened(self):
+        from ai_studio.runner import compact_history, _clean_for_api
+        big = "x" * 5000
+        msgs = [{"role": "user", "content": "briefing"}]
+        for i in range(4):
+            msgs.append({"role": "assistant", "content": [{"type": "tool_use", "id": f"t{i}", "name": "fetch_url", "input": {}}]})
+            msgs.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": f"t{i}", "content": big}]})
+        saved = compact_history(msgs, keep_last=2, max_chars=600)
+        self.assertGreater(saved, 8000)
+        self.assertLess(len(msgs[2]["content"][0]["content"]), 600)
+        self.assertEqual(len(msgs[8]["content"][0]["content"]), 5000)        # récents intacts
+        self.assertEqual(compact_history(msgs, 2, 600), 0)                    # idempotent
+        clean = _clean_for_api(msgs)
+        self.assertNotIn("_compacte", clean[2]["content"][0])
+        self.assertIn("_compacte", msgs[2]["content"][0])                     # l'original garde le marqueur
+
+    def test_runner_sends_compacted_history(self):
+        from test_core import FakeLLM
+        self.make()
+        tid = self.db.add_task("Lire", "data")
+        long = "y" * 4000
+        script = [[{"type": "tool_use", "id": f"r{i}", "name": "recall", "input": {"query": "q"}}] for i in range(4)]
+        script.append([{"type": "tool_use", "id": "end", "name": "complete_task", "input": {"result": "ok"}}])
+        llm = FakeLLM(script)
+        from ai_studio.tools import REGISTRY
+        orig = REGISTRY["recall"].func
+        REGISTRY["recall"].func = lambda ctx, query: long
+        try:
+            run_task(self.cfg, self.db, llm, self.guard, self.db.task(tid))
+        finally:
+            REGISTRY["recall"].func = orig
+        last = llm.calls[-1]["messages"]
+        sizes = [len(b["content"]) for m in last if isinstance(m["content"], list) for b in m["content"] if b.get("type") == "tool_result"]
+        self.assertEqual(sizes[-1], 4000)
+        self.assertLess(sizes[0], 600)
+        self.assertTrue(all("_compacte" not in b for m in last if isinstance(m["content"], list) for b in m["content"]))
+
+    def test_rules_and_search_quota(self):
+        from ai_studio.agents import RULES
+        self.make()
+        self.assertIn("coût d'API", RULES)
+        self.assertEqual(self.cfg["budget"]["web_searches_per_day"], 30)
+
+
 if __name__ == "__main__":
     unittest.main()

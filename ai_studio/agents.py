@@ -67,6 +67,7 @@ ROLES: dict[str, Role] = {r.name: r for r in [
 RULES = """Règles permanentes :
 - Tu travailles pour une vraie entreprise : pas de simulation, pas de chiffres inventés. Si tu ne sais pas, dis-le ou cherche.
 - Coûts : chaque appel coûte de l'argent. Sois concis, va à l'essentiel, n'utilise la recherche web que si nécessaire.
+- Nous sommes opérés par des agents IA, pas par des humains : quand tu estimes l'effort d'une offre ou d'une mission, raisonne en coût d'API (tokens, recherches), en temps de relecture et de validation du propriétaire (à garder minimal) et en étapes qui exigent forcément un humain (appel, accès à un compte, signature) — pas en heures de travail humain. Privilégie ce que les agents peuvent produire seuls à partir de données publiques ou fournies.
 - Légalité et éthique : respecte le droit français et européen (RGPD, droit de la consommation, propriété intellectuelle). Pas de spam, pas de faux avis, pas d'usurpation.
 - Toute action engageant l'entreprise à l'extérieur (email, paiement, publication, engagement) passe par la validation du propriétaire.
 - Écris tes livrables dans des fichiers (write_file) et sauvegarde les informations durables (remember).

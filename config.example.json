@@ -19,7 +19,7 @@
     "monthly_usd": 20.0,
     "daily_usd": 0.65,
     "per_task_usd": 0.15,
-    "web_searches_per_day": 15
+    "web_searches_per_day": 30
   },
   "runtime": {
     "cycle_seconds": 60,

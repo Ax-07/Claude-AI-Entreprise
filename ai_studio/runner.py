@@ -35,6 +35,38 @@ def _tools_for(cfg, role, guard) -> list[dict]:
     return specs
 
 
+def compact_history(messages: list, keep_last: int = 2, max_chars: int = 600) -> int:
+    """Raccourcit les anciens résultats d'outils (pages lues, résultats de recherche…) déjà exploités.
+
+    À chaque étape, tout l'historique est renvoyé au modèle : sans compactage, une page web lue à
+    l'étape 1 est facturée à chaque étape suivante. On garde en entier les `keep_last` derniers
+    messages de résultats d'outils et on tronque les plus anciens. Retourne le nombre de caractères gagnés.
+    """
+    result_msgs = [m for m in messages if m["role"] == "user" and isinstance(m["content"], list)
+                   and any(b.get("type") == "tool_result" for b in m["content"])]
+    saved = 0
+    for m in result_msgs[:-keep_last] if keep_last else result_msgs:
+        for b in m["content"]:
+            c = b.get("content")
+            if b.get("type") == "tool_result" and isinstance(c, str) and len(c) > max_chars and not b.get("_compacte"):
+                cut = c[: max_chars // 2]
+                b["content"] = cut + f"\n[… résultat ancien raccourci ({len(c)} caractères) pour économiser des tokens ; " \
+                                     "ce qui comptait doit être dans tes notes, ta mémoire ou tes fichiers.]"
+                b["_compacte"] = True
+                saved += len(c) - len(b["content"])
+    return saved
+
+
+def _clean_for_api(messages: list) -> list:
+    """Retire les marqueurs internes avant l'envoi à l'API."""
+    out = []
+    for m in messages:
+        if isinstance(m["content"], list):
+            m = {**m, "content": [{k: v for k, v in b.items() if not k.startswith("_")} for b in m["content"]]}
+        out.append(m)
+    return out
+
+
 def _briefing(db, task) -> str:
     parts = [f"Tâche #{task['id']} : {task['title']}", "", task["description"] or "(pas de description)"]
     if task["parent_id"]:
@@ -77,7 +109,8 @@ def run_task(cfg, db, llm, guard, task) -> str:
                 else:
                     messages.append({"role": "user", "content": [note]})
             guard.check(task["id"])
-            resp = llm.complete(model, system, messages, _tools_for(cfg, role, guard), int(rt["max_output_tokens"]))
+            compact_history(messages, int(rt.get("keep_full_tool_results", 2)), int(rt.get("old_tool_result_chars", 600)))
+            resp = llm.complete(model, system, _clean_for_api(messages), _tools_for(cfg, role, guard), int(rt["max_output_tokens"]))
             guard.record(role.name, task["id"], model, resp.get("usage", {}))
             content = resp.get("content", [])
             messages.append({"role": "assistant", "content": content})
