@@ -783,6 +783,74 @@ def rh_c(s):
     s.line(s.p(0, 0, 31), (x, y + 15), 1.5, s.hi, .6)
     s.beam(-36, 36, 0, 50)
 
+CLOUD = '<path d="M-16 9 a8 8 0 0 1 2 -15.5 a11 11 0 0 1 21 -1 a8 8 0 0 1 9 16.5 z" fill="#FFFFFF" fill-opacity=".85"/>'
+FLOW = ('<g stroke="#FFFFFF" stroke-width="2.4"><line x1="-15" y1="-7" x2="13" y2="-9"/><line x1="13" y1="-9" x2="0" y2="9"/><line x1="0" y1="9" x2="-15" y2="-7"/></g>'
+        '<circle cx="-15" cy="-7" r="4.5" fill="#FFFFFF"/><circle cx="13" cy="-9" r="4.5" fill="#FFFFFF"/><circle cx="0" cy="9" r="5" fill="#FFFFFF"/>')
+def if_a(s):
+    """Centre de données : halle basse, rangées de baies lumineuses et groupes de refroidissement."""
+    s.slab()
+    f = rect(-42, 42, -34, 34); s.prism(f, 0, 26, "dark"); s.cornice(f, 26, 2)
+    for k, v in enumerate((-24, -8, 8)):
+        r = rect(-34, 30, v, v + 8); s.prism(r, 28.5, 36, "dark"); s.crown(r, 36)
+        for u in range(-30, 30, 8):
+            x, y = s.p(u, v + 8, 33); s.raw('<circle class="pulse" cx="%.1f" cy="%.1f" r="1.3" fill="%s" style="animation-delay: %.1fs"/>' % (x, y, s.c, ((u + 30) % 16) / 10 + k*.3))
+    for u in (-30, 30):
+        x, y, rx, ry = s.ell(u, 26, 28.5, 5); s.raw('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="%s" stroke="%s"/>' % (x, y, rx, ry, mix(s.c, .3), s.c))
+    x, y = s.p(0, 0, 76); s.raw(_sym_holo(s, x, y, CLOUD, .8))
+    s.beam(-42, 34, 0, 56); s.beam(42, -34, 0, 56)
+def if_b(s):
+    """Tour d'hébergement : tour sombre aux voyants de serveurs et nuage lumineux au sommet."""
+    s.slab()
+    f0 = cham(-30, 30, -30, 30, 8); s.prism(f0, 0, 16, "office"); s.cornice(f0, 16, 2.5)
+    f = cham(-18, 18, -18, 18, 4); s.prism(f, 18.5, 112, "dark"); s.cornice(f, 112)
+    for z in range(30, 108, 9):
+        for k, u in enumerate((-12, -4, 4, 12)):
+            x, y = s.p(u, 18, z); s.raw('<rect x="%.1f" y="%.1f" width="3" height="1.6" fill="%s" fill-opacity="%.2f"/>' % (x, y, s.c, .4 + .15 * ((z + k) % 4)))
+    x, y = s.p(0, 0, 144); s.raw(_sym_holo(s, x, y, CLOUD, .85))
+    s.line(s.p(0, 0, 115), (x, y + 16), 1.5, s.hi, .6)
+    s.beam(-30, 30, 0, 60)
+def if_c(s):
+    """Nuage : bâtiment vitré sous un grand nuage holographique relié par des faisceaux."""
+    s.slab()
+    f = cham(-36, 36, -30, 30, 6); s.prism(f, 0, 34, "glass"); s.cornice(f, 34, 2)
+    x, y = s.p(0, 0, 96)
+    for u, v in ((-24, -18), (24, 18), (-20, 20)):
+        s.line(s.p(u, v, 36), (x, y + 10), 1.2, s.hi, .5)
+    s.raw(_sym_holo(s, x, y, CLOUD, 1.1))
+    s.beam(-36, 30, 0, 50)
+def au_a(s):
+    """Usine à workflows : halle et réseau de nœuds lumineux reliés au-dessus du toit."""
+    s.slab()
+    f = rect(-40, 40, -32, 32); s.prism(f, 0, 30, "office"); s.cornice(f, 30, 2)
+    nodes = [(-26, -18, 48), (22, -20, 56), (-6, 16, 52), (26, 14, 44)]
+    pts = [s.p(*n) for n in nodes]
+    for a, b in ((0, 1), (1, 2), (2, 0), (1, 3), (2, 3)):
+        s.line(pts[a], pts[b], 1.6, s.hi, .8)
+    for (u, v, z), (x, y) in zip(nodes, pts):
+        s.line(s.p(u, v, 31), (x, y), 1, mix(s.c, .6), .6)
+        s.raw('<circle class="pulse" cx="%.1f" cy="%.1f" r="4" fill="%s" filter="url(#nf%s)"/>' % (x, y, s.c, s.uid))
+    x, y = s.p(0, 0, 98); s.raw(_sym_holo(s, x, y, FLOW, .8))
+    s.beam(-40, 32, 0, 56); s.beam(40, -32, 0, 56)
+def au_b(s):
+    """Tour d'intégration : tour vitrée cerclée d'anneaux de connecteurs en orbite."""
+    s.slab()
+    f0 = cham(-30, 30, -30, 30, 8); s.prism(f0, 0, 16, "office"); s.cornice(f0, 16, 2.5)
+    f = circ(0, 0, 17); s.prism(f, 18.5, 110, "glass", smooth=True); s.cornice(f, 110, smooth=True)
+    for z in (50, 80):
+        s.ring(0, 0, z, 30, w=2)
+    x, y = s.p(0, 0, 142); s.raw(_sym_holo(s, x, y, FLOW, .85))
+    s.line(s.p(0, 0, 113), (x, y + 16), 1.5, s.hi, .6)
+    s.beam(-30, 30, 0, 60)
+def au_c(s):
+    """Hub de connecteurs : rotonde reliée par des conduits lumineux à des bornes de connexion."""
+    s.slab()
+    f = circ(0, 0, 22); s.prism(f, 0, 44, "bands", smooth=True); s.cornice(f, 44, 2, smooth=True)
+    for (u, v) in ((-36, -10), (30, -28), (34, 24), (-20, 34)):
+        r = rect(u - 5, u + 5, v - 5, v + 5); s.prism(r, 0, 16, "dark"); s.crown(r, 16)
+        s.line(s.p(u, v, 14), s.p(0, 0, 30), 2, s.c, .8)
+    x, y = s.p(0, 0, 88); s.raw(_sym_holo(s, x, y, FLOW, .8))
+    s.beam(-36, 36, 0, 50)
+
 POLES = [
  ("hq", "Command HQ", "Orchestration", "#818CF8", [("A", "Spire de commandement", "Tour à pans coupés, bandeaux vitrés lumineux et couronne qui brille.", hq_a), ("B", "Citadelle", "Deux tours noires à enseignes néon reliées par une passerelle de verre.", hq_b), ("C", "Anneau orbital", "Tour cylindrique vitrée entourée d’anneaux de données en orbite.", hq_c)]),
  ("research", "Labo Recherche", "Veille et opportunités", "#34D399", [("A", "Observatoire", "Rotonde nervurée, coupole et télescope pointé vers les marchés.", re_a), ("B", "Serre de verre", "Laboratoire transparent : on voit les idées pousser à l’intérieur.", re_b), ("C", "Labo à antenne", "Labo vitré aux écrans allumés et tour équipée d’une parabole.", re_c)]),
@@ -797,6 +865,8 @@ POLES = [
  ("video", "Studio vidéo", "Vidéo · en préparation", "#F43F5E", [("A", "Studio de tournage", "Grand plateau, écran géant et projecteurs.", vi_a), ("B", "Tour média", "Tour vitrée, voyant REC et lecteur vidéo flottant.", vi_b), ("C", "Plateau de diffusion", "Coupole, antenne d’émission et ondes.", vi_c)]),
  ("ecommerce", "E-commerce", "Boutique · en préparation", "#A3E635", [("A", "Entrepôt logistique", "Halle, quais de chargement et colis empilés.", ec_a), ("B", "Boutique en ligne", "Tour vitrée et caddie lumineux au sommet.", ec_b), ("C", "Hub de livraison", "Centre de tri, tapis de colis et drone de livraison.", ec_c)]),
  ("rh", "Ressources humaines", "Spécialistes · en préparation", "#E879F9", [("A", "Maison des talents", "Immeuble aux nombreuses fenêtres et réserve d’experts au sommet.", rh_a), ("B", "Tour des experts", "Tour élancée : chaque étage vitré accueille un spécialiste.", rh_b), ("C", "Campus RH", "Bâtiment en anneau autour d’un patio et d’un hologramme d’équipe.", rh_c)]),
+ ("infra", "Infrastructure", "Hébergement · en préparation", "#2DD4BF", [("A", "Centre de données", "Halle basse, rangées de baies lumineuses et refroidissement.", if_a), ("B", "Tour d’hébergement", "Tour sombre aux voyants de serveurs, nuage lumineux au sommet.", if_b), ("C", "Nuage", "Bâtiment vitré sous un grand nuage holographique.", if_c)]),
+ ("auto", "Automatisations", "Workflows · en préparation", "#FACC15", [("A", "Usine à workflows", "Halle et réseau de nœuds lumineux au-dessus du toit.", au_a), ("B", "Tour d’intégration", "Tour vitrée cerclée d’anneaux de connecteurs.", au_b), ("C", "Hub de connecteurs", "Rotonde reliée par des conduits lumineux à des bornes.", au_c)]),
  ("finance", "Trésorerie", "Finances", "#F472B6", [("A", "Coffre-fort", "Bloc noir, porte de coffre circulaire et lames dorées.", fi_a), ("B", "Temple financier", "Colonnade dorée et fronton : la solidité des comptes.", fi_b), ("C", "Tour des pièces", "Pile de pièces géante et pièce d’or flottante.", fi_c)]),
 ]
 
@@ -897,6 +967,13 @@ def _holo(s, u, v, kind, col, size=1.0):
         for (dx, dy, k) in ((-R*.8, R*.15, .8), (R*.8, R*.15, .8), (0, 0, 1)):
             g += '<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/><path d="M%.1f %.1f a%.1f %.1f 0 0 1 %.1f 0 z" fill="%s" fill-opacity=".8"/>' % (
                 x + dx, cy + dy - R*.35*k, R*.28*k, "#FFFFFF" if k == 1 else hc, x + dx - R*.5*k, cy + dy + R*.55*k, R*.5*k, R*.5*k, R*k, hc)
+    elif kind == "cloud":
+        g += '<path d="M%.1f %.1f a%.1f %.1f 0 0 1 %.1f -%.1f a%.1f %.1f 0 0 1 %.1f %.1f a%.1f %.1f 0 0 1 0 %.1f z" fill="%s" fill-opacity=".3" stroke="%s" stroke-width="1.8"/>' % (
+            x - R*.9, cy + R*.5, R*.5, R*.5, R*.4, R*.6, R*.6, R*.6, R*1.1, R*.1, R*.45, R*.45, R*.9, col, hc)
+    elif kind == "flow":
+        pts = [(x - R, cy - R*.5), (x + R, cy - R*.6), (x, cy + R*.6)]
+        g += "".join('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="1.6"/>' % (a + b + (hc,)) for a, b in ((pts[0], pts[1]), (pts[1], pts[2]), (pts[2], pts[0])))
+        g += "".join('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/>' % (px, py, R*.28, "#FFFFFF" if i == 2 else hc) for i, (px, py) in enumerate(pts))
     elif kind == "coin":
         g += '<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="#FBBF24" stroke="#FFF1B8" stroke-width="1.5"/><ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="none" stroke="#B45309" stroke-width="1.2"/>' % (x, cy, R*.9, R*1.1, x, cy, R*.55, R*.7)
     g += '</g>'
