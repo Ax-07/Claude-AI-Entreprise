@@ -108,14 +108,14 @@ La phase de test utilise OpenAI (crédits déjà disponibles chez le propriétai
 
 ## 6. Catalogue des outils
 
-Chaque agent n'accède qu'aux outils de son rôle ; les outils marqués « validation » créent une demande au lieu d'agir.
+Chaque agent n'accède qu'aux outils de son rôle ; les outils marqués « validation » créent une demande au lieu d'agir. Un outil qui dépend d'une clé absente du `.env` (Stripe, Brave) n'est pas proposé aux agents, pour éviter des appels inutiles.
 
 | Outil | Fonction | Accès | Validation | Coût |
 | --- | --- | --- | --- | --- |
 | complete_task | Termine la tâche avec un résultat | Tous | Non | — |
 | remember / recall | Écrit et cherche dans la mémoire partagée | Tous | Non | — |
 | list_tasks / get_task_result | Consulte les tâches et leurs résultats | Tous | Non | — |
-| write_file / read_file / list_files | Livrables dans l'espace de travail (bac à sable) | Tous | Non | — |
+| write_file / read_file / list_files | Livrables dans l'espace de travail (bac à sable) ; `append=true` pour écrire un long document en plusieurs parties | Tous | Non | — |
 | request_owner_decision | Pose une question au propriétaire | Tous | Réponse attendue | — |
 | list_objectives | Lit les objectifs de l'entreprise | Tous | Non | — |
 | delegate_task | Crée une tâche pour un autre agent | Tous (profondeur max. 3) | Non | — |

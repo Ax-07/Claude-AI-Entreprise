@@ -19,7 +19,7 @@ class Base(unittest.TestCase):
     def setUp(self):
         env = unittest.mock.patch.dict(os.environ, {}, clear=False)
         env.start(); self.addCleanup(env.stop)
-        for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "BRAVE_API_KEY", "OPENAI_BASE_URL"):
+        for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "BRAVE_API_KEY", "OPENAI_BASE_URL", "STRIPE_SECRET_KEY"):
             os.environ.pop(k, None)
         self.dir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.dir, True)
@@ -241,6 +241,49 @@ class TestCli(Base):
             main(["archiver", str(oid)])
             self.assertEqual(self.db.one("SELECT status FROM objectives WHERE id=?", (oid,))[0], "paused")
             self.assertEqual(self.db.task(t1)["status"], "blocked")
+
+
+class TestLongDeliverables(Base):
+    def _ctx(self):
+        from ai_studio.tools import ToolContext
+        self.make()
+        tid = self.db.add_task("Rapport", "recherche")
+        return ToolContext(self.cfg, self.db, "recherche", self.db.task(tid), ["recherche"])
+
+    def test_write_file_append(self):
+        from ai_studio.tools import run_tool
+        ctx = self._ctx()
+        run_tool("write_file", ctx, {"path": "r/rapport.md", "content": "# Partie 1\n"})
+        out = run_tool("write_file", ctx, {"path": "r/rapport.md", "content": "## Partie 2\n", "append": True})
+        self.assertIn("complété", out)
+        self.assertEqual((self.cfg.workspace / "r" / "rapport.md").read_text(encoding="utf-8"), "# Partie 1\n## Partie 2\n")
+
+    def test_truncated_arguments_give_clear_advice(self):
+        from ai_studio.tools import run_tool
+        ctx = self._ctx()
+        args = from_openai_response({"choices": [{"finish_reason": "length", "message": {"tool_calls": [
+            {"id": "c", "type": "function", "function": {"name": "write_file", "arguments": '{"path": "a.md", "content": "texte coup'}}]}}]})["content"][0]["input"]
+        out = run_tool("write_file", ctx, args)
+        self.assertIn("append=true", out)
+
+    def test_output_limit_raised(self):
+        self.make()
+        self.assertGreaterEqual(self.cfg["runtime"]["max_output_tokens"], 6000)
+
+    def test_stripe_tools_hidden_without_key(self):
+        from test_core import FakeLLM
+        self.make()
+        tid = self.db.add_task("Finances", "finance")
+        llm = FakeLLM([[{"type": "tool_use", "id": "t", "name": "complete_task", "input": {"result": "ok"}}]])
+        run_task(self.cfg, self.db, llm, self.guard, self.db.task(tid))
+        names = [t.get("name") for t in llm.calls[0]["tools"]]
+        self.assertNotIn("stripe_balance", names)
+        self.assertNotIn("propose_payment_link", names)
+        os.environ["STRIPE_SECRET_KEY"] = "rk_test"
+        tid = self.db.add_task("Finances 2", "finance")
+        llm = FakeLLM([[{"type": "tool_use", "id": "t", "name": "complete_task", "input": {"result": "ok"}}]])
+        run_task(self.cfg, self.db, llm, self.guard, self.db.task(tid))
+        self.assertIn("stripe_balance", [t.get("name") for t in llm.calls[0]["tools"]])
 
 
 if __name__ == "__main__":

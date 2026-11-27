@@ -70,13 +70,15 @@ def _studio(cfg, db):
 def cmd_run(cfg, db, a):
     st = _studio(cfg, db)
     if a.once:
+        from .db import iso
         st.recover()
+        started = iso()
         s = st.cycle()
         _out(f"Cycle terminé : {s['ran']} tâche(s) exécutée(s), {s['reviews']} revue(s) planifiée(s)."
              + (f" Pause : {s['paused']}" if s["paused"] else ""))
         if s["error"]:
             _out(f"\nERREUR (configuration à corriger, les tâches restent en attente) :\n{s['error']}")
-        failed = db.q("SELECT id, title, result FROM tasks WHERE status='failed' ORDER BY id DESC LIMIT 5")
+        failed = db.q("SELECT id, title, result FROM tasks WHERE status='failed' AND updated_at >= ? ORDER BY id DESC LIMIT 5", (started,))
         for t in failed:
             _out(f"Tâche en échec #{t['id']} {t['title']} : {(t['result'] or '')[:200]}")
         if failed:
@@ -184,12 +186,13 @@ def cmd_agents(cfg, db, a):
     import os
     from .agents import ROLES
     from .llm import models_for, resolve_provider
+    from .tools import REGISTRY
     m = models_for(cfg)
     search = "Brave" if os.environ.get("BRAVE_API_KEY") else ("Anthropic (serveur)" if resolve_provider(cfg) == "anthropic" else "aucune (ajoute BRAVE_API_KEY)")
     _out(f"Fournisseur : {resolve_provider(cfg)} — recherche web : {search}\n")
     for r in ROLES.values():
         model = m["strong"] if r.model == "strong" else m["default"]
-        _out(f"{r.name:<10} {r.pole:<15} {model:<20} outils : {', '.join(r.all_tools())}{' + recherche web' if r.web_search else ''}")
+        _out(f"{r.name:<10} {r.pole:<15} {model:<20} outils : {', '.join(n for n in r.all_tools() if n in REGISTRY and REGISTRY[n].available())}{' + recherche web' if r.web_search else ''}")
 
 
 def main(argv=None):

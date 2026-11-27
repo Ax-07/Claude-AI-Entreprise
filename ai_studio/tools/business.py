@@ -54,7 +54,7 @@ def stripe_request(method: str, path: str, params: dict | None = None) -> dict:
         return json.loads(r.read().decode())
 
 
-@tool("stripe_balance", "Consulte le solde Stripe de l'entreprise (lecture seule).", {})
+@tool("stripe_balance", "Consulte le solde Stripe de l'entreprise (lecture seule).", {}, requires_env=("STRIPE_SECRET_KEY",))
 def stripe_balance(ctx: ToolContext) -> str:
     b = stripe_request("GET", "balance")
     fmt = lambda arr: ", ".join(f"{x['amount']/100:.2f} {x['currency'].upper()}" for x in arr) or "0"
@@ -62,7 +62,7 @@ def stripe_balance(ctx: ToolContext) -> str:
 
 
 @tool("stripe_recent_payments", "Liste les derniers paiements reçus sur Stripe (lecture seule).",
-      {"limit": {"type": "integer", "default": 10}})
+      {"limit": {"type": "integer", "default": 10}}, requires_env=("STRIPE_SECRET_KEY",))
 def stripe_recent_payments(ctx: ToolContext, limit: int = 10) -> str:
     r = stripe_request("GET", "charges", {"limit": min(int(limit), 50)})
     rows = r.get("data", [])
@@ -76,7 +76,7 @@ def stripe_recent_payments(ctx: ToolContext, limit: int = 10) -> str:
       {"product_name": {"type": "string"}, "amount_eur": {"type": "number"},
        "recurring": {"type": "string", "description": "vide = paiement unique, sinon 'month' ou 'year'"},
        "reason": {"type": "string"}},
-      ["product_name", "amount_eur", "reason"], sensitive=True)
+      ["product_name", "amount_eur", "reason"], sensitive=True, requires_env=("STRIPE_SECRET_KEY",))
 def propose_payment_link(ctx: ToolContext, product_name: str, amount_eur: float, reason: str, recurring: str = "") -> str:
     if not 1 <= float(amount_eur) <= 5000:
         return "Montant hors limites (1 à 5000 €)."

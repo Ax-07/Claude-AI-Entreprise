@@ -103,17 +103,23 @@ def _safe_path(ctx: ToolContext, rel: str) -> Path:
     return p
 
 
-@tool("write_file", "Écrit un fichier texte (livrable, rapport, brouillon) dans l'espace de travail de l'entreprise.",
-      {"path": {"type": "string", "description": "ex. recherche/etude-marche.md"}, "content": {"type": "string"}},
+@tool("write_file",
+      "Écrit un fichier texte (livrable, rapport, brouillon) dans l'espace de travail de l'entreprise. "
+      "Pour un long document, écris-le en plusieurs appels d'environ 1 000 mots : le premier crée le fichier, "
+      "les suivants ajoutent la suite avec append=true.",
+      {"path": {"type": "string", "description": "ex. recherche/etude-marche.md"}, "content": {"type": "string"},
+       "append": {"type": "boolean", "description": "true = ajoute à la fin du fichier existant", "default": False}},
       ["path", "content"])
-def write_file(ctx: ToolContext, path: str, content: str) -> str:
-    if len(content) > 200_000:
-        return "Refusé : fichier trop gros (200 Ko max)."
+def write_file(ctx: ToolContext, path: str, content: str, append: bool = False) -> str:
     p = _safe_path(ctx, path)
+    size = (p.stat().st_size if (append and p.is_file()) else 0) + len(content.encode("utf-8"))
+    if size > 200_000:
+        return "Refusé : fichier trop gros (200 Ko max)."
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(content, encoding="utf-8")
-    ctx.db.log(ctx.agent, "file", f"Fichier écrit : {path}", ctx.task["id"] if ctx.task is not None else None)
-    return f"Fichier enregistré : {path}"
+    with open(p, "a" if append else "w", encoding="utf-8") as f:
+        f.write(content)
+    ctx.db.log(ctx.agent, "file", f"Fichier {'complété' if append else 'écrit'} : {path}", ctx.task["id"] if ctx.task is not None else None)
+    return f"Fichier {'complété' if append else 'enregistré'} : {path} ({size} octets)"
 
 
 @tool("read_file", "Lit un fichier de l'espace de travail.", {"path": {"type": "string"}}, ["path"])

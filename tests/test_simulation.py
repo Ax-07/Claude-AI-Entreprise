@@ -77,7 +77,7 @@ class TestSimulation(unittest.TestCase):
         # Les tests ne doivent pas dépendre des clés présentes sur la machine (fournisseur forcé à Anthropic).
         env = unittest.mock.patch.dict(os.environ, {}, clear=False)
         env.start(); self.addCleanup(env.stop)
-        for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "BRAVE_API_KEY", "OPENAI_BASE_URL"):
+        for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "BRAVE_API_KEY", "OPENAI_BASE_URL", "STRIPE_SECRET_KEY"):
             os.environ.pop(k, None)
         self.dir = Path(tempfile.mkdtemp())
         self.cfg = load_config(self.dir)
