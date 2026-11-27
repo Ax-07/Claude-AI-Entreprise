@@ -60,7 +60,7 @@ N = len(E) - 1                       # 5 îlots par côté ; l'îlot (2, 2) est 
 HW = 12                              # demi-largeur d'une rue
 TH = 5                               # hauteur des trottoirs
 DIVS = {  # division : nom, couleur (bordure lumineuse des îlots)
- "direction": ("Direction", "#818CF8"), "commercial": ("Pôle commercial", "#38BDF8"),
+ "direction": ("Direction & Tech", "#818CF8"), "commercial": ("Pôle commercial", "#38BDF8"),
  "production": ("Pôle production", "#FB923C"), "administration": ("Services partagés", "#E879F9")}
 # (i, j) = îlot entre E[i]..E[i+1] en u et E[j]..E[j+1] en v. À l'écran : i croissant = vers la droite et l'avant,
 # j croissant = vers la gauche et l'avant. Le Data Core occupe la case centrale (2, 2) ; chaque pôle occupe un coin de
@@ -69,9 +69,10 @@ ZONES = {"direction": (0, 0), "production": (3, 0), "commercial": (0, 3), "admin
 LOTS = {"data": (2, 2, "direction"), "hq": (1, 1, "direction"),
         "marketing": (0, 4, "commercial"), "sales": (1, 3, "commercial"), "support": (1, 4, "commercial"),
         "research": (3, 0, "production"), "atelier": (3, 1, "production"),
-        "legal": (3, 4, "administration"), "security": (4, 3, "administration"), "finance": (4, 4, "administration")}
+        "legal": (3, 4, "administration"), "finance": (4, 4, "administration"),
+        "security": (1, 0, "direction")}   # Cybersécurité avec la Direction et le Data Core : pôle Tech
 PLOTS = [dict(id="video", name="Studio vidéo", col="#F43F5E", ij=(4, 0)),
-         dict(id="ecommerce", name="E-commerce", col="#A3E635", ij=(4, 1))]
+         dict(id="ecommerce", name="E-commerce", col="#A3E635", ij=(0, 3))]   # E-commerce = canal de vente : Pôle commercial
 PARKS = {(i, j) for i in range(N) for j in range(N) if (i == 2) != (j == 2)}   # la croix entre les 4 coins
 used = {(i, j) for (i, j, d) in LOTS.values()} | {a["ij"] for a in PLOTS} | PARKS
 FREE = {(i, j): d for d, (i0, j0) in ZONES.items() for i in (i0, i0 + 1) for j in (j0, j0 + 1) if (i, j) not in used}
@@ -81,7 +82,7 @@ INFO = {  # nom, couleur, agent, rôle affiché, description, échelle du bâtim
  "data": ("Data Core", "#22D3EE", "data", "Mémoire et données", "Le cœur de l’entreprise : mémoire partagée, mesures et amélioration des agents.", .6),
  "marketing": ("Hub Marketing", "#60A5FA", "marketing", "Acquisition", "Positionnement, contenus et pages de vente, dans plusieurs langues.", .56),
  "sales": ("Centre Ventes", "#A78BFA", "ventes", "Revenus", "Prospection, offres, liens de paiement et conversion.", .56),
- "support": ("Zone Support", "#FBBF24", "support", "Clients", "Réponses aux clients, livraisons et suivi des commandes.", .56),
+ "support": ("Service Client", "#FBBF24", "support", "Clients", "Réponses aux clients, livraisons et suivi des commandes.", .56),
  "research": ("Labo Recherche", "#34D399", "recherche", "R&D et veille", "Marchés, niches, concurrence et nouvelles offres pour toutes les activités.", .56),
  "atelier": ("Atelier", "#FB923C", "atelier", "Production", "Fabrique les livrables vendus aux clients, selon la fiche d’offre.", .56),
  "legal": ("Juridique", "#CBD5E1", "juridique", "Conformité", "CGV, mentions, RGPD, factures : relit les actions avant ta décision.", .56),

@@ -96,7 +96,7 @@ La phase de test utilise OpenAI (crédits déjà disponibles chez le propriétai
 | recherche | Labo Recherche | Économique | Marchés, besoins, concurrence, prix, niches ; cite ses sources | Présenter une estimation comme un fait |
 | marketing | Hub Marketing | Économique | Positionnement, offres, messages, contenus multilingues | Promesses exagérées |
 | ventes | Centre Ventes | Économique | Prospects B2B, messages personnalisés, offres, liens de paiement | Envoyer un email ou créer un paiement sans validation |
-| support | Zone Support | Économique | Réponses clients, FAQ, procédures, problèmes récurrents | Répondre à un client sans validation |
+| support | Service Client | Économique | Réponses clients, FAQ, procédures, problèmes récurrents | Répondre à un client sans validation |
 | data | Data Core | Économique | Entretien de la mémoire, mesures, propositions d'amélioration | Modifier les règles des autres agents |
 | finance | Trésorerie | Économique | Revenus Stripe, coûts API, rentabilité, alertes de dérive, prix | Effectuer un paiement |
 

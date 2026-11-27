@@ -29,10 +29,10 @@ class Role:
 
 # Divisions de l'entreprise : elles regroupent les pôles qui travaillent ensemble (même découpage que la carte).
 DIVISIONS = {
-    "Direction": ["pdg", "data"],
+    "Direction & Tech": ["pdg", "data", "securite"],
     "Division commerciale": ["marketing", "ventes", "support"],
     "Division production": ["atelier", "recherche"],
-    "Administration": ["finance", "juridique", "securite"],
+    "Administration": ["finance", "juridique"],
 }
 DIVISION_OF = {a: d for d, names in DIVISIONS.items() for a in names}
 
@@ -62,7 +62,7 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "à l'activité du destinataire, avec possibilité de refuser les messages suivants.",
          ["fetch_url", "send_email", "propose_payment_link", "propose_page", "list_inbox", "read_email", "list_sales",
           "save_offer", "list_offers", "list_orders", "delegate_task"], web_search=True),
-    Role("support", "Zone Support", "Agent Support — relation client",
+    Role("support", "Service Client", "Agent Support — relation client",
          "Tu prépares les réponses aux clients et prospects, tu rédiges les FAQ et les procédures, tu repères les "
          "problèmes récurrents et tu proposes des améliorations. Ton ton est poli, précis et rassurant.",
          ["send_email", "deliver_order", "list_orders", "set_order_status", "list_offers", "list_inbox", "read_email",
