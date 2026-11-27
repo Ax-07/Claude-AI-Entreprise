@@ -20,6 +20,11 @@ Commandes principales :
   objectifs                    liste les objectifs
   archiver ID                  met un objectif en pause (et annule ses tâches en attente)
   relancer [ID]                remet en attente les tâches en échec (toutes, ou une seule)
+  notifier-test                affiche une notification Windows de test
+  sauvegarder                  sauvegarde immédiate (la sauvegarde quotidienne est automatique)
+  sauvegardes                  liste les sauvegardes
+  restaurer NOM                restaure une sauvegarde (moteur arrêté)
+  demarrage-auto [--retirer]   lance le moteur automatiquement à l'ouverture de session Windows
 """
 from __future__ import annotations
 
@@ -27,6 +32,8 @@ import argparse
 import json
 import shutil
 import sys
+from datetime import datetime
+from pathlib import Path
 
 from .config import ROOT, load_config
 from .db import DB
@@ -77,6 +84,8 @@ def _start_dashboard(cfg, port: int, open_browser: bool):
         _out(f"Tableau de bord non démarré (port {port} occupé ?) : {e}")
         return
     url = f"http://127.0.0.1:{port}"
+    from .db import DB
+    DB(cfg.db_path).kv_set("dashboard_url", url)   # utilisé par les notifications pour ouvrir la bonne page
     _out(f"Tableau de bord : {url}")
     if open_browser:
         import webbrowser
@@ -224,6 +233,58 @@ def cmd_agents(cfg, db, a):
         _out(f"{r.name:<10} {r.pole:<15} {model:<20} outils : {', '.join(n for n in r.all_tools() if n in REGISTRY and REGISTRY[n].available())}{' + recherche web' if r.web_search else ''}")
 
 
+def cmd_notifier_test(cfg, db, a):
+    from . import notify
+    if notify.runner is None:
+        _out("Les notifications Windows ne fonctionnent que sous Windows.")
+        return
+    ok = notify.send(cfg, db, "AI Enterprise Studio", "Notification de test : tu seras prévenu ici quand une validation t'attend.")
+    _out("Notification envoyée : elle doit apparaître en bas à droite de l'écran." if ok else
+         "La notification n'a pas pu être affichée (voir : python -m ai_studio journal). "
+         "Vérifie que les notifications sont autorisées dans Paramètres > Système > Notifications.")
+
+
+def cmd_sauvegarder(cfg, db, a):
+    from .backup import make_backup
+    _out(f"Sauvegarde créée : {make_backup(cfg, db, datetime.now().strftime('%Y-%m-%d_%H%M%S'))}")
+
+
+def cmd_sauvegardes(cfg, db, a):
+    from .backup import list_backups
+    lst = list_backups(cfg)
+    if not lst:
+        _out("Aucune sauvegarde pour l'instant (la première est faite au premier cycle du moteur).")
+    for b in lst:
+        _out(f"{b['name']:<20} {b['size'] / 1024:>8.0f} Ko   {b['path']}")
+
+
+def cmd_restaurer(cfg, db, a):
+    from .backup import restore
+    db.conn.close()
+    _out(f"Base restaurée depuis la sauvegarde {a.nom} ({restore(cfg, a.nom)}). L'ancienne base est conservée à côté.")
+
+
+def startup_file() -> Path:
+    import os
+    return Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup" / "AI Enterprise Studio.cmd"
+
+
+def cmd_demarrage_auto(cfg, db, a):
+    if sys.platform != "win32":
+        _out("Le démarrage automatique ne concerne que Windows.")
+        return
+    f = startup_file()
+    if a.retirer:
+        f.unlink(missing_ok=True)
+        _out("Démarrage automatique désactivé.")
+        return
+    bat = ROOT / "demarrer.bat"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(f'@echo off\r\nstart "AI Enterprise Studio" /min cmd /c ""{bat}" --auto"\r\n', encoding="utf-8")
+    _out(f"Démarrage automatique activé : le moteur se lancera (fenêtre réduite) à chaque ouverture de session.\n"
+         f"Fichier créé : {f}\nPour l'enlever : python -m ai_studio demarrage-auto --retirer")
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="ai_studio", description="AI Enterprise Studio — moteur multi-agents")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -244,6 +305,9 @@ def main(argv=None):
     sub.add_parser("couts"); sub.add_parser("agents"); sub.add_parser("objectifs")
     s = sub.add_parser("relancer"); s.add_argument("id", type=int, nargs="?")
     s = sub.add_parser("archiver"); s.add_argument("id", type=int)
+    sub.add_parser("notifier-test"); sub.add_parser("sauvegarder"); sub.add_parser("sauvegardes")
+    s = sub.add_parser("restaurer"); s.add_argument("nom")
+    s = sub.add_parser("demarrage-auto"); s.add_argument("--retirer", action="store_true")
     a = p.parse_args(argv)
 
     cfg = load_config()
@@ -251,7 +315,9 @@ def main(argv=None):
     handlers = {"init": cmd_init, "objectif": cmd_objectif, "tache": cmd_tache, "run": cmd_run, "status": cmd_status,
                 "validations": cmd_validations, "taches": cmd_taches, "voir": cmd_voir, "journal": cmd_journal,
                 "couts": cmd_couts, "agents": cmd_agents, "relancer": cmd_relancer, "objectifs": cmd_objectifs,
-                "archiver": cmd_archiver, "serveur": cmd_serveur,
+                "archiver": cmd_archiver, "serveur": cmd_serveur, "notifier-test": cmd_notifier_test,
+                "sauvegarder": cmd_sauvegarder, "sauvegardes": cmd_sauvegardes, "restaurer": cmd_restaurer,
+                "demarrage-auto": cmd_demarrage_auto,
                 "valider": lambda c, d, x: cmd_decide(c, d, x, True), "refuser": lambda c, d, x: cmd_decide(c, d, x, False)}
     try:
         handlers[a.cmd](cfg, db, a)

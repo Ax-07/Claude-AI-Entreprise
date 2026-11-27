@@ -4,6 +4,7 @@ from __future__ import annotations
 import time
 from datetime import datetime, timedelta, timezone
 
+from . import backup, notify
 from .db import iso, now
 from .llm import BudgetExceeded, BudgetGuard, LLMError
 from .runner import run_task
@@ -48,6 +49,15 @@ class Studio:
         return created
 
     def cycle(self) -> dict:
+        backup.daily(self.cfg, self.db)
+        stats = self._cycle()
+        try:
+            notify.check(self.cfg, self.db, stats)
+        except Exception as e:  # une notification ratée ne doit jamais arrêter le moteur
+            self.db.log("systeme", "notification", f"Erreur de notification : {e}")
+        return stats
+
+    def _cycle(self) -> dict:
         stats = {"ran": 0, "paused": None, "reviews": 0, "error": None}
         self.db.kv_set("last_cycle_at", iso())
         try:

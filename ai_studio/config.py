@@ -66,6 +66,10 @@ DEFAULTS: dict = {
         "web_search": {"enabled": True, "type": "web_search_20260209", "max_uses": 3},
         "web_fetch": {"enabled": False, "type": "web_fetch_20260209", "max_uses": 3, "max_content_tokens": 6000},
     },
+    # Notifications Windows : nouvelle validation à faire, budget atteint, erreur bloquante.
+    "notifications": {"windows": True, "approvals": True, "budget": True, "errors": True},
+    # Sauvegarde quotidienne de la base et des livrables dans data/sauvegardes (les N plus récentes sont gardées).
+    "backup": {"enabled": True, "keep": 14},
     "email": {
         "from_name": "AI Enterprise Studio",
         "daily_limit": 20,

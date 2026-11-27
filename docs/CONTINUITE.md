@@ -34,11 +34,19 @@ _Mis à jour le 27/11/2026_
 - Refonte fidèle à la maquette (demande du propriétaire) : même carte (outils/carte/gen_carte.py → web/carte.svg, compressée ≈ 6×), même mise en page et icônes ; panneaux sans données encore réelles affichés vides honnêtement (revenus, ventes) ; choix des bâtiments et de la vue mémorisés ; ajout du panneau Validations (absent de la maquette) en haut de la colonne de droite. 57 tests.
 - Critère de fin de phase : le propriétaire voit ses vraies données et valide une action depuis la page.
 
+## Fiabilité 24 h/24 (27/11/2026)
+- `ai_studio/notify.py` : notifications Windows (toast via PowerShell, sans dépendance) pour toute nouvelle validation, la pause budget et une erreur bloquante. Une seule notification par événement, clic → tableau de bord. Le texte des agents passe par une variable d'environnement en XML échappé (pas d'injection de commande). Commande de test : `notifier-test`.
+- `ai_studio/backup.py` : sauvegarde quotidienne automatique (API de sauvegarde SQLite + zip des livrables) dans `data/sauvegardes/AAAA-MM-JJ`, 14 gardées. Commandes `sauvegarder`, `sauvegardes`, `restaurer NOM` (l'ancienne base est conservée).
+- `demarrage-auto [--retirer]` : lancement à l'ouverture de session Windows (fichier dans le dossier Démarrage, fenêtre réduite, sans navigateur).
+- Réglages : `notifications` et `backup` dans config.json. 69 tests.
+
 ## Non vérifié
-- Aucun cycle réel complet n'a encore réussi. Prochain test chez le propriétaire : `python -m ai_studio run --once`.
+- Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.
 
 ## Prochaines étapes
-1. Vérification du tableau de bord par le propriétaire sur ses vraies données.
-2. Phase « Prêt à vendre » : domaine, email pro, CGV, n8n.
+1. Vérification par le propriétaire : tableau de bord sur ses vraies données, `notifier-test`, `demarrage-auto`.
+2. Boucle commerciale complète dans l'app : page d'offre (GitHub Pages), lecture des réponses (IMAP), détection des paiements Stripe (revenus dans le tableau de bord), livraison.
+3. Notes du propriétaire sur les livrables, pour l'amélioration des agents.
+4. Phase « Prêt à vendre » : domaine, email pro, CGV, n8n.
 3. Choisir l'activité (piste : diagnostic SEO local) et viser le premier paiement Stripe.

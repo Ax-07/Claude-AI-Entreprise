@@ -12,6 +12,7 @@ Sécurité :
 from __future__ import annotations
 
 import json
+import sys
 import mimetypes
 import threading
 from datetime import datetime, timedelta, timezone
@@ -267,6 +268,10 @@ def integrations(cfg) -> list[dict]:
         {"name": "Brave Search", "ok": bool(os.environ.get("BRAVE_API_KEY")), "detail": "recherche web"},
         {"name": "Stripe", "ok": bool(os.environ.get("STRIPE_SECRET_KEY")), "detail": "paiements"},
         {"name": "Email (SMTP)", "ok": bool(os.environ.get("SMTP_HOST") and os.environ.get("SMTP_USER")), "detail": "envoi après validation"},
+        {"name": "Notifications Windows", "ok": sys.platform == "win32" and bool(cfg.get("notifications", "windows", default=True)),
+         "detail": "validations, budget, erreurs" if sys.platform == "win32" else "disponibles seulement sous Windows"},
+        {"name": "Sauvegarde quotidienne", "ok": bool(cfg.get("backup", "enabled", default=True)),
+         "detail": f"data/sauvegardes, {cfg.get('backup', 'keep', default=14)} dernières gardées"},
     ]
 
 
