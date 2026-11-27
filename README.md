@@ -75,6 +75,10 @@ python -m ai_studio tache "Rédiger une FAQ" -a support -d "FAQ pour l'offre X"
 La carte est générée par `outils/carte/gen_carte.py` (à relancer seulement si on change le dessin). Tout est lu en direct dans la base, rafraîchi toutes les 5 secondes, et accessible uniquement depuis ton PC.
 
 Pour le fonctionnement 24 h/24 : double-clique sur `demarrer.bat`. Il lance le moteur **et** le tableau de bord (`run --tableau`) et redémarre tout seul en cas d'arrêt.
+
+- `python -m ai_studio demarrage-auto` : le lance automatiquement à chaque ouverture de session Windows (`--retirer` pour annuler).
+- Notifications Windows : tu es prévenu dès qu'une validation t'attend, que le budget est atteint ou que le moteur est bloqué. Clique sur la notification pour ouvrir le tableau de bord. Test : `python -m ai_studio notifier-test`.
+- Sauvegarde automatique chaque jour dans `data/sauvegardes` (14 jours gardés). `sauvegardes` pour la liste, `restaurer NOM` pour revenir en arrière, moteur arrêté.
 Pense à désactiver la mise en veille du PC.
 
 Les livrables des agents sont dans `data/workspace/`, la base de données dans `data/studio.db`.
