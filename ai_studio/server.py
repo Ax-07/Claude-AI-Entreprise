@@ -198,6 +198,78 @@ def file_content(cfg, db, rel: str) -> dict:
     return {"path": rel, "content": p.read_text(encoding="utf-8", errors="replace")[:300_000]}
 
 
+def insights(cfg, db, days: int = 7) -> dict:
+    """Séries réelles pour le panneau Performance + pipeline commercial + prochaines échéances."""
+    days = 30 if int(days) >= 30 else 7
+    today = now().date()
+    labels, done, cost, rate = [], [], [], []
+    for i in range(days - 1, -1, -1):
+        d = (today - timedelta(days=i)).isoformat()
+        n_done = db.one("SELECT COUNT(*) FROM tasks WHERE status='done' AND substr(updated_at,1,10)=?", (d,))[0]
+        n_fail = db.one("SELECT COUNT(*) FROM tasks WHERE status='failed' AND substr(updated_at,1,10)=?", (d,))[0]
+        usd = db.one("SELECT COALESCE(SUM(usd),0) FROM costs WHERE day=?", (d,))[0]
+        labels.append(d); done.append(n_done); cost.append(round(float(usd), 4))
+        rate.append(round(100 * n_done / (n_done + n_fail)) if n_done + n_fail else None)
+    count = lambda sql: db.one(sql)[0]
+    pipeline = [
+        {"stage": "Pistes en mémoire", "value": count("SELECT COUNT(*) FROM memory")},
+        {"stage": "Emails préparés", "value": count("SELECT COUNT(*) FROM approvals WHERE action='send_email'")},
+        {"stage": "Emails envoyés", "value": count("SELECT COUNT(*) FROM approvals WHERE action='send_email' AND status='executed'")},
+        {"stage": "Liens de paiement créés", "value": count("SELECT COUNT(*) FROM approvals WHERE action='stripe_payment_link' AND status='executed'")},
+    ]
+    schedule = []
+    every = timedelta(minutes=int(cfg["runtime"]["ceo_review_minutes"]))
+    for o in db.active_objectives():
+        nxt = (datetime.fromisoformat(o["last_review_at"]) + every) if o["last_review_at"] else now()
+        schedule.append({"at": nxt.isoformat(timespec="seconds"), "title": f"Revue de l'objectif #{o['id']}", "who": "pdg"})
+    last = db.kv_get("last_cycle_at")
+    if last:
+        schedule.append({"at": (datetime.fromisoformat(last) + timedelta(seconds=int(cfg["runtime"]["cycle_seconds"]))).isoformat(timespec="seconds"),
+                         "title": "Prochain cycle du moteur", "who": "systeme"})
+    midnight = datetime.combine(today + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+    schedule.append({"at": midnight.isoformat(timespec="seconds"), "title": "Remise à zéro du budget du jour", "who": "finance"})
+    schedule.sort(key=lambda s: s["at"])
+    return {"days": labels, "done": done, "cost": cost, "success_rate": rate, "pipeline": pipeline, "schedule": schedule[:5]}
+
+
+MAP_POLES = {"hq", "research", "marketing", "sales", "support", "data", "finance"}
+
+
+def map_settings(cfg, db) -> dict:
+    try:
+        variants = json.loads(db.kv_get("map_variants") or "{}")
+    except json.JSONDecodeError:
+        variants = {}
+    return {"variants": variants, "view": db.kv_get("map_view") or "ville"}
+
+
+def set_map(cfg, db, body: dict) -> dict:
+    cur = map_settings(cfg, db)
+    if "view" in body:
+        if body["view"] not in ("ville", "bureaux"):
+            raise ApiError(400, "view doit valoir ville ou bureaux")
+        db.kv_set("map_view", body["view"])
+    if "pole" in body:
+        pole, var = body.get("pole"), body.get("variant")
+        if pole not in MAP_POLES or var not in ("A", "B", "C"):
+            raise ApiError(400, "pôle ou variante invalide")
+        cur["variants"][pole] = var
+        db.kv_set("map_variants", json.dumps(cur["variants"]))
+    return {"ok": True, **map_settings(cfg, db)}
+
+
+def integrations(cfg) -> list[dict]:
+    import os
+    from .llm import resolve_provider
+    p = resolve_provider(cfg)
+    return [
+        {"name": "Fournisseur d'IA", "ok": bool(os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")), "detail": p},
+        {"name": "Brave Search", "ok": bool(os.environ.get("BRAVE_API_KEY")), "detail": "recherche web"},
+        {"name": "Stripe", "ok": bool(os.environ.get("STRIPE_SECRET_KEY")), "detail": "paiements"},
+        {"name": "Email (SMTP)", "ok": bool(os.environ.get("SMTP_HOST") and os.environ.get("SMTP_USER")), "detail": "envoi après validation"},
+    ]
+
+
 # ====================================================================== actions
 def decide_approval(cfg, db, approval_id: int, body: dict) -> dict:
     from .approvals import decide
@@ -254,12 +326,15 @@ def make_handler(cfg):
             host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]").lower()
             return host in ALLOWED_HOSTS
 
-        def _send(self, status: int, data, ctype="application/json; charset=utf-8"):
+        def _send(self, status: int, data, ctype="application/json; charset=utf-8", gzipped: bool = False, cache: bool = False):
             body = data if isinstance(data, bytes) else json.dumps(data, ensure_ascii=False).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", ctype)
+            if gzipped:
+                self.send_header("Content-Encoding", "gzip")
+                self.send_header("Vary", "Accept-Encoding")
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
+            self.send_header("Cache-Control", "private, max-age=3600" if cache else "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY")
             self.send_header("Content-Security-Policy",
@@ -302,11 +377,14 @@ def make_handler(cfg):
                         "status": lambda: status(cfg, db), "agents": lambda: agents(cfg, db),
                         "approvals": lambda: approvals(cfg, db), "costs": lambda: costs(cfg, db),
                         "objectives": lambda: objectives(cfg, db), "files": lambda: files(cfg, db),
+                        "map": lambda: map_settings(cfg, db), "integrations": lambda: integrations(cfg),
                     }
                     if parts == ["tasks"]:
                         return self._send(200, tasks(cfg, db, q("status"), q("agent"), int(q("limit", "50") or 50)))
                     if len(parts) == 2 and parts[0] == "tasks" and parts[1].isdigit():
                         return self._send(200, task_detail(cfg, db, int(parts[1])))
+                    if parts == ["insights"]:
+                        return self._send(200, insights(cfg, db, int(q("days", "7") or 7)))
                     if parts == ["events"]:
                         return self._send(200, events(cfg, db, int(q("since", "0") or 0), int(q("limit", "40") or 40)))
                     if parts == ["file"]:
@@ -319,6 +397,8 @@ def make_handler(cfg):
                         return self._send(200, decide_approval(cfg, db, int(parts[1]), body))
                     if parts == ["objectives"]:
                         return self._send(200, add_objective(cfg, db, body))
+                    if parts == ["map"]:
+                        return self._send(200, set_map(cfg, db, body))
                     if len(parts) == 2 and parts[0] == "objectives" and parts[1].isdigit():
                         return self._send(200, set_objective(cfg, db, int(parts[1]), body))
                     if len(parts) == 3 and parts[0] == "tasks" and parts[1].isdigit() and parts[2] == "retry":
@@ -337,9 +417,15 @@ def make_handler(cfg):
             if WEB_DIR.resolve() not in p.parents or not p.is_file():
                 return self._send(404, {"error": "Introuvable"})
             ctype = mimetypes.guess_type(str(p))[0] or "application/octet-stream"
-            if ctype.startswith("text/") or ctype in ("application/javascript", "image/svg+xml"):
+            if ctype.startswith("text/") or ctype in ("application/javascript", "image/svg+xml", "application/json"):
                 ctype += "; charset=utf-8"
-            return self._send(200, p.read_bytes(), ctype)
+            data = p.read_bytes()
+            big = len(data) > 20_000
+            if big and "gzip" in (self.headers.get("Accept-Encoding") or ""):
+                data, gz = _gzip_cached(p, data), True       # la carte (≈ 640 Ko) tombe à ≈ 100 Ko
+            else:
+                gz = False
+            return self._send(200, data, ctype, gzipped=gz, cache=big)
 
         def do_GET(self):
             self._dispatch("GET")
@@ -348,6 +434,17 @@ def make_handler(cfg):
             self._dispatch("POST")
 
     return Handler
+
+
+_GZ: dict = {}
+
+
+def _gzip_cached(path: Path, data: bytes) -> bytes:
+    import gzip
+    key = (str(path), path.stat().st_mtime)
+    if key not in _GZ:
+        _GZ[key] = gzip.compress(data, 6)
+    return _GZ[key]
 
 
 def make_server(cfg, port: int = 8765) -> ThreadingHTTPServer:
