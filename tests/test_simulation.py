@@ -4,9 +4,11 @@ Les réponses reproduisent le format exact de l'API Claude (blocs server_tool_us
 stop_reason pause_turn…). Aucun appel réseau.
 """
 import json
+import os
 import shutil
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from ai_studio.config import load_config
@@ -72,6 +74,11 @@ class ScriptedAPI:
 
 class TestSimulation(unittest.TestCase):
     def setUp(self):
+        # Les tests ne doivent pas dépendre des clés présentes sur la machine (fournisseur forcé à Anthropic).
+        env = unittest.mock.patch.dict(os.environ, {}, clear=False)
+        env.start(); self.addCleanup(env.stop)
+        for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "BRAVE_API_KEY", "OPENAI_BASE_URL"):
+            os.environ.pop(k, None)
         self.dir = Path(tempfile.mkdtemp())
         self.cfg = load_config(self.dir)
         self.db = DB(self.cfg.db_path)

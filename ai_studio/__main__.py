@@ -59,10 +59,9 @@ def cmd_tache(cfg, db, a):
 
 
 def _studio(cfg, db):
-    from .llm import AnthropicClient
+    from .llm import make_llm
     from .orchestrator import Studio
-    llm = AnthropicClient(timeout=int(cfg["runtime"]["request_timeout_seconds"]))
-    return Studio(cfg, db, llm)
+    return Studio(cfg, db, make_llm(cfg))
 
 
 def cmd_run(cfg, db, a):
@@ -78,8 +77,9 @@ def cmd_run(cfg, db, a):
 
 
 def cmd_status(cfg, db, a):
+    from .llm import models_for, resolve_provider
     b = cfg["budget"]
-    _out(f"== {cfg['company']['name']} ==")
+    _out(f"== {cfg['company']['name']} == (fournisseur : {resolve_provider(cfg)}, modèles : {', '.join(models_for(cfg).values())})")
     _out(f"Budget : jour {db.spent('day'):.4f} / {b['daily_usd']} $ — mois {db.spent('month'):.4f} / {b['monthly_usd']} $"
          f" — recherches web {db.searches_today()} / {b['web_searches_per_day']}")
     _out("\nObjectifs :")
@@ -141,10 +141,15 @@ def cmd_couts(cfg, db, a):
 
 
 def cmd_agents(cfg, db, a):
+    import os
     from .agents import ROLES
+    from .llm import models_for, resolve_provider
+    m = models_for(cfg)
+    search = "Brave" if os.environ.get("BRAVE_API_KEY") else ("Anthropic (serveur)" if resolve_provider(cfg) == "anthropic" else "aucune (ajoute BRAVE_API_KEY)")
+    _out(f"Fournisseur : {resolve_provider(cfg)} — recherche web : {search}\n")
     for r in ROLES.values():
-        model = cfg["models"]["strong"] if r.model == "strong" else cfg["models"]["default"]
-        _out(f"{r.name:<10} {r.pole:<15} {model:<20} outils : {', '.join(r.all_tools())}{' + web_search' if r.web_search else ''}")
+        model = m["strong"] if r.model == "strong" else m["default"]
+        _out(f"{r.name:<10} {r.pole:<15} {model:<20} outils : {', '.join(r.all_tools())}{' + recherche web' if r.web_search else ''}")
 
 
 def main(argv=None):

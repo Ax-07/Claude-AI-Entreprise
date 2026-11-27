@@ -10,15 +10,15 @@ Tout ce qui engage l'entreprise vers l'extérieur (envoyer un email, créer un l
 
 ## L'équipe
 
-| Agent | Pôle | Modèle | Outils spécifiques |
+| Agent | Pôle | Modèle (Anthropic / OpenAI) | Outils spécifiques |
 |---|---|---|---|
-| `pdg` | Command HQ | Sonnet (fort) | déléguer, budget, statistiques, objectifs |
-| `recherche` | Labo Recherche | Haiku (économique) | recherche web, lecture de pages |
-| `marketing` | Hub Marketing | Haiku | recherche web, lecture de pages |
-| `ventes` | Centre Ventes | Haiku | recherche web, brouillons d'emails*, liens de paiement* |
-| `support` | Zone Support | Haiku | brouillons d'emails* |
-| `data` | Data Core | Haiku | statistiques, budget |
-| `finance` | Trésorerie | Haiku | budget, Stripe (lecture), liens de paiement* |
+| `pdg` | Command HQ | Sonnet 5.5 / gpt-6.1-terra (fort) | déléguer, budget, statistiques, objectifs |
+| `recherche` | Labo Recherche | Haiku 5.5 / gpt-6-luna (économique) | recherche web, lecture de pages |
+| `marketing` | Hub Marketing | économique | recherche web, lecture de pages |
+| `ventes` | Centre Ventes | économique | recherche web, brouillons d'emails*, liens de paiement* |
+| `support` | Zone Support | économique | brouillons d'emails* |
+| `data` | Data Core | économique | statistiques, budget |
+| `finance` | Trésorerie | économique | budget, Stripe (lecture), liens de paiement* |
 
 \* soumis à ta validation.
 Tous les agents ont en plus : mémoire partagée, fichiers de travail, liste des tâches, demande de décision au propriétaire.
@@ -40,9 +40,12 @@ Tous les agents ont en plus : mémoire partagée, fichiers de travail, liste des
    ```
    python -m ai_studio init
    ```
-4. Ouvre le fichier `.env` créé et colle ta clé API Anthropic après `ANTHROPIC_API_KEY=`.
+4. Ouvre le fichier `.env` créé et colle **une** clé de fournisseur d'IA : `OPENAI_API_KEY=` ou `ANTHROPIC_API_KEY=`.
+   Le moteur choisit automatiquement le fournisseur selon la clé présente (`"provider": "auto"` dans `config.json`).
+   Ajoute aussi `BRAVE_API_KEY=` pour la recherche web (Brave Search API, offre Search).
    (Optionnel : clé Stripe restreinte et paramètres SMTP.)
-5. Dans la console Anthropic, fixe aussi une **limite de dépense mensuelle** sur ton compte : c'est une double sécurité.
+5. Dans la console de ton fournisseur (OpenAI ou Anthropic), fixe aussi une **limite de dépense mensuelle** : c'est une double sécurité.
+   `python -m ai_studio agents` affiche le fournisseur, les modèles et le moteur de recherche utilisés.
 
 Aucune bibliothèque à installer : tout utilise Python standard.
 
