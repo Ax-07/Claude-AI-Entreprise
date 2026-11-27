@@ -81,6 +81,12 @@ Pour le fonctionnement 24 h/24 : double-clique sur `demarrer.bat`. Il lance le m
 - Sauvegarde automatique chaque jour dans `data/sauvegardes` (14 jours gardés). `sauvegardes` pour la liste, `restaurer NOM` pour revenir en arrière, moteur arrêté.
 Pense à désactiver la mise en veille du PC.
 
+### Mémoire des agents
+
+Les agents gardent une mémoire partagée. Si une information fausse s'y est glissée :
+`python -m ai_studio memoire "mots clés"` pour la retrouver, `oublier ID` pour l'effacer, et
+`retenir SUJET "texte"` pour ajouter une consigne qui passe avant tout ce que les agents ont mémorisé.
+
 ### Vendre : paiements, emails, site
 
 - **Ventes Stripe** : lues toutes les 10 minutes. Chaque paiement s'affiche dans le tableau de bord, déclenche une notification et une tâche de livraison pour les agents.

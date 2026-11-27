@@ -131,6 +131,25 @@ class BackupTest(Base):
         self.assertIsNone(backup.daily(self.cfg, self.db))
 
 
+class MemoryCliTest(Base):
+    def test_search_forget_and_owner_priority(self):
+        from ai_studio import __main__ as cli
+        bad = self.db.remember("support", "commande 18 envoi", "Aucun outil d'envoi direct d'email.")
+        self.db.remember("pdg", "offre", "Diagnostic SEO local à 250 €.")
+        out = []
+        with unittest.mock.patch.object(cli, "_out", out.append), unittest.mock.patch.object(cli, "load_config", return_value=self.cfg):
+            cli.main(["memoire", "outil envoi"])
+            self.assertIn(f"#{bad}", out[0]); self.assertNotIn("Diagnostic", "".join(out))
+            cli.main(["retenir", "envoi email", "send_email envoie l'email automatiquement après validation."])
+            cli.main(["oublier", str(bad), "999"])
+        db = DB(self.cfg.db_path)
+        self.assertIsNone(db.one("SELECT 1 FROM memory WHERE id=?", (bad,)))
+        self.db.remember("support", "envoi email", "ancienne note")
+        self.assertEqual(db.recall("envoi email")[0]["agent"], "proprietaire")
+        db.conn.close()
+        self.assertTrue(any("introuvable" in x for x in out))
+
+
 class StartupTest(unittest.TestCase):
     def test_startup_file_on_windows(self):
         from ai_studio import __main__ as cli
