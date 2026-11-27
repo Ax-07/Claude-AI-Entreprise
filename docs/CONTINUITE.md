@@ -60,6 +60,12 @@ _Mis à jour le 27/11/2026_
 - Suivi automatique (`follow_orders`, à chaque cycle, sans coût) : relance du PDG si plus aucune tâche ni validation en cours depuis 30 min (48 h en attente client), 3 relances puis notification « commande bloquée » ; notification si le délai promis est dépassé ; une réponse du client relance la commande.
 - CLI : `offres`, `commandes [-t]`, `livree N`. 99 tests.
 
+## Consignes du propriétaire sur une commande (27/11/2026)
+- Constat : la consigne du propriétaire (donnée dans la note d'un refus) n'a vécu que dans une tâche ; relancé, le PDG cherchait une « confirmation du client » et remettait la commande en attente du client alors que celui-ci avait répondu.
+- `sales.owner_notes` : toute note du propriétaire sur une validation liée à une commande y est attachée, rappelée en tête de chaque relance (« font foi ») et dans `list_orders` ; la commande repasse à livrer. CLI `consigne N "texte"` (relance immédiate du PDG).
+- `set_order_status(attente_client)` refusé si aucun email n'a été envoyé au client ou s'il a déjà répondu au dernier.
+- Règles : les consignes du propriétaire font foi ; avancer avec une hypothèse raisonnable signalée plutôt que bloquer. 101 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

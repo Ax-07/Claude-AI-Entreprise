@@ -155,6 +155,7 @@ class DB:
         ("sales", "nudges", "INTEGER NOT NULL DEFAULT 0"),
         ("sales", "last_nudge_at", "TEXT"),
         ("sales", "stage_note", "TEXT"),
+        ("sales", "owner_notes", "TEXT"),                  # consignes du propriétaire sur la commande (font foi)
     )
 
     def _migrate(self):

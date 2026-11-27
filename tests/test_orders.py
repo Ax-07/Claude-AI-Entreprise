@@ -106,7 +106,10 @@ class OrdersTest(Base):
     def test_waiting_for_client_not_nudged_before_delay(self):
         n = self.sell()
         self.db.run("UPDATE tasks SET status='done'")
-        run_tool("set_order_status", self.ctx("support"), {"order": n, "status": "attente_client", "note": "URL demandée"})
+        self.assertIn("Refusé", run_tool("set_order_status", self.ctx("support"), {"order": n, "status": "attente_client"}))
+        aid = self.db.add_approval("support", None, "send_email", {"to": "client@exemple.fr", "subject": "Votre URL ?", "body": "b"}, "r")
+        self.db.set_approval(aid, status="executed", decided_at=iso())
+        self.assertIn("attente_client", run_tool("set_order_status", self.ctx("support"), {"order": n, "status": "attente_client", "note": "URL demandée"}))
         self.assertEqual(commerce.follow_orders(self.cfg, self.db)["nudged"], [])
         self.db.run("UPDATE sales SET last_nudge_at=?", (iso(now() - timedelta(hours=49)),))
         self.assertEqual(commerce.follow_orders(self.cfg, self.db)["nudged"], [n])
@@ -146,6 +149,37 @@ class OrdersTest(Base):
         self.assertEqual(commerce.get_order(self.db, n)["stage"], "livree")
         self.assertEqual(self.db.one("SELECT COUNT(*) FROM tasks")[0], tasks_before)    # pas de tâche de suite inutile
         self.assertEqual(run_tool("list_orders", self.ctx("pdg"), {}), "Aucune commande dans cet état.")
+
+    def test_refusal_note_sticks_to_order_and_resumes_it(self):
+        n = self.sell()
+        pdg = self.db.one("SELECT * FROM tasks WHERE order_ref=?", (n,))
+        self.db.run("UPDATE sales SET stage='attente_client', nudges=2")
+        aid = self.db.add_approval("support", pdg["id"], "send_email", {"to": "client@exemple.fr", "subject": "Re: ?", "body": "b"}, "r")
+        approvals.decide(self.cfg, self.db, aid, False, "Pas besoin de redemander : page d'accueil de ax-07.fr, annonce 48 h.")
+        s = commerce.get_order(self.db, n)
+        self.assertEqual((s["stage"], s["nudges"]), ("a_livrer", 0))
+        self.assertIn("page d'accueil de ax-07.fr", s["owner_notes"])
+        follow = self.db.q("SELECT description FROM tasks ORDER BY id DESC LIMIT 1")[0][0]
+        self.assertIn("CONSIGNES DU PROPRIÉTAIRE", follow)
+        self.db.run("UPDATE tasks SET status='done', updated_at=?", (iso(now() - timedelta(hours=2)),))
+        commerce.follow_orders(self.cfg, self.db)
+        relance = self.db.q("SELECT description FROM tasks ORDER BY id DESC LIMIT 1")[0][0]
+        self.assertIn("font foi", relance)
+        self.assertIn("ax-07.fr", relance)
+        self.assertIn("CONSIGNES DU PROPRIÉTAIRE", run_tool("list_orders", self.ctx("pdg"), {}))
+
+    def test_cli_consigne(self):
+        from ai_studio import __main__ as cli
+        n = self.sell()
+        out = []
+        with unittest.mock.patch.object(cli, "_out", out.append), unittest.mock.patch.object(cli, "load_config", return_value=self.cfg):
+            cli.main(["consigne", str(n), "Livre le diagnostic de la page d'accueil, hypothèses signalées."])
+        self.assertIn("le PDG s'en occupe", out[0])
+        db = DB(self.cfg.db_path)
+        t = db.one("SELECT * FROM tasks ORDER BY id DESC LIMIT 1")
+        self.assertEqual((t["agent"], t["order_ref"], t["priority"]), ("pdg", n, 1))
+        self.assertIn("hypothèses signalées", t["description"])
+        db.conn.close()
 
 
 class MigrationTest(Base):
