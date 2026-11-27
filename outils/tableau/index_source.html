@@ -380,9 +380,10 @@ function openSettings(){
 }
 async function openSales(){
   const list = await api("GET","/api/sales");
-  modal("Ventes encaissées", h("div",{style:{overflowX:"auto"}}, list.length ? h("table",{}, h("thead",{}, h("tr",{}, ["Date","Montant","Produit","Client","Livraison"].map(x=>h("th",{},x)))),
-    h("tbody",{}, list.map(s => h("tr",{class:s.task_id?"click":null,onclick:s.task_id?()=>openTask(s.task_id):null}, h("td",{class:"muted"}, new Date(s.created_at).toLocaleString("fr-FR")), h("td",{}, `${s.amount.toLocaleString("fr-FR",{minimumFractionDigits:2})} ${s.currency}` + (s.livemode ? "" : " (test)")),
-      h("td",{}, s.product||"—"), h("td",{}, [s.customer_name, s.customer_email].filter(Boolean).join(" · ")||"—"), h("td",{class:"muted"}, s.task_id ? `tâche #${s.task_id}` : "historique"))))) : h("div",{class:"empty"},"Aucune vente pour l’instant. Elles apparaîtront ici dans les 10 minutes qui suivent un paiement Stripe.")));
+  modal("Ventes encaissées", h("div",{style:{overflowX:"auto"}}, list.length ? h("table",{}, h("thead",{}, h("tr",{}, ["Commande","Montant","Produit","Client","Livraison"].map(x=>h("th",{},x)))),
+    h("tbody",{}, list.map(s => h("tr",{class:s.task_id?"click":null,onclick:s.task_id?()=>openTask(s.task_id):null}, h("td",{class:"muted"}, `n°${s.n} · ` + new Date(s.created_at).toLocaleString("fr-FR")), h("td",{}, `${s.amount.toLocaleString("fr-FR",{minimumFractionDigits:2})} ${s.currency}` + (s.livemode ? "" : " (test)")),
+      h("td",{}, s.product||"—"), h("td",{}, [s.customer_name, s.customer_email].filter(Boolean).join(" · ")||"—"),
+      h("td",{class:{livree:"st-done",a_livrer:"st-running",attente_client:"st-pending"}[s.stage]||"muted"}, ({a_livrer:"À livrer",attente_client:"Attente client",livree:"Livrée",historique:"Historique"})[s.stage]||"—", s.due_at && s.stage!=="livree" ? h("div",{class:"small muted"}, "avant le " + new Date(s.due_at).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"})) : null))))) : h("div",{class:"empty"},"Aucune vente pour l’instant. Elles apparaîtront ici dans les 10 minutes qui suivent un paiement Stripe.")));
 }
 async function openInbox(){
   const list = await api("GET","/api/inbox"), LBL = {new:"Nouveau",queued:"Confié à un agent",ignored:"Ignoré",replied:"Répondu"};

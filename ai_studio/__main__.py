@@ -20,6 +20,9 @@ Commandes principales :
   objectifs                    liste les objectifs
   archiver ID                  met un objectif en pause (et annule ses tâches en attente)
   relancer [ID]                remet en attente les tâches en échec (toutes, ou une seule)
+  offres                       catalogue des offres (prix, livrable, délai, lien de paiement)
+  commandes [-t]               commandes payées et état de livraison (-t : toutes, livrées comprises)
+  livree N [-n "note"]         marque la commande N comme livrée (livraison faite hors des agents)
   memoire [RECHERCHE]          affiche la mémoire des agents (ou les entrées qui contiennent ces mots)
   oublier ID [ID...]           efface des entrées de mémoire (une information fausse, par exemple)
   retenir SUJET "texte"        ajoute une consigne du propriétaire, prioritaire sur ce que les agents ont mémorisé
@@ -239,6 +242,35 @@ def cmd_agents(cfg, db, a):
         _out(f"{r.name:<10} {r.pole:<15} {model:<20} outils : {', '.join(n for n in r.all_tools() if n in REGISTRY and REGISTRY[n].available())}{' + recherche web' if r.web_search else ''}")
 
 
+def cmd_offres(cfg, db, a):
+    from .commerce import offer_sheet
+    rows = db.q("SELECT * FROM offers WHERE status='active' ORDER BY id")
+    if not rows:
+        _out("Catalogue vide : les agents créent les fiches avec save_offer (demande-le au PDG par un objectif).")
+    for o in rows:
+        _out(f"#{o['id']} {offer_sheet(o)}\n- Lien de paiement : {o['payment_link_url'] or 'aucun'}\n")
+
+
+def cmd_commandes(cfg, db, a):
+    from .commerce import STAGES
+    sql = "SELECT rowid AS n, * FROM sales" + ("" if a.toutes else " WHERE stage IN ('a_livrer','attente_client')")
+    rows = db.q(sql + " ORDER BY created_at DESC LIMIT 50")
+    if not rows:
+        _out("Aucune commande en cours." if not a.toutes else "Aucune commande.")
+    for s in rows:
+        _out(f"n°{s['n']:<4} {s['created_at'][:16]}  {STAGES.get(s['stage'], s['stage']):<20} {s['amount']:>8.2f} {s['currency']}"
+             f"{'' if s['livemode'] else ' (test)'}  {s['product'] or '?'}  {s['customer_email'] or '?'}"
+             + (f"  promise avant {s['due_at'][:16]}" if s["due_at"] else "") + (f"  relances : {s['nudges']}" if s["nudges"] else ""))
+
+
+def cmd_livree(cfg, db, a):
+    from .commerce import get_order, mark_delivered
+    if not get_order(db, a.n):
+        _out("Commande introuvable."); return
+    mark_delivered(db, a.n, a.note or "Marquée livrée par le propriétaire")
+    _out(f"Commande n°{a.n} marquée livrée : le moteur ne la relancera plus.")
+
+
 def cmd_memoire(cfg, db, a):
     if a.recherche:
         words = [w.lower() for w in a.recherche.split() if w]
@@ -348,6 +380,9 @@ def main(argv=None):
     sub.add_parser("couts"); sub.add_parser("agents"); sub.add_parser("objectifs")
     s = sub.add_parser("relancer"); s.add_argument("id", type=int, nargs="?")
     s = sub.add_parser("archiver"); s.add_argument("id", type=int)
+    sub.add_parser("offres")
+    s = sub.add_parser("commandes"); s.add_argument("-t", "--toutes", action="store_true")
+    s = sub.add_parser("livree"); s.add_argument("n", type=int); s.add_argument("-n", "--note")
     s = sub.add_parser("memoire"); s.add_argument("recherche", nargs="?", default=""); s.add_argument("-n", type=int, default=30)
     s = sub.add_parser("oublier"); s.add_argument("ids", type=int, nargs="+")
     s = sub.add_parser("retenir"); s.add_argument("sujet"); s.add_argument("texte")
@@ -362,6 +397,7 @@ def main(argv=None):
                 "validations": cmd_validations, "taches": cmd_taches, "voir": cmd_voir, "journal": cmd_journal,
                 "couts": cmd_couts, "agents": cmd_agents, "relancer": cmd_relancer, "objectifs": cmd_objectifs,
                 "archiver": cmd_archiver, "serveur": cmd_serveur, "notifier-test": cmd_notifier_test,
+                "offres": cmd_offres, "commandes": cmd_commandes, "livree": cmd_livree,
                 "memoire": cmd_memoire, "oublier": cmd_oublier, "retenir": cmd_retenir,
                 "sauvegarder": cmd_sauvegarder, "sauvegardes": cmd_sauvegardes, "restaurer": cmd_restaurer,
                 "demarrage-auto": cmd_demarrage_auto,

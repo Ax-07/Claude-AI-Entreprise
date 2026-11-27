@@ -1,0 +1,178 @@
+"""Catalogue d'offres et suivi des commandes jusqu'à la livraison (Stripe et SMTP simulés)."""
+import os
+import sqlite3
+import unittest
+import unittest.mock
+from datetime import timedelta
+
+from ai_studio import approvals, commerce
+from ai_studio.db import DB, iso, now
+from ai_studio.tools import ToolContext, run_tool
+from test_commerce import Base, session
+
+
+class OrdersTest(Base):
+    def setUp(self):
+        super().setUp()
+        os.environ["STRIPE_SECRET_KEY"] = "rk_test"
+        self.db.kv_set("stripe_sync_ts", "0")       # pas de premier passage « historique »
+
+    def ctx(self, agent="support"):
+        from ai_studio.agents import ROLES
+        tid = self.db.add_task("t", agent)
+        return ToolContext(self.cfg, self.db, agent, self.db.task(tid), list(ROLES))
+
+    def offer(self, **kw):
+        args = {"name": "Diagnostic SEO local", "price_eur": 250, "summary": "Audit de la page d'accueil",
+                "deliverable": "Rapport PDF priorisé", "delay_hours": 48, "required_info": "URL du site, ville",
+                "producer": "recherche", **kw}
+        return run_tool("save_offer", self.ctx("pdg"), args)
+
+    def sell(self, sid="cs_1", product="Diagnostic SEO local", link="plink_x", email="client@exemple.fr", live=True):
+        s = session(sid, int(now().timestamp()), product=product, email=email, live=live)
+        s["payment_link"] = link
+        commerce.sync_stripe(self.cfg, self.db, lambda m, p, params: {"data": [s], "has_more": False})
+        return commerce.order_number(self.db, sid)
+
+    def test_offer_catalog_and_payment_link(self):
+        self.assertIn("ajoutée au catalogue", self.offer())
+        self.assertIn("mise à jour", self.offer(price_eur=290))
+        self.assertIn("Agent inconnu", self.offer(producer="stagiaire"))
+        out = run_tool("propose_payment_link", self.ctx("ventes"), {"offer": "diagnostic seo local", "reason": "vendre"})
+        self.assertIn("créé automatiquement", out)
+        aid = self.db.pending_approvals()[0]["id"]
+        calls = iter([{"id": "price_1"}, {"id": "plink_9", "url": "https://buy.stripe.com/test_9"}])
+        with unittest.mock.patch.object(approvals, "stripe_request", lambda *a: next(calls)):
+            approvals.decide(self.cfg, self.db, aid, True)
+        o = self.db.one("SELECT * FROM offers")
+        self.assertEqual((o["price_eur"], o["payment_link_id"]), (290, "plink_9"))
+        self.assertIn("buy.stripe.com/test_9", run_tool("list_offers", self.ctx("support"), {}))
+
+    def test_sale_matched_to_offer_gets_deadline_and_clear_brief(self):
+        self.offer()
+        self.db.run("UPDATE offers SET payment_link_id='plink_x'")
+        n = self.sell(product="Autre nom affiché")          # retrouvée par le lien de paiement
+        s = commerce.get_order(self.db, n)
+        self.assertEqual(s["stage"], "a_livrer")
+        self.assertIsNotNone(s["offer_id"])
+        self.assertAlmostEqual((commerce.datetime.fromisoformat(s["due_at"]) - commerce.datetime.fromisoformat(s["created_at"])).total_seconds(), 48 * 3600)
+        t = self.db.one("SELECT * FROM tasks WHERE order_ref=?", (n,))
+        self.assertEqual(t["agent"], "pdg")
+        for expected in ("Rapport PDF priorisé", "l'agent recherche", f"deliver_order, order={n}", "n'est PAS un livrable",
+                         "jamais « aucun délai confirmé »"):
+            self.assertIn(expected, t["description"])
+
+    def test_unknown_product_asks_to_create_offer(self):
+        n = self.sell(product="Test diagnostic", live=False)
+        t = self.db.one("SELECT description FROM tasks WHERE order_ref=?", (n,))[0]
+        self.assertIn("Aucune fiche d'offre", t)
+        self.assertIn("mode test", t)          # vente test : à traiter comme une vraie
+
+    def test_delegation_keeps_order_and_watchdog_relaunches(self):
+        n = self.sell()
+        pdg = self.db.one("SELECT * FROM tasks WHERE order_ref=?", (n,))
+        ctx = ToolContext(self.cfg, self.db, "pdg", pdg, ["pdg", "recherche", "support"])
+        run_tool("delegate_task", ctx, {"agent": "recherche", "title": "Produire le rapport", "description": "…"})
+        child = self.db.one("SELECT * FROM tasks WHERE agent='recherche'")
+        self.assertEqual(child["order_ref"], n)
+        self.assertEqual(commerce.follow_orders(self.cfg, self.db)["nudged"], [])    # du travail en cours
+        self.db.run("UPDATE tasks SET status='done', updated_at=?", (iso(now() - timedelta(hours=2)),))
+        out = commerce.follow_orders(self.cfg, self.db)
+        self.assertEqual(out["nudged"], [n])
+        relance = self.db.one("SELECT * FROM tasks WHERE title LIKE ?", (f"Commande n°{n} : relance 1%",))
+        self.assertIn("RELANCE AUTOMATIQUE", relance["description"])
+        self.assertEqual(commerce.follow_orders(self.cfg, self.db)["nudged"], [])    # la relance est en cours
+
+    def test_pending_delivery_approval_counts_as_work(self):
+        n = self.sell()
+        self.db.run("UPDATE tasks SET status='done', updated_at=?", (iso(now() - timedelta(hours=2)),))
+        self.db.add_approval("support", None, "send_email", {"to": "c@x.fr", "subject": "s", "body": "b", "order": n}, "r")
+        self.assertEqual(commerce.follow_orders(self.cfg, self.db)["nudged"], [])
+
+    def test_max_nudges_then_owner_notified_once(self):
+        n = self.sell()
+        self.db.run("UPDATE tasks SET status='done'")
+        self.db.run("UPDATE sales SET nudges=3, last_nudge_at=?", (iso(now() - timedelta(hours=2)),))
+        self.assertEqual(commerce.follow_orders(self.cfg, self.db)["stuck"], [n])
+        self.assertEqual(commerce.follow_orders(self.cfg, self.db)["stuck"], [])
+        self.assertTrue(any("bloquée" in x for x in self.toasts))
+
+    def test_late_order_notified(self):
+        n = self.sell()
+        self.db.run("UPDATE sales SET due_at=?", (iso(now() - timedelta(hours=1)),))
+        self.assertEqual(commerce.follow_orders(self.cfg, self.db)["late"], [n])
+        self.assertTrue(any("en retard" in x for x in self.toasts))
+
+    def test_waiting_for_client_not_nudged_before_delay(self):
+        n = self.sell()
+        self.db.run("UPDATE tasks SET status='done'")
+        run_tool("set_order_status", self.ctx("support"), {"order": n, "status": "attente_client", "note": "URL demandée"})
+        self.assertEqual(commerce.follow_orders(self.cfg, self.db)["nudged"], [])
+        self.db.run("UPDATE sales SET last_nudge_at=?", (iso(now() - timedelta(hours=49)),))
+        self.assertEqual(commerce.follow_orders(self.cfg, self.db)["nudged"], [n])
+        self.assertIn("n'a pas répondu", self.db.q("SELECT description FROM tasks ORDER BY id DESC LIMIT 1")[0][0])
+
+    def test_client_reply_resumes_order(self):
+        from test_commerce import FakeIMAP, mail
+        os.environ.update(SMTP_HOST="smtp.gmail.com", SMTP_USER="studio@gmail.com", SMTP_PASSWORD="x")
+        n = self.sell(email="marie@cafe.fr")
+        self.db.run("UPDATE sales SET stage='attente_client', nudges=2")
+        self.db.kv_set("inbox_last_uid", "0"); self.db.kv_set("inbox_uidvalidity", "7")
+        commerce.sync_inbox(self.cfg, self.db, connect=lambda: FakeIMAP({1: mail("Marie <marie@cafe.fr>", "Re: infos", "Voici l'URL", "<m@x>")}))
+        s = commerce.get_order(self.db, n)
+        self.assertEqual((s["stage"], s["nudges"]), ("a_livrer", 0))
+        t = self.db.one("SELECT * FROM tasks WHERE title LIKE 'Répondre à Marie%'")
+        self.assertEqual((t["order_ref"], t["priority"]), (n, 1))
+
+    def test_deliver_order_flow(self):
+        n = self.sell()
+        d = self.cfg.workspace / "livraisons" / f"commande-{n}"
+        d.mkdir(parents=True)
+        (d / "plan.md").write_text("plan", encoding="utf-8")
+        (d / "rapport.md").write_text("# Rapport\n" + "constat détaillé. " * 60, encoding="utf-8")
+        args = {"order": n, "subject": "Votre diagnostic", "body": "Bonjour, voici votre rapport."}
+        self.assertIn("trop court", run_tool("deliver_order", self.ctx(), {**args, "attachment": f"livraisons/commande-{n}/plan.md"}))
+        self.assertIn("introuvable", run_tool("deliver_order", self.ctx(), {**args, "attachment": "livraisons/x.md"}))
+        self.assertIn(f"livraisons/commande-{n}/rapport.md", run_tool("list_orders", self.ctx("pdg"), {}))
+        out = run_tool("deliver_order", self.ctx(), {**args, "attachment": f"livraisons/commande-{n}/rapport.md"})
+        self.assertIn("marquée livrée", out)
+        self.assertIn("attend déjà", run_tool("deliver_order", self.ctx(), {**args, "attachment": f"livraisons/commande-{n}/rapport.md"}))
+        aid = self.db.pending_approvals()[0]["id"]
+        self.assertEqual(commerce.follow_orders(self.cfg, self.db)["nudged"], [])
+        os.environ.update(SMTP_HOST="h", SMTP_USER="u", SMTP_PASSWORD="p")
+        tasks_before = self.db.one("SELECT COUNT(*) FROM tasks")[0]
+        with unittest.mock.patch.dict(approvals.EXECUTORS, {"send_email": lambda c, p: "Email envoyé"}):
+            approvals.decide(self.cfg, self.db, aid, True)
+        self.assertEqual(commerce.get_order(self.db, n)["stage"], "livree")
+        self.assertEqual(self.db.one("SELECT COUNT(*) FROM tasks")[0], tasks_before)    # pas de tâche de suite inutile
+        self.assertEqual(run_tool("list_orders", self.ctx("pdg"), {}), "Aucune commande dans cet état.")
+
+
+class MigrationTest(Base):
+    def test_old_database_is_upgraded_without_loss(self):
+        path = self.dir / "ancienne.db"
+        con = sqlite3.connect(path)
+        con.executescript("""
+            CREATE TABLE tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+              agent TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', priority INTEGER NOT NULL DEFAULT 3, parent_id INTEGER,
+              objective_id INTEGER, created_by TEXT NOT NULL DEFAULT 'owner', depth INTEGER NOT NULL DEFAULT 0,
+              attempts INTEGER NOT NULL DEFAULT 0, result TEXT, cost_usd REAL NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL);
+            CREATE TABLE sales (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, amount REAL NOT NULL, currency TEXT NOT NULL,
+              customer_email TEXT, customer_name TEXT, product TEXT, payment_link TEXT, livemode INTEGER NOT NULL DEFAULT 1,
+              task_id INTEGER, recorded_at TEXT NOT NULL);
+            INSERT INTO tasks(id, title, agent, created_at, updated_at) VALUES (18, 'Livrer', 'pdg', 't', 't');
+            INSERT INTO sales VALUES ('cs_a', '2026-11-27T13:18:00+00:00', 10, 'EUR', 'x@y.fr', 'X', 'Test diagnostic', NULL, 0, 18, 't');
+            INSERT INTO sales VALUES ('cs_b', '2026-11-01T10:00:00+00:00', 5, 'EUR', NULL, NULL, NULL, NULL, 0, NULL, 't');
+        """)
+        con.commit(); con.close()
+        db = DB(path)
+        self.assertEqual([r["stage"] for r in db.q("SELECT stage FROM sales ORDER BY rowid")], ["a_livrer", "historique"])
+        self.assertEqual(db.one("SELECT order_ref FROM tasks WHERE id=18")[0], 1)
+        self.assertIn("première tâche de livraison : #18", commerce.delivery_brief(db, 1))
+        db.conn.close()
+        DB(path).conn.close()            # migration idempotente
+
+
+if __name__ == "__main__":
+    unittest.main()

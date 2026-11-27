@@ -51,6 +51,7 @@ def create_payment_link(cfg, payload: dict) -> str:
         params["recurring[interval]"] = payload["recurring"]
     price = stripe_request("POST", "prices", params)
     link = stripe_request("POST", "payment_links", {"line_items[0][price]": price["id"], "line_items[0][quantity]": 1})
+    payload["_result"] = {"id": link["id"], "url": link["url"]}      # relié à la fiche d'offre par decide()
     return f"Lien de paiement créé : {link['url']}"
 
 
@@ -95,6 +96,12 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "") -> str:
             db.set_approval(approval_id, status="executed", decided_at=iso(), result=res)
             if a["action"] == "send_email" and payload.get("in_reply_to"):
                 db.run("UPDATE inbox SET status='replied' WHERE id=?", (payload["in_reply_to"],))
+            if a["action"] == "send_email" and payload.get("order"):
+                from .commerce import mark_delivered
+                mark_delivered(db, payload["order"], f"Livrable envoyé : {payload.get('attachment')}")
+            if a["action"] == "stripe_payment_link" and payload.get("offer_id") and payload.get("_result"):
+                db.run("UPDATE offers SET payment_link_id=?, payment_link_url=? WHERE id=?",
+                       (payload["_result"]["id"], payload["_result"]["url"], payload["offer_id"]))
             outcome = f"VALIDÉ et exécuté : {res}. {note}".strip()
         except Exception as e:
             db.set_approval(approval_id, status="error", decided_at=iso(), result=str(e))
@@ -105,6 +112,8 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "") -> str:
     db.log("proprietaire", "decision", f"Demande #{approval_id} ({a['action']}) : {outcome}")
     # On informe l'agent demandeur via une nouvelle tâche pour qu'il poursuive le travail.
     summary = payload.get("question") or payload.get("subject") or payload.get("product_name") or payload.get("title") or a["action"]
+    if a["action"] == "send_email" and payload.get("order") and approve and "exécuté" in outcome:
+        return outcome          # livraison faite : rien à poursuivre pour l'agent
     db.add_task(f"Suite à la demande #{approval_id} : {summary}"[:120], a["agent"],
                 f"Ta demande #{approval_id} ({a['action']}) a reçu une réponse.\n{outcome}\n"
                 f"Contexte initial : {a['reason']}\nPoursuis le travail en conséquence, puis termine la tâche.",

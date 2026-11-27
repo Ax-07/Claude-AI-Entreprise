@@ -104,6 +104,22 @@ CREATE TABLE IF NOT EXISTS inbox (
     recorded_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_inbox_msgid ON inbox(message_id);
+CREATE TABLE IF NOT EXISTS offers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    price_eur REAL NOT NULL,
+    summary TEXT NOT NULL DEFAULT '',
+    deliverable TEXT NOT NULL DEFAULT '',            -- ce que reçoit le client
+    delay_hours INTEGER NOT NULL DEFAULT 72,         -- délai de livraison promis
+    required_info TEXT NOT NULL DEFAULT '',          -- ce qu'il faut demander au client pour livrer
+    producer TEXT NOT NULL DEFAULT 'recherche',      -- agent qui produit le livrable
+    status TEXT NOT NULL DEFAULT 'active',           -- active | archived
+    payment_link_id TEXT,
+    payment_link_url TEXT,
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status, priority, id);
 CREATE INDEX IF NOT EXISTS idx_costs_day ON costs(day);
 CREATE INDEX IF NOT EXISTS idx_memory_topic ON memory(topic);
@@ -126,7 +142,30 @@ class DB:
         if self.path != ":memory:":
             self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.executescript(SCHEMA)
+        self._migrate()
         self.conn.commit()
+
+    # Colonnes ajoutées après coup : ajoutées aux bases existantes sans perte de données.
+    MIGRATIONS = (
+        ("tasks", "order_ref", "INTEGER"),                # commande concernée (suivi jusqu'à la livraison)
+        ("sales", "offer_id", "INTEGER"),
+        ("sales", "stage", "TEXT"),                       # a_livrer | attente_client | livree | historique
+        ("sales", "due_at", "TEXT"),
+        ("sales", "delivered_at", "TEXT"),
+        ("sales", "nudges", "INTEGER NOT NULL DEFAULT 0"),
+        ("sales", "last_nudge_at", "TEXT"),
+        ("sales", "stage_note", "TEXT"),
+    )
+
+    def _migrate(self):
+        for table, col, ddl in self.MIGRATIONS:
+            cols = {r[1] for r in self.conn.execute(f"PRAGMA table_info({table})")}
+            if col not in cols:
+                self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+        # Ventes antérieures au suivi des commandes : celles qui avaient une tâche de livraison restent à livrer.
+        self.conn.execute("UPDATE sales SET stage = CASE WHEN task_id IS NULL THEN 'historique' ELSE 'a_livrer' END WHERE stage IS NULL")
+        self.conn.execute("UPDATE tasks SET order_ref = (SELECT s.rowid FROM sales s WHERE s.task_id = tasks.id) "
+                          "WHERE order_ref IS NULL AND id IN (SELECT task_id FROM sales WHERE task_id IS NOT NULL)")
 
     # ---------- générique ----------
     def q(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:
@@ -163,12 +202,15 @@ class DB:
     # ---------- tâches ----------
     def add_task(self, title: str, agent: str, description: str = "", priority: int = 3,
                  parent_id: int | None = None, objective_id: int | None = None,
-                 created_by: str = "owner", depth: int = 0) -> int:
+                 created_by: str = "owner", depth: int = 0, order_ref: int | None = None) -> int:
         t = iso()
+        if order_ref is None and parent_id is not None:          # une sous-tâche reste rattachée à la même commande
+            p = self.one("SELECT order_ref FROM tasks WHERE id=?", (parent_id,))
+            order_ref = p[0] if p else None
         return self.run(
-            "INSERT INTO tasks(title, description, agent, priority, parent_id, objective_id, created_by, depth, created_at, updated_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (title, description, agent, max(1, min(5, int(priority))), parent_id, objective_id, created_by, depth, t, t))
+            "INSERT INTO tasks(title, description, agent, priority, parent_id, objective_id, created_by, depth, created_at, updated_at, order_ref)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (title, description, agent, max(1, min(5, int(priority))), parent_id, objective_id, created_by, depth, t, t, order_ref))
 
     def task(self, task_id: int):
         return self.one("SELECT * FROM tasks WHERE id=?", (task_id,))
