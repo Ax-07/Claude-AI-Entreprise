@@ -186,7 +186,7 @@ class MaquetteTest(ServerTest):
             self.assertIn(f'class="office" data-pole="{p["id"]}"', svg)
         q = {x["id"]: x for x in meta["quarters"]}
         self.assertEqual(q["commercial"]["poles"], ["marketing", "sales", "support", "ecommerce"])
-        self.assertEqual(sorted(q["tech"]["poles"]), ["data", "security"])
+        self.assertEqual(sorted(q["tech"]["poles"]), ["auto", "data", "infra", "security"])
         self.assertEqual(sorted(q["direction"]["poles"]), ["finance", "hq", "legal", "rh"])
         # plateau « ville » : enseigne à l'avant de chaque îlot, pas de nom de code (rester professionnel)
         for p in meta["poles"]:
@@ -199,7 +199,7 @@ class MaquetteTest(ServerTest):
         # chaque pôle occupe un coin de 4 emplacements
         slots = {k: len(q[k]["poles"]) + q[k]["free"] for k in ("direction", "commercial", "production", "tech")}
         planned = {p["id"] for p in meta["poles"] if p["planned"]}
-        self.assertEqual(planned, {"video", "ecommerce", "rh"})               # bâtiments des divisions en préparation
+        self.assertEqual(planned, {"video", "ecommerce", "rh", "infra", "auto"})               # bâtiments des divisions en préparation
         self.assertEqual((meta["agents_of_pole"]["video"], "video" in meta["agent_of_pole"]), ([], False))
         self.assertEqual(set(slots.values()), {4})
 

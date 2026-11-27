@@ -129,6 +129,8 @@ _Mis à jour le 27/11/2026_
 - Coin du bas renommé **Tech & Données** (bordure blanche) : Data Core (coin avant) et Cybersécurité + 2 emplacements libres.
 - Case centrale : **place de rassemblement** (dallage, bassin lumineux). Chaque agent y a un personnage à sa couleur, visible quand il est au repos ; quand il travaille ou a du travail en attente, ses robots apparaissent devant son bâtiment (3 s'il travaille, 1 s'il attend). Clic sur un personnage : fiche de son pôle.
 
+- Tech & Données complété (décision du propriétaire) : **Infrastructure** (#2DD4BF : hébergement et mise en ligne des sites, domaines, HTTPS, surveillance ; piste de forfaits hébergement + maintenance récurrents) et **Automatisations** (#FACC15 : n8n, API, connecteurs, workflows à vendre aux clients), bâtiments en préparation (Centre de données / Tour d'hébergement / Nuage ; Usine à workflows / Tour d'intégration / Hub de connecteurs). Leurs agents seront activés avec les premières ventes de sites. Tous les emplacements de la carte sont occupés.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

@@ -11,6 +11,8 @@
   "video": "A",
   "ecommerce": "A",
   "rh": "A",
+  "infra": "A",
+  "auto": "A",
   "legal": "A",
   "finance": "A",
   "security": "A"
@@ -64,7 +66,9 @@
   ],
   "security": [
    "securite"
-  ]
+  ],
+  "infra": [],
+  "auto": []
  },
  "quarters": [
   {
@@ -119,9 +123,11 @@
    "planned": false,
    "poles": [
     "data",
-    "security"
+    "security",
+    "infra",
+    "auto"
    ],
-   "free": 2,
+   "free": 0,
    "left": "50.00%",
    "top": "96.77%"
   }
@@ -560,6 +566,66 @@
      "L": "C",
      "name": "Centre de veille",
      "text": "Salle d’écrans et radar qui balaie l’horizon 24 h/24."
+    }
+   ]
+  },
+  {
+   "id": "infra",
+   "name": "Infrastructure",
+   "color": "#2DD4BF",
+   "agent": null,
+   "planned": true,
+   "quarter": "tech",
+   "division": "tech",
+   "left": "50.00%",
+   "top": "67.90%",
+   "role": "Tech & Données · En préparation",
+   "desc": "Hébergement et mise en ligne des sites clients et de l’entreprise : domaines, HTTPS, surveillance, forfaits de maintenance.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Centre de données",
+     "text": "Halle basse, rangées de baies lumineuses et refroidissement."
+    },
+    {
+     "L": "B",
+     "name": "Tour d’hébergement",
+     "text": "Tour sombre aux voyants de serveurs, nuage lumineux au sommet."
+    },
+    {
+     "L": "C",
+     "name": "Nuage",
+     "text": "Bâtiment vitré sous un grand nuage holographique."
+    }
+   ]
+  },
+  {
+   "id": "auto",
+   "name": "Automatisations",
+   "color": "#FACC15",
+   "agent": null,
+   "planned": true,
+   "quarter": "tech",
+   "division": "tech",
+   "left": "39.80%",
+   "top": "76.13%",
+   "role": "Tech & Données · En préparation",
+   "desc": "Intégrations et workflows (n8n, API, connecteurs) pour l’entreprise et à vendre aux clients.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Usine à workflows",
+     "text": "Halle et réseau de nœuds lumineux au-dessus du toit."
+    },
+    {
+     "L": "B",
+     "name": "Tour d’intégration",
+     "text": "Tour vitrée cerclée d’anneaux de connecteurs."
+    },
+    {
+     "L": "C",
+     "name": "Hub de connecteurs",
+     "text": "Rotonde reliée par des conduits lumineux à des bornes."
     }
    ]
   }

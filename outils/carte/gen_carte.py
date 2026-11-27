@@ -71,7 +71,8 @@ LOTS = {"hq": (1, 1, "direction"), "finance": (1, 0, "direction"), "legal": (0, 
         "ecommerce": (0, 3, "commercial"),     # E-commerce = canal de vente
         "research": (3, 0, "production"), "atelier": (3, 1, "production"), "dev": (4, 1, "production"),
         "video": (4, 0, "production"),
-        "data": (4, 4, "tech"), "security": (4, 3, "tech")}   # Tech & Données : Data Core et Cybersécurité
+        "data": (4, 4, "tech"), "security": (4, 3, "tech"),   # Tech & Données : Data Core et Cybersécurité,
+        "infra": (3, 3, "tech"), "auto": (3, 4, "tech")}      # Infrastructure et Automatisations (en préparation)
 PLAZA = (2, 2)      # place de rassemblement (agents au repos)
 PLOTS = []          # plus de chantier : les futures divisions ont leur bâtiment
 PARKS = {(i, j) for i in range(N) for j in range(N) if (i == 2) != (j == 2)}   # la croix entre les 4 coins
@@ -90,14 +91,16 @@ INFO = {  # nom, couleur, agent, rôle affiché, description, échelle du bâtim
  "video": ("Studio vidéo", "#F43F5E", None, "En préparation", "Future division vidéo : une chaîne YouTube de promotion de l’entreprise, puis des chaînes de contenu monétisées, à l’international.", .56),
  "ecommerce": ("E-commerce", "#A3E635", None, "En préparation", "Future division de vente en ligne (dropshipping international) : boutique, fournisseurs, commandes et retours.", .56),
  "rh": ("Ressources humaines", "#E879F9", None, "En préparation", "Réserve d’agents spécialisés, mobilisés à la demande pour une mission précise, puis remis en réserve.", .56),
+ "infra": ("Infrastructure", "#2DD4BF", None, "En préparation", "Hébergement et mise en ligne des sites clients et de l’entreprise : domaines, HTTPS, surveillance, forfaits de maintenance.", .56),
+ "auto": ("Automatisations", "#FACC15", None, "En préparation", "Intégrations et workflows (n8n, API, connecteurs) pour l’entreprise et à vendre aux clients.", .56),
  "legal": ("Juridique", "#CBD5E1", "juridique", "Conformité", "CGV, mentions, RGPD, factures : relit les actions avant ta décision.", .56),
  "finance": ("Trésorerie", "#F472B6", "finance", "Finances", "Revenus, coûts d’API et rentabilité de chaque activité.", .56),
  "security": ("Cybersécurité", "#F87171", "securite", "Protection", "Configuration, anomalies et emails piégés : veille défensive quotidienne.", .56),
 }
 KIND = {"hq": "globe", "data": "city", "marketing": "target", "sales": "bars", "support": "headset", "research": "chart",
-        "atelier": "gear", "dev": "code", "video": "play", "ecommerce": "cart", "rh": "people", "legal": "scale", "finance": "coin", "security": "shield"}
+        "atelier": "gear", "dev": "code", "video": "play", "ecommerce": "cart", "rh": "people", "infra": "cloud", "auto": "flow", "legal": "scale", "finance": "coin", "security": "shield"}
 VARS = {p[0]: p[4] for p in POLES}
-DEFAULT = {"hq": "A", "data": "A", "marketing": "A", "sales": "A", "support": "B", "research": "A", "atelier": "A", "dev": "A", "video": "A", "ecommerce": "A", "rh": "A",
+DEFAULT = {"hq": "A", "data": "A", "marketing": "A", "sales": "A", "support": "B", "research": "A", "atelier": "A", "dev": "A", "video": "A", "ecommerce": "A", "rh": "A", "infra": "A", "auto": "A",
            "legal": "A", "finance": "A", "security": "A"}
 FOOT = 25
 
