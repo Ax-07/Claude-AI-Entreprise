@@ -134,7 +134,7 @@
   {
    "id": "data",
    "name": "Data Core",
-   "color": "#22D3EE",
+   "color": "#F1F5F9",
    "agent": "data",
    "quarter": "direction",
    "division": "direction",

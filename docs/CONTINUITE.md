@@ -112,6 +112,7 @@ _Mis à jour le 27/11/2026_
 - `/api/agents` renvoie `level` (1 + tâches réussies // 10, même barème que l'entreprise). Les 3 bâtiments au choix par pôle (6 pour le Data Core) et la vue bureaux sont conservés. Générateur : `outils/carte/gen_carte.py` (E, ZONES, LOTS, PLOTS, PARKS, FREE). 116 tests.
 
 - Survol d'un bâtiment (sur la carte ou son étiquette) : aura lumineuse à la couleur du pôle (`applyHover`, classe CSS `hov`).
+- Data Core en blanc (#F1F5F9) : bâtiment, halo, bordure de sa case, carte d’agent (choix du propriétaire).
 
 - Réorganisation validée par le propriétaire (proposition de Gemini, ajustée) : E-commerce (chantier) dans le Pôle commercial, emplacement libre de ce coin ; « Zone Support » renommé **Service Client** (l'agent `support` fait du service client, pas du support interne) ; **Cybersécurité dans le coin Direction**, rebaptisé « Direction & Tech » (`DIVISIONS` : Direction & Tech = pdg, data, securite ; Administration = finance, juridique). Une case Tech collée au Data Core aurait supprimé un parc de la croix : écarté. Emplacements libres : 2 en Direction & Tech, 1 en Production, 2 en Services partagés.
 
