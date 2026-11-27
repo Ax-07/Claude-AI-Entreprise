@@ -68,7 +68,11 @@ python -m ai_studio relancer                        # remet en attente les tâch
 python -m ai_studio tache "Rédiger une FAQ" -a support -d "FAQ pour l'offre X"
 ```
 
-Pour le fonctionnement 24 h/24 : double-clique sur `demarrer.bat` (redémarre tout seul en cas d'arrêt).
+## Tableau de bord
+
+`python -m ai_studio serveur` ouvre le tableau de bord Command HQ sur http://127.0.0.1:8765 : indicateurs, carte des pôles, agents, **validations en un clic**, fil d'activité, tâches (avec leur résultat complet), objectifs, coûts et livrables. Tout est lu en direct dans la base, rafraîchi toutes les 5 secondes, et accessible uniquement depuis ton PC.
+
+Pour le fonctionnement 24 h/24 : double-clique sur `demarrer.bat`. Il lance le moteur **et** le tableau de bord (`run --tableau`) et redémarre tout seul en cas d'arrêt.
 Pense à désactiver la mise en veille du PC.
 
 Les livrables des agents sont dans `data/workspace/`, la base de données dans `data/studio.db`.

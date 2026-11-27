@@ -49,6 +49,7 @@ class Studio:
 
     def cycle(self) -> dict:
         stats = {"ran": 0, "paused": None, "reviews": 0, "error": None}
+        self.db.kv_set("last_cycle_at", iso())
         try:
             self.guard.check()
         except BudgetExceeded as e:

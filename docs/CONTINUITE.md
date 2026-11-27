@@ -28,11 +28,16 @@ _Mis à jour le 27/11/2026_
 - Décision du propriétaire : on reste sur la **construction de l'app** ; les agents gardent un objectif d'entraînement sans action externe.
 - Piste d'évolution : passer à l'API Responses d'OpenAI pour garder le raisonnement avec les outils (PDG).
 
+## Phase 3 — tableau de bord branché (27/11/2026)
+- `ai_studio/server.py` (API locale sécurisée) + `ai_studio/web/index.html` (page néon : indicateurs, carte des pôles dont les bâtiments grandissent avec les tâches terminées, agents, validations en un clic, activité, tâches, objectifs, coûts, livrables).
+- `python -m ai_studio serveur` ou `run --tableau` ; `demarrer.bat` lance les deux. 42 tests ; rendu vérifié par capture d'écran sur des données de démonstration.
+- Critère de fin de phase : le propriétaire voit ses vraies données et valide une action depuis la page.
+
 ## Non vérifié
 - Aucun cycle réel complet n'a encore réussi. Prochain test chez le propriétaire : `python -m ai_studio run --once`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.
 
 ## Prochaines étapes
-1. API locale (127.0.0.1:8765) et branchement du tableau de bord.
+1. Vérification du tableau de bord par le propriétaire sur ses vraies données.
 2. Phase « Prêt à vendre » : domaine, email pro, CGV, n8n.
 3. Choisir l'activité (piste : diagnostic SEO local) et viser le premier paiement Stripe.

@@ -6,6 +6,8 @@ Commandes principales :
   tache "titre" -a agent       confie directement une tâche à un agent (option -d description, -p priorité)
   run                          démarre le moteur en continu (24 h/24)
   run --once                   exécute un seul cycle puis s'arrête (pour tester)
+  run --tableau                moteur en continu + tableau de bord (http://127.0.0.1:8765)
+  serveur                      tableau de bord seul (sans faire travailler les agents)
   status                       vue d'ensemble : objectifs, tâches, budget, validations en attente
   validations                  liste les actions qui attendent ta validation
   valider ID [-n "note"]       valide une action (l'email part, le lien de paiement est créé…)
@@ -67,8 +69,35 @@ def _studio(cfg, db):
     return Studio(cfg, db, make_llm(cfg))
 
 
+def _start_dashboard(cfg, port: int, open_browser: bool):
+    from .server import serve_in_thread
+    try:
+        serve_in_thread(cfg, port)
+    except OSError as e:
+        _out(f"Tableau de bord non démarré (port {port} occupé ?) : {e}")
+        return
+    url = f"http://127.0.0.1:{port}"
+    _out(f"Tableau de bord : {url}")
+    if open_browser:
+        import webbrowser
+        webbrowser.open(url)
+
+
+def cmd_serveur(cfg, db, a):
+    import time
+    _start_dashboard(cfg, a.port, not a.sans_navigateur)
+    _out("Le serveur tourne (Ctrl+C pour arrêter). Le moteur des agents n'est pas lancé par cette commande.")
+    try:
+        while True:
+            time.sleep(3600)
+    except KeyboardInterrupt:
+        _out("Serveur arrêté.")
+
+
 def cmd_run(cfg, db, a):
     st = _studio(cfg, db)
+    if getattr(a, "tableau", False) and not a.once:
+        _start_dashboard(cfg, a.port, not a.sans_navigateur)
     if a.once:
         from .db import iso
         st.recover()
@@ -203,6 +232,9 @@ def main(argv=None):
     s = sub.add_parser("tache"); s.add_argument("titre"); s.add_argument("-a", "--agent", required=True)
     s.add_argument("-d", "--description"); s.add_argument("-p", "--priorite", type=int, default=3)
     s = sub.add_parser("run"); s.add_argument("--once", action="store_true")
+    s.add_argument("--tableau", action="store_true", help="démarre aussi le tableau de bord")
+    s.add_argument("--port", type=int, default=8765); s.add_argument("--sans-navigateur", action="store_true")
+    s = sub.add_parser("serveur"); s.add_argument("--port", type=int, default=8765); s.add_argument("--sans-navigateur", action="store_true")
     sub.add_parser("status"); sub.add_parser("validations")
     for name in ("valider", "refuser"):
         s = sub.add_parser(name); s.add_argument("id", type=int); s.add_argument("-n", "--note")
@@ -219,7 +251,7 @@ def main(argv=None):
     handlers = {"init": cmd_init, "objectif": cmd_objectif, "tache": cmd_tache, "run": cmd_run, "status": cmd_status,
                 "validations": cmd_validations, "taches": cmd_taches, "voir": cmd_voir, "journal": cmd_journal,
                 "couts": cmd_couts, "agents": cmd_agents, "relancer": cmd_relancer, "objectifs": cmd_objectifs,
-                "archiver": cmd_archiver,
+                "archiver": cmd_archiver, "serveur": cmd_serveur,
                 "valider": lambda c, d, x: cmd_decide(c, d, x, True), "refuser": lambda c, d, x: cmd_decide(c, d, x, False)}
     try:
         handlers[a.cmd](cfg, db, a)

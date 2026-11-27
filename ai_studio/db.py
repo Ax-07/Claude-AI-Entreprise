@@ -72,6 +72,10 @@ CREATE TABLE IF NOT EXISTS events (
     message TEXT NOT NULL,
     task_id INTEGER
 );
+CREATE TABLE IF NOT EXISTS kv (
+    k TEXT PRIMARY KEY,
+    v TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status, priority, id);
 CREATE INDEX IF NOT EXISTS idx_costs_day ON costs(day);
 CREATE INDEX IF NOT EXISTS idx_memory_topic ON memory(topic);
@@ -107,6 +111,14 @@ class DB:
         cur = self.conn.execute(sql, params)
         self.conn.commit()
         return cur.lastrowid
+
+    # ---------- valeurs clés (état du moteur) ----------
+    def kv_set(self, k: str, v: str) -> None:
+        self.run("INSERT INTO kv(k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v=excluded.v", (k, v))
+
+    def kv_get(self, k: str, default: str | None = None) -> str | None:
+        r = self.one("SELECT v FROM kv WHERE k=?", (k,))
+        return r[0] if r else default
 
     # ---------- journal ----------
     def log(self, agent: str, kind: str, message: str, task_id: int | None = None) -> None:

@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Command HQ — AI Enterprise Studio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%236366F1%27/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070B1A;--ink:#EEF1FF;--ink2:#B4BCDD;--ink3:#8B95BC;--line:rgba(130,150,255,.16);--ok:#34D399;--warn:#FBBF24;--bad:#F87171;--acc:#818CF8}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1200px 600px at 55% 20%,#1a1650 0%,rgba(7,11,26,0) 70%),radial-gradient(800px 500px at 95% 0%,#0d2a4a 0%,rgba(7,11,26,0) 70%),var(--bg);color:var(--ink);font:14px/1.45 Inter,system-ui,sans-serif;min-height:100vh}
+h1,h2,h3,.gro{font-family:"Space Grotesk",Inter,sans-serif}
+a{color:#A5B4FC}
+button,select,input,textarea{font:inherit;color:inherit}
+.wrap{max-width:1720px;margin:0 auto;padding:18px;display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+.pn{background:linear-gradient(180deg,rgba(22,30,66,.78),rgba(12,17,40,.84));border:1px solid var(--line);border-radius:18px;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.side{flex:1 1 230px;max-width:100%;padding:18px 14px;display:flex;flex-direction:column;gap:16px;position:relative}
+.main{flex:999 1 900px;min-width:0;display:flex;flex-direction:column;gap:18px}
+.logo{display:flex;gap:12px;align-items:center;padding:0 6px}
+.logo .ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,#6366F1,#22D3EE);box-shadow:0 0 22px rgba(99,102,241,.6);font-weight:700}
+.nav a{display:block;padding:10px 14px;border-radius:12px;text-decoration:none;color:var(--ink2);font-weight:500}
+.nav a:hover{background:rgba(255,255,255,.05);color:#fff}
+.box{padding:14px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.lab{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+.bar{height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#6366F1,#22D3EE);box-shadow:0 0 10px #6366F1}
+.kpis{display:flex;flex-wrap:wrap;gap:14px}
+.kpi{flex:1 1 128px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.kpi .v{font-family:"Space Grotesk";font-size:24px;font-weight:700}
+.kpi .s{font-size:12px;color:var(--ink3)}
+.kpi.alert{border-color:rgba(251,191,36,.6);box-shadow:0 0 24px rgba(251,191,36,.25)}
+.row{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+.card{padding:18px}
+.card h2{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#C7CEF0;margin:0 0 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.live{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.agents{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.agent{padding:14px;display:flex;flex-direction:column;gap:10px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid var(--line);cursor:pointer}
+.agent:hover{border-color:rgba(165,180,252,.5)}
+.av{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-family:"Space Grotesk"}
+.feed{display:flex;flex-direction:column;max-height:420px;overflow:auto}
+.ev{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid rgba(140,160,255,.08);font-size:13px}
+.ev .t{color:var(--ink3);font-size:11px;white-space:nowrap;min-width:42px}
+.ev .m{color:var(--ink2);word-break:break-word}
+.ev b{color:var(--ink);font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-weight:600;color:var(--ink3);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:8px;border-bottom:1px solid var(--line)}
+td{padding:9px 8px;border-bottom:1px solid rgba(140,160,255,.07);vertical-align:top}
+tr.click{cursor:pointer}tr.click:hover td{background:rgba(255,255,255,.03)}
+.tw{overflow-x:auto}
+.btn{border:1px solid var(--line);background:rgba(255,255,255,.05);border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:600}
+.btn:hover{background:rgba(255,255,255,.1)}
+.btn.ok{background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.6);color:#A7F3D0}
+.btn.no{background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.5);color:#FECACA}
+.btn.pri{background:linear-gradient(135deg,#6366F1,#4F46E5);border-color:#818CF8}
+select,input[type=text],textarea{background:rgba(5,8,22,.7);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+textarea{width:100%;resize:vertical}
+.appr{padding:14px;border-radius:14px;border:1px solid rgba(251,191,36,.4);background:rgba(251,191,36,.05);display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.appr pre,.pre{white-space:pre-wrap;word-break:break-word;margin:0;font:13px/1.5 ui-monospace,Consolas,monospace;background:rgba(5,8,22,.6);border:1px solid var(--line);border-radius:10px;padding:10px;max-height:260px;overflow:auto}
+.muted{color:var(--ink3)}
+.st-done{color:#6EE7B7}.st-failed{color:#FCA5A5}.st-running{color:#93C5FD}.st-pending{color:#FDE68A}.st-blocked{color:#94A3B8}
+.modal{position:fixed;inset:0;background:rgba(3,5,15,.75);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:10;overflow:auto}
+.modal.on{display:flex}
+.modal .pn{width:min(980px,100%);padding:22px}
+.toast{position:fixed;right:20px;bottom:20px;padding:12px 16px;border-radius:12px;background:#111a3d;border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.4);display:none;z-index:20;max-width:420px}
+.costbars{display:flex;align-items:flex-end;gap:6px;height:120px;padding-top:8px}
+.costbars div{flex:1;min-width:10px;background:linear-gradient(180deg,#22D3EE,#6366F1);border-radius:4px 4px 0 0;position:relative}
+.costbars div:hover::after{content:attr(data-t);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#111a3d;border:1px solid var(--line);padding:3px 8px;border-radius:6px;font-size:11px;white-space:nowrap}
+.map svg{width:100%;height:auto;display:block}
+.map .plat{cursor:pointer}
+.grow{flex:999 1 520px;min-width:0}.side2{flex:1 1 340px;min-width:0;display:flex;flex-direction:column;gap:18px}
+.empty{color:var(--ink3);padding:14px 0}
+.flex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ach{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+@media (max-width:700px){.wrap{padding:10px}.kpi .v{font-size:20px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside class="pn side">
+    <div class="logo"><span class="ic">AI</span><span><span class="gro" style="font-size:17px;font-weight:700;display:block" id="company">AI Enterprise</span><span class="lab" style="color:#A5B4FC">Studio · HQ</span></span></div>
+    <nav class="nav">
+      <a href="#vue">Vue d'ensemble</a><a href="#validations">Validations</a><a href="#agents">Agents</a>
+      <a href="#taches">Tâches</a><a href="#objectifs">Objectifs</a><a href="#couts">Coûts</a><a href="#fichiers">Livrables</a>
+    </nav>
+    <div class="box">
+      <div class="lab">Niveau du HQ</div>
+      <div class="flex" style="margin:8px 0"><span class="gro" style="font-size:28px;font-weight:700;color:#FDE68A" id="level">1</span><span class="muted" id="xp">0 XP</span></div>
+      <div class="bar"><i id="xpbar" style="width:0"></i></div>
+      <div class="muted" style="font-size:12px;margin-top:6px">10 XP par tâche terminée, 25 par action validée et exécutée</div>
+    </div>
+    <div class="box">
+      <div class="lab">Objectif en cours</div>
+      <div id="obj" style="margin-top:8px" class="muted">Aucun objectif actif</div>
+    </div>
+    <div class="box" id="engine"></div>
+    <div class="box"><div class="lab">Succès</div><div id="ach" style="margin-top:10px"></div></div>
+  </aside>
+
+  <main class="main">
+    <section class="kpis" id="vue"></section>
+
+    <div class="row">
+      <section class="pn card grow map">
+        <h2><span>Carte de l'entreprise</span><span class="muted" style="font-size:11px;text-transform:none;letter-spacing:0">La hauteur des bâtiments grandit avec les tâches terminées · clique sur un pôle</span></h2>
+        <div id="map"></div>
+      </section>
+      <div class="side2">
+        <section class="pn card" id="validations"><h2><span>Validations</span><span class="pill" id="apcount">0</span></h2><div id="approvals"></div></section>
+        <section class="pn card"><h2><span>Fil d'activité</span><span class="dot live" style="background:var(--ok)"></span></h2><div class="feed" id="feed"></div></section>
+      </div>
+    </div>
+
+    <section class="pn card" id="agents"><h2><span>Escouade d'agents</span></h2><div class="agents" id="agentlist"></div></section>
+
+    <section class="pn card" id="taches">
+      <h2><span>Tâches</span>
+        <span class="flex"><select id="fstatus" aria-label="Filtrer par statut"><option value="">Tous les statuts</option><option value="pending">En attente</option><option value="running">En cours</option><option value="done">Terminées</option><option value="failed">En échec</option><option value="blocked">Bloquées</option></select>
+        <select id="fagent" aria-label="Filtrer par agent"><option value="">Tous les agents</option></select></span></h2>
+      <div class="tw"><table><thead><tr><th>#</th><th>Tâche</th><th>Agent</th><th>Statut</th><th>Créée par</th><th>Coût</th><th>Mise à jour</th></tr></thead><tbody id="tasks"></tbody></table></div>
+    </section>
+
+    <div class="row">
+      <section class="pn card grow" id="objectifs">
+        <h2><span>Objectifs</span></h2>
+        <form id="objform" class="flex" style="margin-bottom:14px"><input type="text" id="objtext" placeholder="Nouvel objectif pour l'équipe…" style="flex:1 1 300px" aria-label="Nouvel objectif"><button class="btn pri" type="submit">Ajouter</button></form>
+        <div id="objectives"></div>
+      </section>
+      <section class="pn card side2" id="couts" style="padding:18px">
+        <h2><span>Coûts API</span><span class="muted" id="costmonth" style="text-transform:none;letter-spacing:0"></span></h2>
+        <div class="costbars" id="costbars"></div>
+        <div class="muted" style="font-size:11px;margin:6px 0 12px">14 derniers jours</div>
+        <table><tbody id="costagents"></tbody></table>
+      </section>
+    </div>
+
+    <section class="pn card" id="fichiers"><h2><span>Livrables des agents</span><span class="muted" style="text-transform:none;letter-spacing:0">data/workspace</span></h2><div class="tw"><table><tbody id="files"></tbody></table></div></section>
+  </main>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true"><div class="pn"><div class="flex" style="justify-content:space-between;margin-bottom:12px"><h3 id="mtitle" style="margin:0"></h3><button class="btn" id="mclose">Fermer</button></div><div id="mbody"></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const COLORS = {pdg:"#818CF8",recherche:"#34D399",marketing:"#60A5FA",ventes:"#A78BFA",support:"#FBBF24",data:"#22D3EE",finance:"#F472B6",proprietaire:"#FDE68A",systeme:"#94A3B8"};
+const STATUS = {pending:"En attente",running:"En cours",done:"Terminée",failed:"En échec",blocked:"Bloquée"};
+const STATE = {running:["En cours","#93C5FD"],waiting:["Tâches en attente","#FDE68A"],idle:["Disponible","#8B95BC"]};
+let agentsCache = [], lastEventId = 0, events = [];
+
+// Construction sûre du DOM : le texte venant des agents n'est jamais interprété comme du HTML.
+function h(tag, attrs, ...kids){
+  const e = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs||{})){
+    if (v === null || v === undefined || v === false) continue;
+    if (k === "style" && typeof v === "object") Object.assign(e.style, v);
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) e.append(k instanceof Node ? k : String(k));
+  return e;
+}
+const put = (el, ...kids) => el.replaceChildren(...kids.flat().filter(k => k !== null && k !== undefined && k !== false));
+const svg = (tag, attrs, ...kids) => { const e = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const [k,v] of Object.entries(attrs||{})) e.setAttribute(k, v); for (const k of kids.flat()) if (k != null) e.append(k instanceof Node ? k : String(k)); return e; };
+const money = v => (v||0).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:4}) + " $";
+const when = ts => { if(!ts) return ""; const d = new Date(ts); const diff = (Date.now()-d)/1000; if (diff<60) return "à l'instant"; if (diff<3600) return "il y a " + Math.floor(diff/60)+" min"; if (diff<86400) return "il y a " + Math.floor(diff/3600)+" h"; return d.toLocaleDateString("fr-FR"); };
+const pct = (a,b) => b ? Math.min(100, Math.round(100*a/b)) : 0;
+
+async function api(method, path, body){
+  const r = await fetch(path, {method, headers: method==="POST" ? {"Content-Type":"application/json","X-AI-Studio":"1"} : {}, body: body ? JSON.stringify(body) : undefined});
+  const data = await r.json().catch(()=>({}));
+  if (!r.ok) throw new Error(data.error || ("Erreur " + r.status));
+  return data;
+}
+function toast(msg, ok=true){ const t=$("#toast"); t.textContent=msg; t.style.borderColor = ok ? "rgba(52,211,153,.6)" : "rgba(248,113,113,.6)"; t.style.display="block"; clearTimeout(toast.t); toast.t=setTimeout(()=>t.style.display="none", 5000); }
+function modal(title, body){ $("#mtitle").textContent = title; $("#mbody").replaceChildren(body); $("#modal").classList.add("on"); }
+$("#mclose").onclick = () => $("#modal").classList.remove("on");
+$("#modal").onclick = e => { if (e.target.id === "modal") $("#modal").classList.remove("on"); };
+document.addEventListener("keydown", e => { if (e.key === "Escape") $("#modal").classList.remove("on"); });
+
+// ---------------------------------------------------------------- état général
+function renderStatus(s){
+  $("#company").textContent = s.company;
+  document.title = (s.approvals_pending ? `(${s.approvals_pending}) ` : "") + "Command HQ — " + s.company;
+  $("#level").textContent = "Niv. " + s.level; $("#xp").textContent = s.xp + " XP"; $("#xpbar").style.width = s.level_progress + "%";
+  const b = s.budget, t = s.tasks;
+  const k = (label, v, sub, opts={}) => h("div", {class:"pn kpi" + (opts.alert ? " alert" : "")}, h("span",{class:"lab"},label), h("span",{class:"v", style:{color:opts.color||"inherit"}}, v), sub ? h("span",{class:"s"},sub) : null, opts.bar!=null ? h("div",{class:"bar"},h("i",{style:{width:opts.bar+"%"}})) : null);
+  $("#vue").replaceChildren(
+    k("Agents actifs", `${s.active_agents} / ${s.agents_total}`, "avec du travail en cours ou en attente"),
+    k("Tâches en cours", t.pending + t.running, `${t.running} en exécution · ${t.blocked} bloquée(s)`),
+    k("Tâches terminées", t.done, `+${t.done_today} aujourd'hui · ${t.failed} en échec`, {color:"#6EE7B7"}),
+    k("Validations", s.approvals_pending, s.approvals_pending ? "attendent ta décision" : "rien à valider", {alert: s.approvals_pending>0, color: s.approvals_pending ? "#FDE68A" : null}),
+    k("Dépense du jour", money(b.day), `plafond ${money(b.day_limit)}`, {bar: pct(b.day,b.day_limit)}),
+    k("Dépense du mois", money(b.month), `plafond ${money(b.month_limit)}`, {bar: pct(b.month,b.month_limit)}),
+    k("Recherches web", `${b.searches} / ${b.searches_limit}`, s.web_search ? (s.web_search==="brave" ? "Brave Search" : "Anthropic") : "non configurée", {bar: pct(b.searches,b.searches_limit)}),
+  );
+  const o = s.objective;
+  put($("#obj"),o ? h("div",{}, h("div",{style:{color:"var(--ink)",marginBottom:"8px"}}, o.text), h("div",{class:"bar"},h("i",{style:{width:pct(o.tasks_done,o.tasks_total)+"%"}})), h("div",{class:"muted",style:{fontSize:"12px",marginTop:"6px"}}, `${o.tasks_done} / ${o.tasks_total} tâches terminées`)) : "Aucun objectif actif");
+  const e = s.engine, run = e.running;
+  put($("#engine"),
+    h("div",{class:"lab"},"Moteur"),
+    h("div",{class:"flex",style:{marginTop:"8px"}}, h("span",{class:"dot"+(run?" live":""),style:{background: run ? "var(--ok)" : "var(--bad)"}}), h("b",{}, run ? "En marche" : "Arrêté")),
+    h("div",{class:"muted",style:{fontSize:"12px",marginTop:"4px"}}, e.last_cycle_at ? "Dernier cycle : " + when(e.last_cycle_at) : "Aucun cycle encore"),
+    run ? null : h("div",{class:"muted",style:{fontSize:"12px",marginTop:"4px"}}, "Lance demarrer.bat (ou python -m ai_studio run --tableau)"),
+    h("div",{class:"muted",style:{fontSize:"12px",marginTop:"8px"}}, `${s.provider} · ${Object.values(s.models).join(" / ")}`),
+    s.stripe ? null : h("div",{class:"muted",style:{fontSize:"12px",marginTop:"4px"}}, "Stripe non configuré"),
+  );
+  $("#ach").replaceChildren(...s.achievements.map(a => h("div",{class:"ach"}, h("div",{class:"flex",style:{justifyContent:"space-between"}}, h("span",{style:{fontWeight:600, color: a.value>=a.max ? "#FDE68A" : "inherit"}}, a.name), h("span",{class:"muted",style:{fontSize:"12px"}}, `${a.value} / ${a.max}`)), h("span",{class:"muted",style:{fontSize:"12px"}}, a.desc), h("div",{class:"bar"},h("i",{style:{width:pct(a.value,a.max)+"%"}})))));
+  $("#apcount").textContent = s.approvals_pending;
+}
+
+// ---------------------------------------------------------------- carte
+const POS = {pdg:[300,175,74], recherche:[170,108,56], marketing:[430,108,56], ventes:[78,190,56], support:[522,190,56], data:[188,268,56], finance:[412,268,56]};
+function renderMap(list){
+  const W=600, H=340, s = svg("svg",{viewBox:`0 0 ${W} ${H}`,role:"img","aria-label":"Carte des pôles de l'entreprise"});
+  const defs = svg("defs",{}, svg("filter",{id:"gl",x:"-50%",y:"-50%",width:"200%",height:"200%"}, svg("feGaussianBlur",{stdDeviation:"3",result:"b"}), svg("feMerge",{}, svg("feMergeNode",{in:"b"}), svg("feMergeNode",{in:"SourceGraphic"}))));
+  s.append(defs);
+  const P = (cx,cy,u,v,z=0) => [cx + (u-v), cy + (u+v)/2 - z];
+  const pts = a => a.map(p=>p.join(",")).join(" ");
+  s.append(svg("polygon",{points:pts([[300,10],[590,170],[300,330],[10,170]]),fill:"#0b1126",stroke:"#3b4a8f","stroke-opacity":".5"}));
+  const [hx,hy] = POS.pdg;
+  for (const a of list){ if (a.name==="pdg") continue; const [x,y]=POS[a.name]; s.append(svg("line",{x1:hx,y1:hy,x2:x,y2:y,stroke:a.color,"stroke-width":a.state==="running"?4:2,"stroke-opacity":a.state==="idle"?.25:.8,filter:"url(#gl)"})); }
+  const order = [...list].sort((a,b)=>POS[a.name][1]-POS[b.name][1]);
+  for (const a of order){
+    const [cx,cy,r] = POS[a.name], c = a.color, u = r/2;
+    const g = svg("g",{class:"plat",tabindex:"0",role:"button","aria-label":`${a.pole} : ${STATE[a.state][0]}`});
+    g.addEventListener("click", ()=>{ $("#fagent").value = a.name; loadTasks(); location.hash = "#taches"; });
+    g.append(svg("polygon",{points:pts([P(cx,cy,-u,-u),P(cx,cy,u,-u),P(cx,cy,u,u),P(cx,cy,-u,u)]),fill:"#111a3d",stroke:c,"stroke-width":2,"stroke-opacity":a.state==="idle"?.4:1,filter:"url(#gl)"}));
+    const hgt = Math.min(90, 14 + a.done*6), w = u*0.45;
+    const L = [P(cx,cy,-w,w),P(cx,cy,w,w),P(cx,cy,w,w,hgt),P(cx,cy,-w,w,hgt)], R=[P(cx,cy,w,-w),P(cx,cy,w,w),P(cx,cy,w,w,hgt),P(cx,cy,w,-w,hgt)], T=[P(cx,cy,-w,-w,hgt),P(cx,cy,w,-w,hgt),P(cx,cy,w,w,hgt),P(cx,cy,-w,w,hgt)];
+    g.append(svg("polygon",{points:pts(L),fill:c,"fill-opacity":.28}), svg("polygon",{points:pts(R),fill:c,"fill-opacity":.14}), svg("polygon",{points:pts(T),fill:c,"fill-opacity":.55,stroke:"#fff","stroke-opacity":.5}));
+    for (let z=10; z<hgt-4; z+=10) g.append(svg("line",{x1:P(cx,cy,-w,w,z)[0],y1:P(cx,cy,-w,w,z)[1],x2:P(cx,cy,w,w,z)[0],y2:P(cx,cy,w,w,z)[1],stroke:c,"stroke-opacity":.8,"stroke-width":1.2}));
+    if (a.state==="running"){ const [bx,by]=P(cx,cy,0,0,hgt+8); g.append(svg("circle",{cx:bx,cy:by,r:5,fill:"#fff",class:"live",filter:"url(#gl)"})); }
+    const [lx,ly] = P(cx,cy,u,u);
+    g.append(svg("text",{x:lx,y:ly+16,"text-anchor":"middle",fill:"#F4F6FF","font-size":11,"font-weight":600,"font-family":"Space Grotesk"}, a.pole.toUpperCase()));
+    g.append(svg("text",{x:lx,y:ly+29,"text-anchor":"middle",fill:STATE[a.state][1],"font-size":10}, STATE[a.state][0] + (a.pending ? ` · ${a.pending}` : "")));
+    s.append(g);
+  }
+  $("#map").replaceChildren(s);
+}
+
+// ---------------------------------------------------------------- agents
+function renderAgents(list){
+  agentsCache = list;
+  if ($("#fagent").options.length === 1) for (const a of list) $("#fagent").append(h("option",{value:a.name}, `${a.name} — ${a.pole}`));
+  $("#agentlist").replaceChildren(...list.map(a => h("div",{class:"agent",tabindex:"0",onclick:()=>{ $("#fagent").value=a.name; loadTasks(); location.hash="#taches"; }},
+    h("div",{class:"flex"}, h("span",{class:"av",style:{background:`radial-gradient(circle at 35% 30%, ${a.color}55, ${a.color}14 70%)`,border:`1.5px solid ${a.color}`,boxShadow:`0 0 18px ${a.color}66`}}, a.name.slice(0,2).toUpperCase()),
+      h("span",{}, h("div",{style:{fontWeight:600}}, a.title.split(" — ")[0]), h("div",{class:"muted",style:{fontSize:"12px"}}, `${a.pole} · ${a.model}`))),
+    h("div",{class:"flex"}, h("span",{class:"dot"+(a.state==="running"?" live":""),style:{background:STATE[a.state][1]}}), h("span",{style:{color:STATE[a.state][1],fontSize:"13px"}}, STATE[a.state][0] + (a.pending ? ` (${a.pending})` : ""))),
+    h("div",{class:"muted",style:{fontSize:"12px",minHeight:"34px"}}, a.current ? "▶ " + a.current.title : (a.last ? `Dernière : ${a.last.title}` : "Pas encore de tâche")),
+    h("div",{class:"flex",style:{justifyContent:"space-between",fontSize:"12px"}}, h("span",{}, `${a.done} terminée(s)` + (a.failed ? ` · ${a.failed} échec(s)` : "")), h("span",{class:"muted"}, money(a.cost_month)))
+  )));
+  renderMap(list);
+}
+
+// ---------------------------------------------------------------- validations
+const ACTION = {send_email:"Envoi d'email", stripe_payment_link:"Lien de paiement Stripe", decision:"Décision demandée"};
+function renderApprovals(list){
+  if (!list.length){ $("#approvals").replaceChildren(h("div",{class:"empty"},"Rien à valider pour l'instant.")); return; }
+  $("#approvals").replaceChildren(...list.map(a => {
+    const note = h("input",{type:"text",placeholder: a.action==="decision" ? "Ta réponse…" : "Note (facultative)", style:{width:"100%"}, "aria-label":"Note"});
+    const p = a.payload, lines = [];
+    if (a.action==="send_email") lines.push(`À : ${p.to}`, `Objet : ${p.subject}`, "", p.body);
+    else if (a.action==="stripe_payment_link") lines.push(`Produit : ${p.product_name}`, `Montant : ${p.amount_eur} €` + (p.recurring ? ` / ${p.recurring==="month"?"mois":"an"}` : ""));
+    else lines.push(p.question, p.context ? "\n" + p.context : "");
+    const act = async ok => { try { const r = await api("POST", `/api/approvals/${a.id}`, {decision: ok ? "approve" : "reject", note: note.value}); toast(r.message, ok); refresh(); } catch(e){ toast(e.message, false); } };
+    return h("div",{class:"appr"},
+      h("div",{class:"flex",style:{justifyContent:"space-between"}}, h("b",{}, `#${a.id} · ${ACTION[a.action] || a.action}`), h("span",{class:"pill",style:{borderColor:COLORS[a.agent]}}, a.agent)),
+      a.reason ? h("div",{class:"muted",style:{fontSize:"12px"}}, a.reason) : null,
+      h("pre",{}, lines.join("\n")), note,
+      h("div",{class:"flex"}, h("button",{class:"btn ok",onclick:()=>act(true)}, a.action==="decision" ? "Répondre / valider" : "Valider"), h("button",{class:"btn no",onclick:()=>act(false)}, "Refuser")));
+  }));
+}
+
+// ---------------------------------------------------------------- activité
+function renderEvents(newEv){
+  if (newEv.length){ lastEventId = Math.max(lastEventId, ...newEv.map(e=>e.id)); events = [...newEv, ...events].slice(0, 80); }
+  if (!events.length){ $("#feed").replaceChildren(h("div",{class:"empty"},"Pas encore d'activité.")); return; }
+  $("#feed").replaceChildren(...events.map(e => h("div",{class:"ev"}, h("span",{class:"t"}, when(e.ts)), h("span",{class:"dot",style:{background:COLORS[e.agent]||"#94A3B8",marginTop:"6px",flex:"none"}}), h("span",{class:"m"}, h("b",{}, e.agent + " "), e.message.length > 220 ? e.message.slice(0,220) + "…" : e.message))));
+}
+
+// ---------------------------------------------------------------- tâches
+async function loadTasks(){
+  const q = new URLSearchParams({status: $("#fstatus").value, agent: $("#fagent").value, limit: 60});
+  const list = await api("GET", "/api/tasks?" + q);
+  $("#tasks").replaceChildren(...(list.length ? list.map(t => h("tr",{class:"click",onclick:()=>openTask(t.id)},
+    h("td",{class:"muted"}, t.id), h("td",{}, t.title), h("td",{}, h("span",{class:"dot",style:{background:COLORS[t.agent],marginRight:"6px"}}), t.agent),
+    h("td",{class:"st-"+t.status}, STATUS[t.status]||t.status), h("td",{class:"muted"}, t.created_by), h("td",{}, money(t.cost_usd)), h("td",{class:"muted"}, when(t.updated_at)))) : [h("tr",{},h("td",{colspan:7,class:"empty"},"Aucune tâche."))]));
+}
+async function openTask(id){
+  const t = await api("GET", `/api/tasks/${id}`);
+  const retry = ["failed","blocked"].includes(t.status) ? h("button",{class:"btn",onclick:async()=>{ try{ await api("POST",`/api/tasks/${id}/retry`,{}); toast("Tâche remise en attente"); $("#modal").classList.remove("on"); refresh(); }catch(e){ toast(e.message,false); } }}, "Relancer") : null;
+  modal(`#${t.id} · ${t.title}`, h("div",{style:{display:"flex",flexDirection:"column",gap:"12px"}},
+    h("div",{class:"flex"}, h("span",{class:"pill"}, t.agent), h("span",{class:"pill st-"+t.status}, STATUS[t.status]), h("span",{class:"pill"}, "coût " + money(t.cost_usd)), h("span",{class:"pill"}, "par " + t.created_by), retry),
+    h("div",{class:"lab"},"Consigne"), h("div",{class:"pre"}, t.description || "—"),
+    h("div",{class:"lab"},"Résultat"), h("div",{class:"pre",style:{maxHeight:"420px"}}, t.result || "(pas encore de résultat)"),
+    t.children.length ? h("div",{}, h("div",{class:"lab",style:{marginBottom:"6px"}},"Tâches créées"), ...t.children.map(c => h("div",{style:{cursor:"pointer",padding:"4px 0"},onclick:()=>openTask(c.id)}, `#${c.id} [${STATUS[c.status]}] ${c.agent} : ${c.title}`))) : null,
+    h("div",{class:"lab"},"Journal"), h("div",{class:"pre"}, t.events.map(e => `${e.ts.slice(11,16)} ${e.kind} — ${e.message}`).join("\n") || "—")));
+}
+$("#fstatus").onchange = loadTasks; $("#fagent").onchange = loadTasks;
+
+// ---------------------------------------------------------------- objectifs
+async function loadObjectives(){
+  const list = await api("GET","/api/objectives");
+  const LBL = {active:"Actif",paused:"En pause",done:"Atteint"};
+  $("#objectives").replaceChildren(...(list.length ? list.map(o => h("div",{class:"box",style:{marginBottom:"10px"}},
+    h("div",{class:"flex",style:{justifyContent:"space-between"}}, h("b",{}, `#${o.id} · ${LBL[o.status]||o.status}`),
+      h("span",{class:"flex"}, o.status==="active" ? h("button",{class:"btn",onclick:()=>setObj(o.id,"paused")},"Mettre en pause") : h("button",{class:"btn",onclick:()=>setObj(o.id,"active")},"Réactiver"))),
+    h("div",{style:{margin:"6px 0"}}, o.text), h("div",{class:"bar"},h("i",{style:{width:pct(o.tasks_done,o.tasks_total)+"%"}})), h("div",{class:"muted",style:{fontSize:"12px",marginTop:"4px"}}, `${o.tasks_done} / ${o.tasks_total} tâches terminées`))) : [h("div",{class:"empty"},"Aucun objectif.")]));
+}
+async function setObj(id, status){ try{ await api("POST",`/api/objectives/${id}`,{status}); toast("Objectif mis à jour"); refresh(); loadObjectives(); }catch(e){ toast(e.message,false); } }
+$("#objform").onsubmit = async e => { e.preventDefault(); const text = $("#objtext").value.trim(); if (!text) return; try{ await api("POST","/api/objectives",{text}); $("#objtext").value=""; toast("Objectif ajouté : le PDG le prendra en charge au prochain cycle"); loadObjectives(); refresh(); }catch(err){ toast(err.message,false); } };
+
+// ---------------------------------------------------------------- coûts et fichiers
+async function loadCosts(){
+  const c = await api("GET","/api/costs"), max = Math.max(0.0001, ...c.days.map(d=>d.usd));
+  $("#costbars").replaceChildren(...(c.days.length ? c.days.map(d => h("div",{style:{height: Math.max(3, 100*d.usd/max)+"%"},"data-t":`${d.day.slice(5)} : ${money(d.usd)} · ${d.searches} rech.`})) : [h("span",{class:"muted"},"Pas encore de dépense")]));
+  $("#costmonth").textContent = c.by_agent.length ? "ce mois : " + money(c.by_agent.reduce((s,a)=>s+a.usd,0)) : "";
+  $("#costagents").replaceChildren(...c.by_agent.map(a => h("tr",{}, h("td",{}, h("span",{class:"dot",style:{background:COLORS[a.agent]||"#94A3B8",marginRight:"6px"}}), a.agent), h("td",{class:"muted"}, `${Math.round((a.input_tokens||0)/1000)}k / ${Math.round((a.output_tokens||0)/1000)}k tokens`), h("td",{style:{textAlign:"right"}}, money(a.usd)))));
+}
+async function loadFiles(){
+  const list = await api("GET","/api/files");
+  $("#files").replaceChildren(...(list.length ? list.map(f => h("tr",{class:"click",onclick:async()=>{ try{ const d = await api("GET","/api/file?path="+encodeURIComponent(f.path)); modal(f.path, h("div",{class:"pre",style:{maxHeight:"70vh"}}, d.content)); }catch(e){ toast(e.message,false); } }},
+    h("td",{}, f.path), h("td",{class:"muted"}, (f.size/1024).toFixed(1)+" Ko"), h("td",{class:"muted",style:{textAlign:"right"}}, when(f.modified)))) : [h("tr",{},h("td",{class:"empty"},"Aucun livrable pour l'instant."))]));
+}
+
+// ---------------------------------------------------------------- rafraîchissement
+async function refresh(){
+  try {
+    const [s, ag, ap, ev] = await Promise.all([api("GET","/api/status"), api("GET","/api/agents"), api("GET","/api/approvals"), api("GET","/api/events?since="+lastEventId+"&limit=40")]);
+    renderStatus(s); renderAgents(ag); renderApprovals(ap); renderEvents(ev);
+  } catch(e){ toast("Connexion au moteur impossible : " + e.message, false); }
+}
+let tick = 0;
+async function loop(){ await refresh(); if (tick % 3 === 0) { loadTasks().catch(()=>{}); loadCosts().catch(()=>{}); loadFiles().catch(()=>{}); loadObjectives().catch(()=>{}); } tick++; setTimeout(loop, 5000); }
+loop();
+</script>
+</body>
+</html>
