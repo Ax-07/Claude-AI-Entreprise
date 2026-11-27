@@ -212,7 +212,7 @@ function renderStatus(s){
 
 // ------------------------------------------------ carte (même dessin que la maquette, chargée une seule fois)
 async function loadMap(){
-  const [svgText, meta, m] = await Promise.all([fetch("/carte.svg").then(r=>r.text()), fetch("/carte.json").then(r=>r.json()), api("GET","/api/map")]);
+  const [svgText, meta, m] = await Promise.all([fetch("/carte.svg",{cache:"no-cache"}).then(r=>r.text()), fetch("/carte.json",{cache:"no-cache"}).then(r=>r.json()), api("GET","/api/map")]);
   META = meta; MAP = m; $("#map").innerHTML = svgText;   // fichier statique du projet, pas un texte d'agent
   applyMap(); renderLabels(); renderDetail();
 }
