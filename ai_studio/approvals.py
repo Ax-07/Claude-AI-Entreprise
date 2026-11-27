@@ -83,6 +83,13 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "") -> str:
     if a["status"] != "pending":
         return f"Déjà traitée ({a['status']})."
     payload = json.loads(a["payload"])
+    order = payload.get("order")
+    if not order and a["task_id"]:
+        row = db.one("SELECT order_ref FROM tasks WHERE id=?", (a["task_id"],))
+        order = row[0] if row else None
+    if order and note.strip():
+        from .commerce import add_owner_note
+        add_owner_note(db, order, note)             # la consigne reste attachée à la commande, au-delà de cette tâche
     if not approve:
         db.set_approval(approval_id, status="rejected", decided_at=iso(), result=note or "Refusé")
         outcome = f"REFUSÉ par le propriétaire. {note}".strip()
@@ -114,6 +121,9 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "") -> str:
     summary = payload.get("question") or payload.get("subject") or payload.get("product_name") or payload.get("title") or a["action"]
     if a["action"] == "send_email" and payload.get("order") and approve and "exécuté" in outcome:
         return outcome          # livraison faite : rien à poursuivre pour l'agent
+    if order and not (a["action"] == "send_email" and payload.get("order") and approve):
+        from .commerce import delivery_brief
+        outcome += "\n\nÉtat complet de la commande :\n" + delivery_brief(db, order)
     db.add_task(f"Suite à la demande #{approval_id} : {summary}"[:120], a["agent"],
                 f"Ta demande #{approval_id} ({a['action']}) a reçu une réponse.\n{outcome}\n"
                 f"Contexte initial : {a['reason']}\nPoursuis le travail en conséquence, puis termine la tâche.",

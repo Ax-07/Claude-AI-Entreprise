@@ -160,6 +160,19 @@ def offer_sheet(o) -> str:
             f"- Agent qui produit : {o['producer']}")
 
 
+def add_owner_note(db, n: int, text: str):
+    """Consigne du propriétaire sur une commande : gardée avec la commande et rappelée à chaque relance."""
+    text = " ".join(str(text).split())[:800]
+    if not text:
+        return
+    s = get_order(db, n)
+    notes = ((s["owner_notes"] or "") + f"\n- {now().strftime('%d/%m %H:%M')} : {text}").strip()
+    db.run("UPDATE sales SET owner_notes=?, stage=CASE WHEN stage='attente_client' THEN 'a_livrer' ELSE stage END, nudges=0 "
+           "WHERE rowid=?", (notes[-3000:], int(n)))
+    db.kv_set(f"order_stuck_{n}", "")
+    db.log("proprietaire", "commande", f"Consigne sur la commande n°{n} : {text}")
+
+
 def delivery_brief(db, n: int, nudge: str = "") -> str:
     s = get_order(db, n)
     o = db.one("SELECT * FROM offers WHERE id=?", (s["offer_id"],)) if s["offer_id"] else None
@@ -168,6 +181,9 @@ def delivery_brief(db, n: int, nudge: str = "") -> str:
             f"Client : {s['customer_name'] or ''} <{s['customer_email'] or 'email inconnu'}>. Payée le {s['created_at'][:16]}"
             + (f" (première tâche de livraison : #{s['task_id']})" if s["task_id"] else "") + ". "
             f"État : {STAGES.get(s['stage'], s['stage'])}." + (f" Livraison promise avant le {s['due_at'][:16]}." if s["due_at"] else "") + "\n\n")
+    if s["owner_notes"]:
+        head += ("CONSIGNES DU PROPRIÉTAIRE SUR CETTE COMMANDE — elles font foi : applique-les directement, sans chercher "
+                 f"d'autre confirmation (ni du client ni de personne) :\n{s['owner_notes']}\n\n")
     offer = (offer_sheet(o) + "\n\n") if o else (
         "Aucune fiche d'offre ne correspond à ce produit. Déduis ce qui a été vendu (mémoire, fichiers, pages publiées) ; "
         "crée la fiche avec save_offer pour les prochaines ventes. Si c'est vraiment impossible à déterminer, fais demander "
@@ -180,8 +196,9 @@ def delivery_brief(db, n: int, nudge: str = "") -> str:
         f"fichier attendu précis (livraisons/commande-{n}/…) et la consigne de déléguer ensuite la livraison à l'agent "
         f"support (deliver_order, order={n}).\n"
         f"3. Si le livrable existe : délègue au support la livraison (deliver_order, order={n}, avec le fichier en pièce jointe).\n"
-        "4. S'il manque vraiment une information du client : fais-la demander par le support (send_email), puis "
-        f"set_order_status({n}, 'attente_client'). Ne redemande pas ce qui est déjà connu.\n"
+        "4. S'il manque une information et qu'une hypothèse raisonnable existe, avance avec cette hypothèse et indique-la "
+        "dans le livrable. Seulement si c'est impossible : fais demander l'information par le support (send_email), puis "
+        f"set_order_status({n}, 'attente_client'). Ne redemande jamais ce qui est déjà connu ou fixé par le propriétaire.\n"
         "Annonce toujours au client le délai de l'offre, jamais « aucun délai confirmé ».")
 
 

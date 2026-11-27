@@ -136,6 +136,7 @@ def list_orders(ctx: ToolContext, status: str = "") -> str:
                    f"{'' if s['livemode'] else ' (test)'} | {s['product'] or '?'} | {s['customer_email'] or '?'} | "
                    f"promise avant {s['due_at'][:16] if s['due_at'] else '—'}"
                    + (f" | note : {s['stage_note']}" if s["stage_note"] else "")
+                   + (f"\n   CONSIGNES DU PROPRIÉTAIRE (font foi) :{s['owner_notes']}" if s["owner_notes"] else "")
                    + (f"\n   fichiers : {', '.join(files[:8])}" if files else ""))
     return "\n".join(out)
 
@@ -150,6 +151,14 @@ def set_order_status(ctx: ToolContext, order: int, status: str, note: str = "") 
     s = get_order(ctx.db, order)
     if not s or s["stage"] in ("livree", "historique"):
         return "Commande introuvable ou déjà livrée."
+    if status == "attente_client" and s["customer_email"]:
+        last_in = ctx.db.one("SELECT MAX(received_at) FROM inbox WHERE lower(from_addr)=lower(?)", (s["customer_email"],))[0]
+        last_out = ctx.db.one("SELECT MAX(decided_at) FROM approvals WHERE action='send_email' AND status='executed' "
+                              "AND lower(json_extract(payload,'$.to'))=lower(?)", (s["customer_email"],))[0]
+        if not last_out or (last_in and last_in >= last_out):
+            return ("Refusé : le client n'attend rien de notre part ou a déjà répondu à notre dernier email. Traite ses "
+                    "réponses (list_inbox, read_email) et les consignes du propriétaire, et fais avancer la livraison. "
+                    "Pour lui poser une question, envoie d'abord l'email (send_email).")
     from ..db import iso
     ctx.db.run("UPDATE sales SET stage=?, stage_note=?, last_nudge_at=? WHERE rowid=?", (status, note[:300], iso(), int(order)))
     ctx.db.log(ctx.agent, "commande", f"Commande n°{order} → {status}. {note}".strip())

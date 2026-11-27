@@ -22,6 +22,7 @@ Commandes principales :
   relancer [ID]                remet en attente les tâches en échec (toutes, ou une seule)
   offres                       catalogue des offres (prix, livrable, délai, lien de paiement)
   commandes [-t]               commandes payées et état de livraison (-t : toutes, livrées comprises)
+  consigne N "texte"           donne une consigne sur la commande N (elle fait foi) et relance aussitôt le PDG
   livree N [-n "note"]         marque la commande N comme livrée (livraison faite hors des agents)
   memoire [RECHERCHE]          affiche la mémoire des agents (ou les entrées qui contiennent ces mots)
   oublier ID [ID...]           efface des entrées de mémoire (une information fausse, par exemple)
@@ -263,6 +264,18 @@ def cmd_commandes(cfg, db, a):
              + (f"  promise avant {s['due_at'][:16]}" if s["due_at"] else "") + (f"  relances : {s['nudges']}" if s["nudges"] else ""))
 
 
+def cmd_consigne(cfg, db, a):
+    from .commerce import add_owner_note, delivery_brief, get_order
+    s = get_order(db, a.n)
+    if not s or s["stage"] in ("livree", "historique"):
+        _out("Commande introuvable ou déjà livrée."); return
+    add_owner_note(db, a.n, a.texte)
+    tid = db.add_task(f"Commande n°{a.n} : nouvelle consigne du propriétaire", "pdg",
+                      delivery_brief(db, a.n, "NOUVELLE CONSIGNE DU PROPRIÉTAIRE : applique-la maintenant.\n\n"),
+                      priority=1, created_by="proprietaire", order_ref=a.n)
+    _out(f"Consigne ajoutée à la commande n°{a.n} ; le PDG s'en occupe (tâche #{tid}).")
+
+
 def cmd_livree(cfg, db, a):
     from .commerce import get_order, mark_delivered
     if not get_order(db, a.n):
@@ -382,6 +395,7 @@ def main(argv=None):
     s = sub.add_parser("archiver"); s.add_argument("id", type=int)
     sub.add_parser("offres")
     s = sub.add_parser("commandes"); s.add_argument("-t", "--toutes", action="store_true")
+    s = sub.add_parser("consigne"); s.add_argument("n", type=int); s.add_argument("texte")
     s = sub.add_parser("livree"); s.add_argument("n", type=int); s.add_argument("-n", "--note")
     s = sub.add_parser("memoire"); s.add_argument("recherche", nargs="?", default=""); s.add_argument("-n", type=int, default=30)
     s = sub.add_parser("oublier"); s.add_argument("ids", type=int, nargs="+")
@@ -397,7 +411,7 @@ def main(argv=None):
                 "validations": cmd_validations, "taches": cmd_taches, "voir": cmd_voir, "journal": cmd_journal,
                 "couts": cmd_couts, "agents": cmd_agents, "relancer": cmd_relancer, "objectifs": cmd_objectifs,
                 "archiver": cmd_archiver, "serveur": cmd_serveur, "notifier-test": cmd_notifier_test,
-                "offres": cmd_offres, "commandes": cmd_commandes, "livree": cmd_livree,
+                "offres": cmd_offres, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne,
                 "memoire": cmd_memoire, "oublier": cmd_oublier, "retenir": cmd_retenir,
                 "sauvegarder": cmd_sauvegarder, "sauvegardes": cmd_sauvegardes, "restaurer": cmd_restaurer,
                 "demarrage-auto": cmd_demarrage_auto,
