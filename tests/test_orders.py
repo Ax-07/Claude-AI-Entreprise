@@ -202,6 +202,38 @@ class AtelierTest(Base):
         self.assertEqual(self.db.one("SELECT producer FROM offers")[0], "atelier")
 
 
+class LegalTest(Base):
+    def test_review_queued_for_pages_and_links_not_replies(self):
+        from ai_studio import legal
+        from ai_studio.agents import ROLES
+        page = self.db.add_approval("marketing", None, "publish_page", {"path": "o.html", "url": "u", "title": "Offre", "file": "site/o.html", "html": "x"}, "r")
+        reply = self.db.add_approval("support", None, "send_email", {"to": "a@b.fr", "subject": "Re", "body": "b", "in_reply_to": 1}, "r")
+        prospect = self.db.add_approval("ventes", None, "send_email", {"to": "c@d.fr", "subject": "Bonjour", "body": "Offre"}, "r")
+        created = legal.queue_reviews(self.cfg, self.db)
+        self.assertEqual(len(created), 1)
+        t = self.db.task(created[0])
+        self.assertEqual(t["agent"], "juridique")
+        self.assertIn(f"approval_id={page}", t["description"])
+        self.assertEqual(legal.queue_reviews(self.cfg, self.db), [])            # une seule fois
+        self.assertEqual(self.db.approval(reply)["review_task"], 0)
+        self.cfg.data["legal_review"]["prospection_emails"] = True
+        self.db.run("UPDATE approvals SET review_task=NULL WHERE id IN (?,?)", (reply, prospect))
+        self.assertEqual(len(legal.queue_reviews(self.cfg, self.db)), 1)        # la prospection, pas la réponse
+        ctx = ToolContext(self.cfg, self.db, "juridique", t, list(ROLES))
+        self.assertIn("Verdict possible", run_tool("legal_review", ctx, {"approval_id": page, "verdict": "bof", "notes": "?"}))
+        run_tool("legal_review", ctx, {"approval_id": page, "verdict": "corrections", "notes": "Ajouter le prix TTC."})
+        self.assertIn("⚠️ À corriger — Ajouter le prix TTC.", self.db.approval(page)["review"])
+        self.db.set_approval(page, status="rejected")
+        self.assertIn("déjà décidé", run_tool("legal_review", ctx, {"approval_id": page, "verdict": "ok", "notes": "x"}))
+
+    def test_role(self):
+        from ai_studio.agents import ROLES
+        r = ROLES["juridique"]
+        self.assertEqual(r.model, "strong")
+        self.assertIn("legal_review", r.all_tools())
+        self.assertIn("legifrance", r.mission)
+
+
 class MigrationTest(Base):
     def test_old_database_is_upgraded_without_loss(self):
         path = self.dir / "ancienne.db"

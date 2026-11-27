@@ -56,6 +56,11 @@ def sync_all(cfg, db) -> dict:
                 db.kv_set(f"sync_{name}_error", msg)
                 db.log("systeme", "synchro", f"Synchronisation {name} impossible : {msg}")
     try:
+        from .legal import queue_reviews
+        out["reviews"] = queue_reviews(cfg, db)
+    except Exception as e:
+        db.log("systeme", "juridique", f"Relecture juridique impossible : {e}")
+    try:
         out["orders"] = follow_orders(cfg, db)
     except Exception as e:
         db.log("systeme", "commande", f"Suivi des commandes impossible : {e}")

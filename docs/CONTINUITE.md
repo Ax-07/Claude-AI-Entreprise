@@ -73,6 +73,12 @@ _Mis à jour le 27/11/2026_
 - Carte : 8e district au coin avant du plateau (Manufacture / Atelier à sheds / Tour-atelier, open-space avec engrenage holographique).
 - Première commande (test) livrée par le propriétaire le 27/11/2026, rapport produit par le Labo Recherche. 102 tests.
 
+## Pôle Juridique (27/11/2026)
+- 9e agent `juridique` (pôle legal, #CBD5E1, coin du haut du plateau ; Palais de justice / Tour de la balance / Archives scellées) : CGV, mentions légales, RGPD, facturation, propriété intellectuelle, avec sources officielles citées ; modèle fort.
+- Relecture automatique (`legal.queue_reviews`, à chaque cycle) des demandes `publish_page` et `stripe_payment_link` ; emails de prospection en option (`legal_review.prospection_emails`, désactivé par défaut pour le coût). Outil `legal_review` → avis affiché sur la carte de validation ; ne bloque jamais la décision.
+- Règle commune : questions juridiques déléguées au juridique. 105 tests.
+- Prochaine étape juridique : faire rédiger CGV, mentions et politique de confidentialité ; factures conformes générées automatiquement à chaque vente (à développer).
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

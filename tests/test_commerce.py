@@ -291,7 +291,7 @@ class PageTest(Base):
 
 class SyncAllTest(Base):
     def test_only_configured_and_errors_logged_once(self):
-        self.assertEqual(set(commerce.sync_all(self.cfg, self.db)), {"orders"})
+        self.assertEqual(set(commerce.sync_all(self.cfg, self.db)), {"orders", "reviews"})
         os.environ["STRIPE_SECRET_KEY"] = "sk_test"
         def boom(cfg, db):
             raise RuntimeError("réseau")

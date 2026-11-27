@@ -106,6 +106,8 @@ La phase de test utilise OpenAI (crédits déjà disponibles chez le propriétai
 
 **Agents envisagés plus tard** : juridique (conformité, CGV), production (exécution des services vendus), contrôle qualité (relecture avant validation).
 
+**Juridique (ajouté le 27/11/2026)** : agent de conformité (CGV, mentions, RGPD, factures). Il relit automatiquement les pages et liens de paiement avant la décision du propriétaire ; son avis s'affiche sur la validation sans la bloquer.
+
 **Atelier (ajouté le 27/11/2026)** : agent de production des livrables clients (modèle fort, 16 étapes, 0,40 $ par tâche au maximum). Il fabrique ce qui est vendu selon la fiche d'offre, puis passe la main au support pour la livraison. Les autres pôles gardent leurs fonctions internes (veille, communication, ventes…).
 
 ## 6. Catalogue des outils

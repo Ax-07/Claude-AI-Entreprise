@@ -193,3 +193,23 @@ def deliver_order(ctx: ToolContext, order: int, attachment: str, subject: str, b
     ctx.db.log(ctx.agent, "approval", f"Livraison de la commande n°{order} en attente de validation (#{aid})")
     return (f"Livraison #{aid} en attente de validation : l'email partira automatiquement dès que le propriétaire la "
             "validera, et la commande sera marquée livrée. Rien d'autre à faire.")
+
+
+# ============================================================================ Juridique
+@tool("legal_review", "Enregistre ton avis juridique sur une demande de validation (affiché au propriétaire avant sa décision).",
+      {"approval_id": {"type": "integer"}, "verdict": {"type": "string", "description": "ok, corrections ou risque"},
+       "notes": {"type": "string", "description": "points concrets à corriger, ou « rien à signaler »"}},
+      ["approval_id", "verdict", "notes"])
+def legal_review(ctx: ToolContext, approval_id: int, verdict: str, notes: str) -> str:
+    from ..legal import VERDICTS
+    verdict = verdict.strip().lower()
+    if verdict not in VERDICTS:
+        return "Verdict possible : ok, corrections ou risque."
+    a = ctx.db.approval(int(approval_id))
+    if not a:
+        return "Demande introuvable."
+    if a["status"] != "pending":
+        return f"Le propriétaire a déjà décidé ({a['status']}) : avis inutile, termine la tâche."
+    ctx.db.set_approval(int(approval_id), review=f"{VERDICTS[verdict]} — {notes.strip()[:1200]}")
+    ctx.db.log(ctx.agent, "juridique", f"Avis sur la demande #{approval_id} : {VERDICTS[verdict]}")
+    return "Avis enregistré : il s'affiche sur la demande de validation."

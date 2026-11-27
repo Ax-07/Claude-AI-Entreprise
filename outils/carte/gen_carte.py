@@ -59,8 +59,9 @@ D = [
  dict(id="data", name="Data Core", col="#22D3EE", x=330, y=425, ag=2),
  dict(id="finance", name="Trésorerie", col="#F472B6", x=670, y=425, ag=2),
  dict(id="atelier", name="Atelier", col="#FB923C", x=500, y=510, ag=3),
+ dict(id="legal", name="Juridique", col="#CBD5E1", x=500, y=150, ag=2),
 ]
-DEFAULT = {"hq": "A", "research": "A", "marketing": "A", "sales": "A", "support": "B", "data": "A", "finance": "A", "atelier": "A"}
+DEFAULT = {"hq": "A", "research": "A", "marketing": "A", "sales": "A", "support": "B", "data": "A", "finance": "A", "atelier": "A", "legal": "A"}
 VARS = {p[0]: p[4] for p in POLES}
 RU = {d["id"]: (56 if d["id"] == "hq" else 46) for d in D}
 TH = 8
@@ -131,7 +132,7 @@ for _ in range(220):
     else:
         objs.append((y, '<g><line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#6b7280" stroke-width="1.2"/><circle cx="%.1f" cy="%.1f" r="2.2" fill="#FDE68A" filter="url(#nfcity)"/></g>' % (x, y, x, y-14, x, y-15)))
     if len(objs) > 75: break
-for (bu, bv) in [(-230, 230), (230, -230), (-238, -238)]:
+for (bu, bv) in [(-230, 230), (230, -230)]:          # le coin du haut est occupé par le pôle Juridique
     G.beam(bu, bv, 0, 170, 10)
 beams = "".join(G.o); G.o = []
 SPOTS = [(.85, .35), (.35, .85), (.8, .8), (.95, -.35), (-.35, .95), (.55, .95), (.95, .55)]
@@ -165,18 +166,20 @@ desc = {
  "support": ("Clients", "Réponses aux clients 24 h/24, gestion des retours et satisfaction.", ["Tickets en attente : 3", "FAQ mise à jour"]),
  "data": ("Mémoire et données", "Base de connaissances partagée, métriques et apprentissage des agents.", ["Indexation des rapports", "Tableau de bord des KPI"]),
  "finance": ("Finances", "Suivi des revenus, contrôle des coûts API et rentabilité par activité.", ["Contrôle du plafond API", "Rapport de rentabilité"]),
+ "legal": ("Conformité", "CGV, mentions légales, RGPD, factures : relit les actions avant ta décision.", ["Relecture des pages", "Documents légaux"]),
  "atelier": ("Production", "Fabrique les livrables vendus aux clients, selon la fiche d’offre, avec une méthode de qualité.", ["Rapports clients", "Contrôle qualité"]),
 }
 for d in D:
     ru = RU[d["id"]]
     districts_js.append(dict(id=d["id"], name=d["name"], color=d["col"], agents=d["ag"] if d["id"] != "hq" else 1,
-        left="%.2f%%" % (d["x"]/W*100), top="%.2f%%" % ((d["y"] + ru + TH + 6)/H*100),
+        left="%.2f%%" % (d["x"]/W*100),
+        top="%.2f%%" % (((d["y"] - 150) if d["id"] == "legal" else (d["y"] + ru + TH + 6))/H*100),
         role=desc[d["id"]][0], desc=desc[d["id"]][1], tasks=desc[d["id"]][2],
         variants=[dict(L=v[0], name=v[1], text=v[2]) for v in VARS[d["id"]]]))
 DEFAULT_JS = json.dumps(DEFAULT)
 
 
-AGENT = {"hq": "pdg", "research": "recherche", "marketing": "marketing", "sales": "ventes", "support": "support", "data": "data", "finance": "finance", "atelier": "atelier"}
+AGENT = {"hq": "pdg", "research": "recherche", "marketing": "marketing", "sales": "ventes", "support": "support", "data": "data", "finance": "finance", "atelier": "atelier", "legal": "juridique"}
 SVG_OUT = SVG.replace('<svg viewBox="0 0 1000 620" width="100%" style="display: block" aria-hidden="true">',
                       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="100%" style="display:block" aria-hidden="true">', 1)
 assert "{{" not in SVG_OUT, "trou de gabarit restant"
