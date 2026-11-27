@@ -11,6 +11,7 @@ Sécurité :
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import mimetypes
@@ -370,15 +371,19 @@ def make_handler(cfg):
             host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]").lower()
             return host in ALLOWED_HOSTS
 
-        def _send(self, status: int, data, ctype="application/json; charset=utf-8", gzipped: bool = False, cache: bool = False):
+        def _send(self, status: int, data, ctype="application/json; charset=utf-8", gzipped: bool = False, etag: str = ""):
             body = data if isinstance(data, bytes) else json.dumps(data, ensure_ascii=False).encode("utf-8")
             self.send_response(status)
+            if etag:
+                self.send_header("ETag", etag)
             self.send_header("Content-Type", ctype)
             if gzipped:
                 self.send_header("Content-Encoding", "gzip")
                 self.send_header("Vary", "Accept-Encoding")
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "private, max-age=3600" if cache else "no-store")
+            # Fichiers statiques : le navigateur garde une copie mais revérifie à chaque chargement (réponse 304 si
+            # rien n'a changé). Ainsi une mise à jour (git pull) est visible immédiatement, sans vider le cache.
+            self.send_header("Cache-Control", "no-cache" if etag else "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY")
             self.send_header("Content-Security-Policy",
@@ -478,12 +483,18 @@ def make_handler(cfg):
             if ctype.startswith("text/") or ctype in ("application/javascript", "image/svg+xml", "application/json"):
                 ctype += "; charset=utf-8"
             data = p.read_bytes()
-            big = len(data) > 20_000
-            if big and "gzip" in (self.headers.get("Accept-Encoding") or ""):
-                data, gz = _gzip_cached(p, data), True       # la carte (≈ 640 Ko) tombe à ≈ 100 Ko
+            etag = '"%s"' % hashlib.sha1(data).hexdigest()[:20]
+            if etag in (self.headers.get("If-None-Match") or ""):
+                self.send_response(304)
+                self.send_header("ETag", etag)
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                return
+            if len(data) > 20_000 and "gzip" in (self.headers.get("Accept-Encoding") or ""):
+                data, gz = _gzip_cached(p, data), True       # la carte (≈ 740 Ko) tombe à ≈ 120 Ko
             else:
                 gz = False
-            return self._send(200, data, ctype, gzipped=gz, cache=big)
+            return self._send(200, data, ctype, gzipped=gz, etag=etag)
 
         def do_GET(self):
             self._dispatch("GET")

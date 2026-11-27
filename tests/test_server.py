@@ -173,6 +173,17 @@ class MaquetteTest(ServerTest):
         self.assertEqual(len(meta["poles"]), 8)
         self.assertEqual(meta["agent_of_pole"]["atelier"], "atelier")
 
+    def test_static_files_revalidated_not_stale(self):
+        c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+        c.request("GET", "/carte.svg", headers={"Host": f"127.0.0.1:{self.port}"})
+        r = c.getresponse(); r.read()
+        etag = r.getheader("ETag")
+        self.assertEqual(r.getheader("Cache-Control"), "no-cache")     # jamais d'ancienne carte après une mise à jour
+        self.assertTrue(etag)
+        c.request("GET", "/carte.svg", headers={"Host": f"127.0.0.1:{self.port}", "If-None-Match": etag})
+        r = c.getresponse(); body = r.read(); c.close()
+        self.assertEqual((r.status, body), (304, b""))
+
     def test_page_follows_mockup_sections(self):
         _, html, _ = self.req("GET", "/")
         for s in ("Carte de l’entreprise", "Vue bureaux", "Bâtiment du pôle", "Performance", "Fil d’activité", "Succès",
