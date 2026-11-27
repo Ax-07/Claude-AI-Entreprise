@@ -49,21 +49,40 @@ def robot(x, y, col):
 def iso(cx, cy, r, u, v): return (cx + (u-v)*r/2, cy + (u+v)*r/4)
 
 import math
-from bld import S, POLES, frange as _fr, office, OFFICE_KIND, mixw
-D = [
- dict(id="research", name="Labo Recherche", col="#34D399", x=310, y=245, ag=3),
- dict(id="marketing", name="Hub Marketing", col="#60A5FA", x=690, y=245, ag=5),
- dict(id="hq", name="Command HQ", col="#818CF8", x=500, y=330, ag=1),
- dict(id="sales", name="Centre Ventes", col="#A78BFA", x=160, y=340, ag=4),
- dict(id="support", name="Zone Support", col="#FBBF24", x=840, y=340, ag=6),
- dict(id="data", name="Data Core", col="#22D3EE", x=330, y=425, ag=2),
- dict(id="finance", name="Trésorerie", col="#F472B6", x=670, y=425, ag=2),
- dict(id="atelier", name="Atelier", col="#FB923C", x=500, y=510, ag=3),
- dict(id="legal", name="Juridique", col="#CBD5E1", x=500, y=150, ag=2),
+from bld import S, POLES, frange as _fr, office, OFFICE_KIND, mixw, mix
+# Plan par divisions, sur trois rangées : Direction sur l'axe central (Command HQ au fond, Data Core au milieu),
+# Commerciale à gauche, Production à droite (le coin droit reste libre pour un futur pôle), Administration devant.
+# Positions écran (x, y) ; le plateau va de x = 0 à 1000 et de y = 80 à 580.
+DIVISIONS = [
+ dict(id="direction", name="Direction", col="#818CF8", poles=["hq", "data"]),
+ dict(id="commerciale", name="Division commerciale", col="#38BDF8", poles=["marketing", "sales", "support"]),
+ dict(id="production", name="Division production", col="#FB923C", poles=["atelier", "research"]),
+ dict(id="administration", name="Administration", col="#E879F9", poles=["finance", "legal"]),
 ]
+XY = {"hq": (500, 136), "data": (500, 330), "marketing": (330, 215), "sales": (300, 330), "support": (100, 330),
+      "research": (670, 215), "atelier": (700, 330), "legal": (400, 430), "finance": (600, 430)}
+def to_uv(x, y): dx, dy = x - 500, y - 330; return ((dx + 2*dy) / 2, (2*dy - dx) / 2)
+UV = {k: to_uv(*p) for k, p in XY.items()}
+LINKS = {"direction": [("hq", "data")], "commerciale": [("support", "sales"), ("sales", "marketing")],
+         "production": [("research", "atelier")], "administration": [("legal", "finance")]}
+D = [
+ dict(id="hq", name="Command HQ", col="#818CF8", ag=1),
+ dict(id="data", name="Data Core", col="#22D3EE", ag=2),
+ dict(id="marketing", name="Hub Marketing", col="#60A5FA", ag=5),
+ dict(id="sales", name="Centre Ventes", col="#A78BFA", ag=4),
+ dict(id="support", name="Zone Support", col="#FBBF24", ag=6),
+ dict(id="atelier", name="Atelier", col="#FB923C", ag=3),
+ dict(id="research", name="Labo Recherche", col="#34D399", ag=3),
+ dict(id="finance", name="Trésorerie", col="#F472B6", ag=2),
+ dict(id="legal", name="Juridique", col="#CBD5E1", ag=2),
+]
+for d in D:
+    d["x"], d["y"] = XY[d["id"]]
+DIV_OF = {p: dv["id"] for dv in DIVISIONS for p in dv["poles"]}
 DEFAULT = {"hq": "A", "research": "A", "marketing": "A", "sales": "A", "support": "B", "data": "A", "finance": "A", "atelier": "A", "legal": "A"}
 VARS = {p[0]: p[4] for p in POLES}
-RU = {d["id"]: (56 if d["id"] == "hq" else 46) for d in D}
+RU = {d["id"]: (56 if d["id"] == "hq" else 44 if d["id"] == "data" else 46) for d in D}
+PAD = 13          # marge de la dalle de division autour de chaque pôle
 TH = 8
 CX, CY, GR = 500, 330, 250
 
@@ -82,7 +101,9 @@ G.slab(r=GR, t=22, road=True, lamps=True, col="#C084FC")
 rnd = random.Random(11); traces = []
 pal = ["#22D3EE", "#C084FC", "#FB923C", "#60A5FA"]
 def near_district(x, y, pad=1.25):
-    return any(abs(x-d["x"])/(2*RU[d["id"]]*pad) + abs(y-d["y"])/(RU[d["id"]]*pad) < 1 for d in D)
+    if any(abs(x-d["x"])/(2*RU[d["id"]]*pad) + abs(y-d["y"])/(RU[d["id"]]*pad) < 1 for d in D):
+        return True
+    return any(seg_dist(x, y, XY[a], XY[b]) < 26 for links in LINKS.values() for a, b in links)
 for _ in range(60):
     u, v = rnd.uniform(-225, 225), rnd.uniform(-225, 225)
     pts = [(u, v)]; ax = rnd.random() < .5
@@ -101,12 +122,29 @@ for scr, c in traces:
     tr += '<circle cx="%.1f" cy="%.1f" r="2" fill="%s"/>' % (scr[-1] + (c,))
 svg += G.o; G.o = []
 svg.append('<g filter="url(#nfcity)">%s</g>' % tr)
-# roads: L-shaped along the iso axes
-hq = [d for d in D if d["id"] == "hq"][0]
-hu, hv = uv(hq["x"], hq["y"])
+# dalles des divisions : sous les pôles d'une même division, une plateforme commune (losanges élargis reliés par
+# des passerelles), dessinée deux fois — contour lumineux puis intérieur sombre — pour n'en garder que le bord extérieur
+def div_shapes(dv, grow, fill, extra=""):
+    out = []
+    for p in dv["poles"]:
+        r = RU[p] + grow; u, v = UV[p]
+        out.append('<polygon points="%s" fill="%s"%s/>' % (G.P([G.p(u - r, v - r), G.p(u + r, v - r), G.p(u + r, v + r), G.p(u - r, v + r)]), fill, extra))
+    for a, b in LINKS[dv["id"]]:
+        (ua, va), (ub, vb) = UV[a], UV[b]
+        pts = [G.p(ua, va), G.p(ub, va), G.p(ub, vb)]
+        out.append('<polyline points="%s" fill="none" stroke="%s" stroke-width="%d" stroke-linejoin="round"%s/>' % (G.P(pts), fill, 2 * (18 + grow - PAD), extra))
+    return "".join(out)
+for dv in DIVISIONS:
+    c = dv["col"]
+    svg.append('<g opacity=".95" filter="url(#nfcity)">%s</g>' % div_shapes(dv, PAD + 2, c))
+    svg.append('<g>%s</g>' % div_shapes(dv, PAD, "#0a0f2a"))
+    svg.append('<g opacity=".25">%s</g>' % div_shapes(dv, PAD, mix(c, .5)))
+# routes : en L le long des axes, depuis le Data Core (le cœur de l'entreprise) vers chaque pôle
+hub = [d for d in D if d["id"] == "data"][0]
+hu, hv = uv(hub["x"], hub["y"])
 roads = []
 for d in D:
-    if d["id"] == "hq": continue
+    if d["id"] == "data": continue
     du, dv = uv(d["x"], d["y"])
     pts = [G.p(hu, hv), G.p(du, hv), G.p(du, dv)]
     roads.append(pts)
@@ -132,7 +170,7 @@ for _ in range(220):
     else:
         objs.append((y, '<g><line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#6b7280" stroke-width="1.2"/><circle cx="%.1f" cy="%.1f" r="2.2" fill="#FDE68A" filter="url(#nfcity)"/></g>' % (x, y, x, y-14, x, y-15)))
     if len(objs) > 75: break
-for (bu, bv) in [(-230, 230), (230, -230)]:          # le coin du haut est occupé par le pôle Juridique
+for (bu, bv) in [(-232, 232), (240, -240)]:
     G.beam(bu, bv, 0, 170, 10)
 beams = "".join(G.o); G.o = []
 SPOTS = [(.85, .35), (.35, .85), (.8, .8), (.95, -.35), (-.35, .95), (.55, .95), (.95, .55)]
@@ -157,6 +195,11 @@ svg.append(beams)
 svg.append('</svg>')
 SVG = "".join(svg)
 
+# étiquettes déplacées quand elles tomberaient sur un bâtiment voisin
+LABEL_DX = {"hq": -280}
+LABEL_DY = {"hq": -110}
+# position du nom de chaque division (x, y écran ; alignement géré par la page)
+DIV_POS = {"direction": (575, 80), "commerciale": (30, 238), "production": (900, 318), "administration": (500, 548)}
 districts_js = []
 desc = {
  "hq": ("Orchestration", "Le PDG IA répartit les missions, arbitre les budgets et valide les décisions sensibles.", ["Priorisation des missions du jour", "Validation du budget API"]),
@@ -172,11 +215,16 @@ desc = {
 for d in D:
     ru = RU[d["id"]]
     districts_js.append(dict(id=d["id"], name=d["name"], color=d["col"], agents=d["ag"] if d["id"] != "hq" else 1,
-        left="%.2f%%" % (d["x"]/W*100),
-        top="%.2f%%" % (((d["y"] - 150) if d["id"] == "legal" else (d["y"] + ru + TH + 6))/H*100),
+        left="%.2f%%" % ((d["x"] + LABEL_DX.get(d["id"], 0))/W*100),
+        top="%.2f%%" % ((d["y"] + ru + TH + 6 + LABEL_DY.get(d["id"], 0))/H*100), division=DIV_OF[d["id"]],
         role=desc[d["id"]][0], desc=desc[d["id"]][1], tasks=desc[d["id"]][2],
         variants=[dict(L=v[0], name=v[1], text=v[2]) for v in VARS[d["id"]]]))
 DEFAULT_JS = json.dumps(DEFAULT)
+DIV_JS = []
+for dv in DIVISIONS:
+    ax, ay = DIV_POS[dv["id"]]
+    DIV_JS.append(dict(id=dv["id"], name=dv["name"], color=dv["col"], poles=dv["poles"],
+                       left="%.2f%%" % (ax / W * 100), top="%.2f%%" % (ay / H * 100)))
 
 
 AGENT = {"hq": "pdg", "research": "recherche", "marketing": "marketing", "sales": "ventes", "support": "support", "data": "data", "finance": "finance", "atelier": "atelier", "legal": "juridique"}
@@ -184,7 +232,7 @@ SVG_OUT = SVG.replace('<svg viewBox="0 0 1000 620" width="100%" style="display: 
                       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="100%" style="display:block" aria-hidden="true">', 1)
 assert "{{" not in SVG_OUT, "trou de gabarit restant"
 (OUT / "carte.svg").write_text(SVG_OUT, encoding="utf-8")
-meta = {"default_variants": DEFAULT, "agent_of_pole": AGENT,
+meta = {"default_variants": DEFAULT, "agent_of_pole": AGENT, "divisions": DIV_JS,
         "poles": [{**{k: v for k, v in d.items() if k not in ("agents", "tasks")}, "agent": AGENT[d["id"]]} for d in districts_js]}
 (OUT / "carte.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
 print("carte.svg :", len(SVG_OUT) // 1024, "Ko")

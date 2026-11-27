@@ -21,67 +21,61 @@
   "atelier": "atelier",
   "legal": "juridique"
  },
+ "divisions": [
+  {
+   "id": "direction",
+   "name": "Direction",
+   "color": "#818CF8",
+   "poles": [
+    "hq",
+    "data"
+   ],
+   "left": "57.50%",
+   "top": "12.90%"
+  },
+  {
+   "id": "commerciale",
+   "name": "Division commerciale",
+   "color": "#38BDF8",
+   "poles": [
+    "marketing",
+    "sales",
+    "support"
+   ],
+   "left": "3.00%",
+   "top": "38.39%"
+  },
+  {
+   "id": "production",
+   "name": "Division production",
+   "color": "#FB923C",
+   "poles": [
+    "atelier",
+    "research"
+   ],
+   "left": "90.00%",
+   "top": "51.29%"
+  },
+  {
+   "id": "administration",
+   "name": "Administration",
+   "color": "#E879F9",
+   "poles": [
+    "finance",
+    "legal"
+   ],
+   "left": "50.00%",
+   "top": "88.39%"
+  }
+ ],
  "poles": [
-  {
-   "id": "research",
-   "name": "Labo Recherche",
-   "color": "#34D399",
-   "left": "31.00%",
-   "top": "49.19%",
-   "role": "Veille et opportunités",
-   "desc": "Analyse des marchés, détection de niches rentables et étude de la concurrence.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Observatoire",
-     "text": "Rotonde nervurée, coupole et télescope pointé vers les marchés."
-    },
-    {
-     "L": "B",
-     "name": "Serre de verre",
-     "text": "Laboratoire transparent : on voit les idées pousser à l’intérieur."
-    },
-    {
-     "L": "C",
-     "name": "Labo à antenne",
-     "text": "Labo vitré aux écrans allumés et tour équipée d’une parabole."
-    }
-   ],
-   "agent": "recherche"
-  },
-  {
-   "id": "marketing",
-   "name": "Hub Marketing",
-   "color": "#60A5FA",
-   "left": "69.00%",
-   "top": "49.19%",
-   "role": "Acquisition",
-   "desc": "Création de contenus, campagnes et pages de vente dans plusieurs langues.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Tour média",
-     "text": "Tour noire couverte d’écrans géants et d’enseignes néon."
-    },
-    {
-     "L": "B",
-     "name": "Studio de diffusion",
-     "text": "Pylône émetteur qui propage les ondes de la marque."
-    },
-    {
-     "L": "C",
-     "name": "Place des panneaux",
-     "text": "Panneaux publicitaires flottants au-dessus d’un studio."
-    }
-   ],
-   "agent": "marketing"
-  },
   {
    "id": "hq",
    "name": "Command HQ",
    "color": "#818CF8",
-   "left": "50.00%",
-   "top": "64.52%",
+   "left": "22.00%",
+   "top": "15.48%",
+   "division": "direction",
    "role": "Orchestration",
    "desc": "Le PDG IA répartit les missions, arbitre les budgets et valide les décisions sensibles.",
    "variants": [
@@ -104,11 +98,83 @@
    "agent": "pdg"
   },
   {
+   "id": "data",
+   "name": "Data Core",
+   "color": "#22D3EE",
+   "left": "50.00%",
+   "top": "62.58%",
+   "division": "direction",
+   "role": "Mémoire et données",
+   "desc": "Base de connaissances partagée, métriques et apprentissage des agents.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Réacteur de données",
+     "text": "Cœur lumineux sous verre, entouré d’anneaux d’énergie."
+    },
+    {
+     "L": "B",
+     "name": "Ferme de serveurs",
+     "text": "Rangées de baies noires et leurs voyants qui clignotent."
+    },
+    {
+     "L": "C",
+     "name": "Cristal de mémoire",
+     "text": "Cristal flottant au-dessus de son socle : la mémoire partagée."
+    },
+    {
+     "L": "D",
+     "name": "L’Archive circulaire",
+     "text": "Cylindres de verre empilés, cerclés d’anneaux lumineux, disque et anneau flottant."
+    },
+    {
+     "L": "E",
+     "name": "Le Prisme neural",
+     "text": "Grand prisme de verre traversé d’un réseau de neurones, livre holographique au sommet."
+    },
+    {
+     "L": "F",
+     "name": "L’Agora en spirale",
+     "text": "Rampe hélicoïdale lumineuse qui s’enroule autour d’une colonne de lumière."
+    }
+   ],
+   "agent": "data"
+  },
+  {
+   "id": "marketing",
+   "name": "Hub Marketing",
+   "color": "#60A5FA",
+   "left": "33.00%",
+   "top": "44.35%",
+   "division": "commerciale",
+   "role": "Acquisition",
+   "desc": "Création de contenus, campagnes et pages de vente dans plusieurs langues.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Tour média",
+     "text": "Tour noire couverte d’écrans géants et d’enseignes néon."
+    },
+    {
+     "L": "B",
+     "name": "Studio de diffusion",
+     "text": "Pylône émetteur qui propage les ondes de la marque."
+    },
+    {
+     "L": "C",
+     "name": "Place des panneaux",
+     "text": "Panneaux publicitaires flottants au-dessus d’un studio."
+    }
+   ],
+   "agent": "marketing"
+  },
+  {
    "id": "sales",
    "name": "Centre Ventes",
    "color": "#A78BFA",
-   "left": "16.00%",
-   "top": "64.52%",
+   "left": "30.00%",
+   "top": "62.90%",
+   "division": "commerciale",
    "role": "Revenus",
    "desc": "Prospection, qualification des leads et préparation des offres.",
    "variants": [
@@ -134,8 +200,9 @@
    "id": "support",
    "name": "Zone Support",
    "color": "#FBBF24",
-   "left": "84.00%",
-   "top": "64.52%",
+   "left": "10.00%",
+   "top": "62.90%",
+   "division": "commerciale",
    "role": "Clients",
    "desc": "Réponses aux clients 24 h/24, gestion des retours et satisfaction.",
    "variants": [
@@ -158,65 +225,12 @@
    "agent": "support"
   },
   {
-   "id": "data",
-   "name": "Data Core",
-   "color": "#22D3EE",
-   "left": "33.00%",
-   "top": "78.23%",
-   "role": "Mémoire et données",
-   "desc": "Base de connaissances partagée, métriques et apprentissage des agents.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Réacteur de données",
-     "text": "Cœur lumineux sous verre, entouré d’anneaux d’énergie."
-    },
-    {
-     "L": "B",
-     "name": "Ferme de serveurs",
-     "text": "Rangées de baies noires et leurs voyants qui clignotent."
-    },
-    {
-     "L": "C",
-     "name": "Cristal de mémoire",
-     "text": "Cristal flottant au-dessus de son socle : la mémoire partagée."
-    }
-   ],
-   "agent": "data"
-  },
-  {
-   "id": "finance",
-   "name": "Trésorerie",
-   "color": "#F472B6",
-   "left": "67.00%",
-   "top": "78.23%",
-   "role": "Finances",
-   "desc": "Suivi des revenus, contrôle des coûts API et rentabilité par activité.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Coffre-fort",
-     "text": "Bloc noir, porte de coffre circulaire et lames dorées."
-    },
-    {
-     "L": "B",
-     "name": "Temple financier",
-     "text": "Colonnade dorée et fronton : la solidité des comptes."
-    },
-    {
-     "L": "C",
-     "name": "Tour des pièces",
-     "text": "Pile de pièces géante et pièce d’or flottante."
-    }
-   ],
-   "agent": "finance"
-  },
-  {
    "id": "atelier",
    "name": "Atelier",
    "color": "#FB923C",
-   "left": "50.00%",
-   "top": "91.94%",
+   "left": "70.00%",
+   "top": "62.90%",
+   "division": "production",
    "role": "Production",
    "desc": "Fabrique les livrables vendus aux clients, selon la fiche d’offre, avec une méthode de qualité.",
    "variants": [
@@ -239,11 +253,68 @@
    "agent": "atelier"
   },
   {
+   "id": "research",
+   "name": "Labo Recherche",
+   "color": "#34D399",
+   "left": "67.00%",
+   "top": "44.35%",
+   "division": "production",
+   "role": "Veille et opportunités",
+   "desc": "Analyse des marchés, détection de niches rentables et étude de la concurrence.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Observatoire",
+     "text": "Rotonde nervurée, coupole et télescope pointé vers les marchés."
+    },
+    {
+     "L": "B",
+     "name": "Serre de verre",
+     "text": "Laboratoire transparent : on voit les idées pousser à l’intérieur."
+    },
+    {
+     "L": "C",
+     "name": "Labo à antenne",
+     "text": "Labo vitré aux écrans allumés et tour équipée d’une parabole."
+    }
+   ],
+   "agent": "recherche"
+  },
+  {
+   "id": "finance",
+   "name": "Trésorerie",
+   "color": "#F472B6",
+   "left": "60.00%",
+   "top": "79.03%",
+   "division": "administration",
+   "role": "Finances",
+   "desc": "Suivi des revenus, contrôle des coûts API et rentabilité par activité.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Coffre-fort",
+     "text": "Bloc noir, porte de coffre circulaire et lames dorées."
+    },
+    {
+     "L": "B",
+     "name": "Temple financier",
+     "text": "Colonnade dorée et fronton : la solidité des comptes."
+    },
+    {
+     "L": "C",
+     "name": "Tour des pièces",
+     "text": "Pile de pièces géante et pièce d’or flottante."
+    }
+   ],
+   "agent": "finance"
+  },
+  {
    "id": "legal",
    "name": "Juridique",
    "color": "#CBD5E1",
-   "left": "50.00%",
-   "top": "0.00%",
+   "left": "40.00%",
+   "top": "79.03%",
+   "division": "administration",
    "role": "Conformité",
    "desc": "CGV, mentions légales, RGPD, factures : relit les actions avant ta décision.",
    "variants": [

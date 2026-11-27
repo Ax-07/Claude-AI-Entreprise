@@ -230,10 +230,13 @@ document.querySelectorAll(".seg [data-view]").forEach(b => b.onclick = async () 
 function agentOfPole(pole){ return AG.find(a => a.name === META.agent_of_pole[pole]); }
 function renderLabels(){
   if (!META) return;
-  put($("#labels"), META.poles.map(p => { const a = agentOfPole(p.id), on = p.id === SEL, st = a ? STATE[a.state] : STATE.idle, n = a ? a.pending + (a.current ? 1 : 0) : 0;
-    return h("button",{class:"lbl",style:{left:p.left,top:p.top,border:`1px solid ${on?p.color:p.color+"66"}`,boxShadow: on?`0 0 22px ${p.color}AA, 0 0 0 1px ${p.color} inset`:`0 0 14px ${p.color}40`},onclick:()=>{ SEL=p.id; renderLabels(); renderDetail(); }},
-      h("span",{class:"gro",style:{fontSize:"13px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:"#F4F6FF"}}, p.name),
-      h("span",{style:{fontSize:"11px",color:p.color,display:"flex",alignItems:"center",gap:"6px"}}, h("span",{class: a&&a.state==="running"?"live":null,style:{width:"6px",height:"6px",borderRadius:"50%",background:st[1]}}), st[0] + (n ? ` · ${n} tâche${n>1?"s":""}` : ""))); }));
+  const divs = (META.divisions||[]).map(d => h("span",{class:"gro",style:{position:"absolute",left:d.left,top:d.top,transform:d.id==="production"||d.id==="administration"?"translate(-50%,0)":"none",pointerEvents:"none",fontSize:"11px",fontWeight:"700",letterSpacing:".18em",textTransform:"uppercase",color:d.color,textShadow:`0 0 10px ${d.color}AA`,whiteSpace:"nowrap"}}, d.name));
+  put($("#labels"), divs, META.poles.map(p => { const a = agentOfPole(p.id), on = p.id === SEL, st = a ? STATE[a.state] : STATE.idle, n = a ? a.pending + (a.current ? 1 : 0) : 0;
+    // étiquette compacte sur une ligne : l'état détaillé est dans la fiche du pôle et dans l'infobulle
+    return h("button",{class:"lbl",title:st[0] + (n ? ` · ${n} tâche${n>1?"s":""}` : ""),style:{left:p.left,top:p.top,flexDirection:"row",alignItems:"center",gap:"7px",padding:"5px 10px",border:`1px solid ${on?p.color:p.color+"66"}`,boxShadow: on?`0 0 22px ${p.color}AA, 0 0 0 1px ${p.color} inset`:`0 0 14px ${p.color}40`},onclick:()=>{ SEL=p.id; renderLabels(); renderDetail(); }},
+      h("span",{class: a&&a.state==="running"?"live":null,style:{width:"7px",height:"7px",borderRadius:"50%",background:st[1],boxShadow:`0 0 6px ${st[1]}`}}),
+      h("span",{class:"gro",style:{fontSize:"12px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:"#F4F6FF"}}, p.name),
+      n ? h("span",{style:{fontSize:"11px",fontWeight:"700",color:"#0B1029",background:p.color,borderRadius:"999px",padding:"0 6px"}}, String(n)) : null); }));
 }
 function renderDetail(){
   if (!META) return;
@@ -250,7 +253,7 @@ function renderDetail(){
         h("span",{style:{fontSize:"12px",lineHeight:"1.4",color:"#B4BCDD"}}, v.text)); }))) : null;
   $("#detail").style.borderColor = p.color + "88";
   put($("#detail"),
-    h("div",{style:{flex:"1 1 280px",display:"flex",flexDirection:"column",gap:"6px"}}, h("span",{style:{fontSize:"11px",letterSpacing:".14em",textTransform:"uppercase",color:p.color}}, p.role), h("span",{class:"gro",style:{fontSize:"22px",fontWeight:"700",color:"#F4F6FF"}}, p.name),
+    h("div",{style:{flex:"1 1 280px",display:"flex",flexDirection:"column",gap:"6px"}}, h("span",{style:{fontSize:"11px",letterSpacing:".14em",textTransform:"uppercase",color:p.color}}, ((META.divisions||[]).find(d=>d.id===p.division)||{name:""}).name + " · " + p.role), h("span",{class:"gro",style:{fontSize:"22px",fontWeight:"700",color:"#F4F6FF"}}, p.name),
       h("span",{style:{fontSize:"13px",lineHeight:"1.5",color:"#B4BCDD"}}, p.desc), a ? h("span",{class:"small muted"}, `${a.title} · ${a.model} · ${a.done} tâche(s) terminée(s) · ${money4(a.cost_month)} ce mois`) : null),
     tasksBox,
     h("div",{style:{flex:"0 0 auto",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"4px"}}, h("span",{class:"gro",style:{fontSize:"34px",fontWeight:"700",color:p.color}}, String(active)), h("span",{class:"small muted"}, active>1?"tâches actives":"tâche active")),
@@ -318,13 +321,18 @@ function renderEvents(ev){ if (ev.length){ lastEv = Math.max(lastEv, ...ev.map(e
   put($("#feed"), shown.length ? shown.map(evRow) : h("div",{class:"empty"},"Pas encore d’activité.")); }
 function renderAgents(list){
   AG = list; applyMap(); renderLabels();
-  put($("#acards"), list.map(a => { const st = STATE[a.state], rate = a.success_rate ?? 0;
+  const order = [...new Set(list.map(a => a.division))];
+  const card = a => { const st = STATE[a.state], rate = a.success_rate ?? 0;
     return h("button",{class:"pn",onclick:()=>{ const pole = Object.entries(META?META.agent_of_pole:{}).find(([k,v])=>v===a.name); if (pole){ SEL = pole[0]; renderLabels(); renderDetail(); window.scrollTo({top:0,behavior:"smooth"}); } },style:{minWidth:"0",padding:"14px",display:"flex",flexDirection:"column",gap:"12px",cursor:"pointer",textAlign:"left",color:"#EEF1FF"}},
       h("div",{style:{display:"flex",gap:"12px",alignItems:"center"}}, h("span",{class:"av",style:{width:"50px",height:"50px",background:`radial-gradient(circle at 35% 30%, ${a.color}55, ${a.color}14 70%)`,border:`1.5px solid ${a.color}`,boxShadow:`0 0 20px ${a.color}66`}}, ico("BOT","#FFFFFF",24)),
         h("span",{style:{display:"flex",flexDirection:"column",gap:"2px",minWidth:"0"}}, h("span",{style:{fontSize:"14px",fontWeight:"600",color:"#F4F6FF"}}, a.title.split(" — ")[0]), h("span",{class:"small muted"}, a.current ? a.current.title : (a.title.split(" — ")[1]||a.pole)),
           h("span",{style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:st[1]}}, h("span",{class:a.state==="running"?"live":null,style:{width:"7px",height:"7px",borderRadius:"50%",background:st[1],boxShadow:`0 0 8px ${st[1]}`}}), st[0] + (a.pending ? ` (${a.pending})` : "")))),
       h("div",{style:{display:"flex",alignItems:"center",gap:"10px"}}, h("span",{class:"bar",style:{flex:"1"}}, h("i",{style:{width:rate+"%",background:a.color,boxShadow:`0 0 10px ${a.color}`}})), h("span",{class:"gro",style:{fontSize:"13px",color:"#C7CEF0"}}, a.success_rate==null ? "—" : rate+" %")),
-      h("span",{class:"small muted",style:{display:"flex",justifyContent:"space-between"}}, h("span",{}, `${a.done} terminée(s)`), h("span",{}, money4(a.cost_month)))); }));
+      h("span",{class:"small muted",style:{display:"flex",justifyContent:"space-between"}}, h("span",{}, `${a.done} terminée(s)`), h("span",{}, money4(a.cost_month)))); };
+  const dcol = name => ((META&&META.divisions||[]).find(d => d.name === name)||{color:"#9AA4C7"}).color;
+  put($("#acards"), order.map(dv => h("div",{style:{gridColumn:"1 / -1",display:"flex",flexDirection:"column",gap:"10px"}},
+    h("span",{class:"gro",style:{fontSize:"12px",letterSpacing:".16em",textTransform:"uppercase",color:dcol(dv),borderBottom:`1px solid ${dcol(dv)}44`,paddingBottom:"6px"}}, dv || "Autres"),
+    h("div",{class:"agrid"}, list.filter(a => a.division === dv).map(card)))));
 }
 async function loadQueue(){
   const list = (await api("GET","/api/tasks?limit=40")).filter(t => t.status==="pending"||t.status==="running").sort((a,b)=>(a.status==="running"?-1:0)-(b.status==="running"?-1:0)).slice(0,5);

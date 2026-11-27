@@ -71,6 +71,8 @@ class ServerTest(unittest.TestCase):
         st, ag, _ = self.req("GET", "/api/agents")
         by = {a["name"]: a for a in ag}
         self.assertEqual(len(ag), 9)
+        self.assertEqual(by["atelier"]["division"], "Division production")
+        self.assertEqual(by["data"]["division"], "Direction")
         self.assertEqual(by["recherche"]["done"], 1)
         self.assertEqual(by["ventes"]["state"], "waiting")
 
@@ -172,6 +174,12 @@ class MaquetteTest(ServerTest):
         self.assertEqual(meta["agent_of_pole"]["sales"], "ventes")
         self.assertEqual(len(meta["poles"]), 9)
         self.assertEqual(meta["agent_of_pole"]["legal"], "juridique")
+        self.assertEqual([d["id"] for d in meta["divisions"]], ["direction", "commerciale", "production", "administration"])
+        data = next(p for p in meta["poles"] if p["id"] == "data")
+        self.assertEqual([v["L"] for v in data["variants"]], list("ABCDEF"))
+        self.assertEqual(data["division"], "direction")
+        for v in "DEF":
+            self.assertIn(f'class="bld" data-pole="data" data-variant="{v}"', svg)
         self.assertEqual(meta["agent_of_pole"]["atelier"], "atelier")
 
     def test_static_files_revalidated_not_stale(self):
@@ -200,6 +208,8 @@ class MaquetteTest(ServerTest):
         self.post("/api/map", {"view": "bureaux"})
         _, m, _ = self.req("GET", "/api/map")
         self.assertEqual(m, {"variants": {"support": "C"}, "view": "bureaux"})
+        st, m, _ = self.post("/api/map", {"pole": "data", "variant": "F"})
+        self.assertEqual((st, m["variants"]["data"]), (200, "F"))
         st, _, _ = self.post("/api/map", {"pole": "support", "variant": "Z"})
         self.assertEqual(st, 400)
 

@@ -21,7 +21,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from .agents import ROLES
+from .agents import DIVISION_OF, ROLES
 from .db import DB, now
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
@@ -138,6 +138,7 @@ def agents(cfg, db) -> list[dict]:
         cost = db.one("SELECT COALESCE(SUM(usd),0) FROM costs WHERE agent=? AND month=?", (r.name, month))[0]
         state = "running" if running else ("waiting" if pending else "idle")
         out.append({"name": r.name, "pole": r.pole, "title": r.title, "color": POLE_COLORS.get(r.name, "#94A3B8"),
+                    "division": DIVISION_OF.get(r.name, ""),
                     "model": m["strong"] if r.model == "strong" else m["default"], "state": state,
                     "current": _row(running) if running else None, "pending": pending, "done": done, "failed": failed,
                     "last": _row(last) if last else None, "cost_month": round(float(cost), 4),
@@ -284,7 +285,7 @@ def set_map(cfg, db, body: dict) -> dict:
         db.kv_set("map_view", body["view"])
     if "pole" in body:
         pole, var = body.get("pole"), body.get("variant")
-        if pole not in MAP_POLES or var not in ("A", "B", "C"):
+        if pole not in MAP_POLES or var not in tuple("ABCDEF"):
             raise ApiError(400, "pôle ou variante invalide")
         cur["variants"][pole] = var
         db.kv_set("map_variants", json.dumps(cur["variants"]))

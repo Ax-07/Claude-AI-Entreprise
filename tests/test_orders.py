@@ -226,6 +226,13 @@ class LegalTest(Base):
         self.db.set_approval(page, status="rejected")
         self.assertIn("déjà décidé", run_tool("legal_review", ctx, {"approval_id": page, "verdict": "ok", "notes": "x"}))
 
+    def test_divisions_cover_every_agent_and_shape_the_prompt(self):
+        from ai_studio.agents import DIVISIONS, ROLES, system_prompt
+        names = [n for ns in DIVISIONS.values() for n in ns]
+        self.assertEqual(sorted(names), sorted(ROLES))
+        prompt = system_prompt(ROLES["pdg"], self.cfg)
+        self.assertIn("Division production :\n  - atelier", prompt)
+
     def test_role(self):
         from ai_studio.agents import ROLES
         r = ROLES["juridique"]
