@@ -161,23 +161,8 @@ svg = ['<svg viewBox="0 0 1000 620" width="100%" style="display: block" aria-hid
        '<linearGradient id="haze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#070b1a" stop-opacity="0"/><stop offset="1" stop-color="#6d28d9" stop-opacity=".25"/></linearGradient>',
        '<radialGradient id="holo"><stop offset="0" stop-color="#22D3EE" stop-opacity=".55"/><stop offset="1" stop-color="#22D3EE" stop-opacity="0"/></radialGradient>',
        '</defs>', '<ellipse cx="500" cy="300" rx="600" ry="340" fill="url(#sky)"/>']
-# --- ligne d'horizon : silhouettes lointaines derrière les deux bords arrière du plateau
-sky = []
-x = 4
-while x < 996:
-    w = rnd.uniform(16, 34); edge = (330 - x * .5) if x < 500 else (80 + (x - 500) * .5)
-    h = rnd.uniform(40, 150) * (1 - abs(x - 500) / 900)
-    top = edge + 14 - h
-    if top < 6: h -= 6 - top; top = 6
-    col = rnd.choice(["#0d1433", "#111a3f", "#0b1130", "#151d48"])
-    sky.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="%s"/>' % (x, top, w, h, col))
-    for yy in range(int(top) + 5, int(top + h) - 4, 7):
-        for xx in range(int(x) + 3, int(x + w) - 3, 6):
-            if rnd.random() < .3:
-                sky.append('<rect x="%d" y="%d" width="2.4" height="2" fill="%s" fill-opacity="%.2f"/>' % (xx, yy, rnd.choice(WINCOL), rnd.uniform(.25, .7)))
-    if rnd.random() < .25: sky.append('<circle cx="%.1f" cy="%.1f" r="1.6" fill="#F43F5E"/>' % (x + w / 2, top - 1))
-    x += w + rnd.uniform(0, 6)
-svg.append('<g opacity=".9">%s</g><rect x="0" y="0" width="1000" height="330" fill="url(#haze)"/>' % "".join(sky))
+# --- fond : seulement le halo (pas de silhouettes d'immeubles, choix du propriétaire)
+svg.append('<rect x="0" y="0" width="1000" height="330" fill="url(#haze)"/>')
 # --- dalle du plateau (bords lumineux) puis chaussée
 G.slab(r=GR, t=22, road=False, lamps=False, col="#C084FC")
 svg += G.o; G.o = []
