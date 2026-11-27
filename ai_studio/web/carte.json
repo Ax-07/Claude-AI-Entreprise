@@ -10,30 +10,35 @@
   "dev": "A",
   "video": "A",
   "ecommerce": "A",
+  "rh": "A",
   "legal": "A",
   "finance": "A",
   "security": "A"
  },
  "agent_of_pole": {
-  "data": "data",
   "hq": "pdg",
+  "finance": "finance",
+  "legal": "juridique",
   "marketing": "marketing",
   "sales": "ventes",
   "support": "support",
   "research": "recherche",
   "atelier": "atelier",
   "dev": "developpement",
-  "legal": "juridique",
-  "finance": "finance",
+  "data": "data",
   "security": "securite"
  },
  "agents_of_pole": {
-  "data": [
-   "data"
-  ],
   "hq": [
    "pdg"
   ],
+  "finance": [
+   "finance"
+  ],
+  "legal": [
+   "juridique"
+  ],
+  "rh": [],
   "marketing": [
    "marketing"
   ],
@@ -43,6 +48,7 @@
   "support": [
    "support"
   ],
+  "ecommerce": [],
   "research": [
    "recherche"
   ],
@@ -52,32 +58,29 @@
   "dev": [
    "developpement"
   ],
-  "legal": [
-   "juridique"
-  ],
-  "finance": [
-   "finance"
+  "video": [],
+  "data": [
+   "data"
   ],
   "security": [
    "securite"
-  ],
-  "video": [],
-  "ecommerce": []
+  ]
  },
  "quarters": [
   {
    "id": "direction",
-   "name": "Direction & Tech",
+   "name": "Direction",
    "color": "#818CF8",
    "planned": false,
    "poles": [
-    "data",
     "hq",
-    "security"
+    "finance",
+    "legal",
+    "rh"
    ],
-   "free": 2,
+   "free": 0,
    "left": "50.00%",
-   "top": "7.74%"
+   "top": "2.26%"
   },
   {
    "id": "commercial",
@@ -110,13 +113,13 @@
    "top": "70.97%"
   },
   {
-   "id": "administration",
-   "name": "Services partagés",
-   "color": "#E879F9",
+   "id": "tech",
+   "name": "Tech & Données",
+   "color": "#E2E8F0",
    "planned": false,
    "poles": [
-    "legal",
-    "finance"
+    "data",
+    "security"
    ],
    "free": 2,
    "left": "50.00%",
@@ -125,51 +128,6 @@
  ],
  "divisions": [],
  "poles": [
-  {
-   "id": "data",
-   "name": "Data Core",
-   "color": "#F1F5F9",
-   "agent": "data",
-   "planned": false,
-   "quarter": "direction",
-   "division": "direction",
-   "left": "50.00%",
-   "top": "51.77%",
-   "role": "Direction & Tech · Mémoire et données",
-   "desc": "Le cœur de l’entreprise : mémoire partagée, mesures et amélioration des agents.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Réacteur de données",
-     "text": "Cœur lumineux sous verre, entouré d’anneaux d’énergie."
-    },
-    {
-     "L": "B",
-     "name": "Ferme de serveurs",
-     "text": "Rangées de baies noires et leurs voyants qui clignotent."
-    },
-    {
-     "L": "C",
-     "name": "Cristal de mémoire",
-     "text": "Cristal flottant au-dessus de son socle : la mémoire partagée."
-    },
-    {
-     "L": "D",
-     "name": "L’Archive circulaire",
-     "text": "Cylindres de verre empilés, cerclés d’anneaux lumineux, disque et anneau flottant."
-    },
-    {
-     "L": "E",
-     "name": "Le Prisme neural",
-     "text": "Grand prisme de verre traversé d’un réseau de neurones, livre holographique au sommet."
-    },
-    {
-     "L": "F",
-     "name": "L’Agora en spirale",
-     "text": "Rampe hélicoïdale lumineuse qui s’enroule autour d’une colonne de lumière."
-    }
-   ]
-  },
   {
    "id": "hq",
    "name": "Command HQ",
@@ -180,7 +138,7 @@
    "division": "direction",
    "left": "50.00%",
    "top": "35.65%",
-   "role": "Direction & Tech · Orchestration",
+   "role": "Direction · Orchestration",
    "desc": "Le PDG IA répartit les missions, arbitre les budgets et fait remonter les décisions sensibles.",
    "variants": [
     {
@@ -197,6 +155,96 @@
      "L": "C",
      "name": "Anneau orbital",
      "text": "Tour cylindrique vitrée entourée d’anneaux de données en orbite."
+    }
+   ]
+  },
+  {
+   "id": "finance",
+   "name": "Trésorerie",
+   "color": "#F472B6",
+   "agent": "finance",
+   "planned": false,
+   "quarter": "direction",
+   "division": "direction",
+   "left": "60.20%",
+   "top": "27.42%",
+   "role": "Direction · Finances",
+   "desc": "Revenus, coûts d’API et rentabilité de chaque activité.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Coffre-fort",
+     "text": "Bloc noir, porte de coffre circulaire et lames dorées."
+    },
+    {
+     "L": "B",
+     "name": "Temple financier",
+     "text": "Colonnade dorée et fronton : la solidité des comptes."
+    },
+    {
+     "L": "C",
+     "name": "Tour des pièces",
+     "text": "Pile de pièces géante et pièce d’or flottante."
+    }
+   ]
+  },
+  {
+   "id": "legal",
+   "name": "Juridique",
+   "color": "#CBD5E1",
+   "agent": "juridique",
+   "planned": false,
+   "quarter": "direction",
+   "division": "direction",
+   "left": "39.80%",
+   "top": "27.42%",
+   "role": "Direction · Conformité",
+   "desc": "CGV, mentions, RGPD, factures : relit les actions avant ta décision.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Palais de justice",
+     "text": "Colonnade, fronton et coupole de verre : le droit au cœur de la cité."
+    },
+    {
+     "L": "B",
+     "name": "Tour de la balance",
+     "text": "Tour élancée surmontée d’une balance lumineuse."
+    },
+    {
+     "L": "C",
+     "name": "Archives scellées",
+     "text": "Salle des registres sous un sceau officiel flottant."
+    }
+   ]
+  },
+  {
+   "id": "rh",
+   "name": "Ressources humaines",
+   "color": "#E879F9",
+   "agent": null,
+   "planned": true,
+   "quarter": "direction",
+   "division": "direction",
+   "left": "50.00%",
+   "top": "19.19%",
+   "role": "Direction · En préparation",
+   "desc": "Réserve d’agents spécialisés, mobilisés à la demande pour une mission précise, puis remis en réserve.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Maison des talents",
+     "text": "Immeuble aux nombreuses fenêtres et réserve d’experts au sommet."
+    },
+    {
+     "L": "B",
+     "name": "Tour des experts",
+     "text": "Tour élancée : chaque étage vitré accueille un spécialiste."
+    },
+    {
+     "L": "C",
+     "name": "Campus RH",
+     "text": "Bâtiment en anneau autour d’un patio et d’un hologramme d’équipe."
     }
    ]
   },
@@ -291,6 +339,36 @@
    ]
   },
   {
+   "id": "ecommerce",
+   "name": "E-commerce",
+   "color": "#A3E635",
+   "agent": null,
+   "planned": true,
+   "quarter": "commercial",
+   "division": "commercial",
+   "left": "19.80%",
+   "top": "43.55%",
+   "role": "Pôle commercial · En préparation",
+   "desc": "Future division de vente en ligne (dropshipping international) : boutique, fournisseurs, commandes et retours.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Entrepôt logistique",
+     "text": "Halle, quais de chargement et colis empilés."
+    },
+    {
+     "L": "B",
+     "name": "Boutique en ligne",
+     "text": "Tour vitrée et caddie lumineux au sommet."
+    },
+    {
+     "L": "C",
+     "name": "Hub de livraison",
+     "text": "Centre de tri, tapis de colis et drone de livraison."
+    }
+   ]
+  },
+  {
    "id": "research",
    "name": "Labo Recherche",
    "color": "#34D399",
@@ -381,96 +459,6 @@
    ]
   },
   {
-   "id": "legal",
-   "name": "Juridique",
-   "color": "#CBD5E1",
-   "agent": "juridique",
-   "planned": false,
-   "quarter": "administration",
-   "division": "administration",
-   "left": "39.80%",
-   "top": "76.13%",
-   "role": "Services partagés · Conformité",
-   "desc": "CGV, mentions, RGPD, factures : relit les actions avant ta décision.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Palais de justice",
-     "text": "Colonnade, fronton et coupole de verre : le droit au cœur de la cité."
-    },
-    {
-     "L": "B",
-     "name": "Tour de la balance",
-     "text": "Tour élancée surmontée d’une balance lumineuse."
-    },
-    {
-     "L": "C",
-     "name": "Archives scellées",
-     "text": "Salle des registres sous un sceau officiel flottant."
-    }
-   ]
-  },
-  {
-   "id": "finance",
-   "name": "Trésorerie",
-   "color": "#F472B6",
-   "agent": "finance",
-   "planned": false,
-   "quarter": "administration",
-   "division": "administration",
-   "left": "50.00%",
-   "top": "84.35%",
-   "role": "Services partagés · Finances",
-   "desc": "Revenus, coûts d’API et rentabilité de chaque activité.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Coffre-fort",
-     "text": "Bloc noir, porte de coffre circulaire et lames dorées."
-    },
-    {
-     "L": "B",
-     "name": "Temple financier",
-     "text": "Colonnade dorée et fronton : la solidité des comptes."
-    },
-    {
-     "L": "C",
-     "name": "Tour des pièces",
-     "text": "Pile de pièces géante et pièce d’or flottante."
-    }
-   ]
-  },
-  {
-   "id": "security",
-   "name": "Cybersécurité",
-   "color": "#F87171",
-   "agent": "securite",
-   "planned": false,
-   "quarter": "direction",
-   "division": "direction",
-   "left": "60.20%",
-   "top": "27.42%",
-   "role": "Direction & Tech · Protection",
-   "desc": "Configuration, anomalies et emails piégés : veille défensive quotidienne.",
-   "variants": [
-    {
-     "L": "A",
-     "name": "Bouclier",
-     "text": "Coupole de verre sous un bouclier hexagonal lumineux."
-    },
-    {
-     "L": "B",
-     "name": "Pare-feu",
-     "text": "Muraille de panneaux en flammes devant une tour de contrôle."
-    },
-    {
-     "L": "C",
-     "name": "Centre de veille",
-     "text": "Salle d’écrans et radar qui balaie l’horizon 24 h/24."
-    }
-   ]
-  },
-  {
    "id": "video",
    "name": "Studio vidéo",
    "color": "#F43F5E",
@@ -501,32 +489,77 @@
    ]
   },
   {
-   "id": "ecommerce",
-   "name": "E-commerce",
-   "color": "#A3E635",
-   "agent": null,
-   "planned": true,
-   "quarter": "commercial",
-   "division": "commercial",
-   "left": "19.80%",
-   "top": "43.55%",
-   "role": "Pôle commercial · En préparation",
-   "desc": "Future division de vente en ligne (dropshipping international) : boutique, fournisseurs, commandes et retours.",
+   "id": "data",
+   "name": "Data Core",
+   "color": "#F1F5F9",
+   "agent": "data",
+   "planned": false,
+   "quarter": "tech",
+   "division": "tech",
+   "left": "50.00%",
+   "top": "84.35%",
+   "role": "Tech & Données · Mémoire et données",
+   "desc": "Le cœur de l’entreprise : mémoire partagée, mesures et amélioration des agents.",
    "variants": [
     {
      "L": "A",
-     "name": "Entrepôt logistique",
-     "text": "Halle, quais de chargement et colis empilés."
+     "name": "Réacteur de données",
+     "text": "Cœur lumineux sous verre, entouré d’anneaux d’énergie."
     },
     {
      "L": "B",
-     "name": "Boutique en ligne",
-     "text": "Tour vitrée et caddie lumineux au sommet."
+     "name": "Ferme de serveurs",
+     "text": "Rangées de baies noires et leurs voyants qui clignotent."
     },
     {
      "L": "C",
-     "name": "Hub de livraison",
-     "text": "Centre de tri, tapis de colis et drone de livraison."
+     "name": "Cristal de mémoire",
+     "text": "Cristal flottant au-dessus de son socle : la mémoire partagée."
+    },
+    {
+     "L": "D",
+     "name": "L’Archive circulaire",
+     "text": "Cylindres de verre empilés, cerclés d’anneaux lumineux, disque et anneau flottant."
+    },
+    {
+     "L": "E",
+     "name": "Le Prisme neural",
+     "text": "Grand prisme de verre traversé d’un réseau de neurones, livre holographique au sommet."
+    },
+    {
+     "L": "F",
+     "name": "L’Agora en spirale",
+     "text": "Rampe hélicoïdale lumineuse qui s’enroule autour d’une colonne de lumière."
+    }
+   ]
+  },
+  {
+   "id": "security",
+   "name": "Cybersécurité",
+   "color": "#F87171",
+   "agent": "securite",
+   "planned": false,
+   "quarter": "tech",
+   "division": "tech",
+   "left": "60.20%",
+   "top": "76.13%",
+   "role": "Tech & Données · Protection",
+   "desc": "Configuration, anomalies et emails piégés : veille défensive quotidienne.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Bouclier",
+     "text": "Coupole de verre sous un bouclier hexagonal lumineux."
+    },
+    {
+     "L": "B",
+     "name": "Pare-feu",
+     "text": "Muraille de panneaux en flammes devant une tour de contrôle."
+    },
+    {
+     "L": "C",
+     "name": "Centre de veille",
+     "text": "Salle d’écrans et radar qui balaie l’horizon 24 h/24."
     }
    ]
   }

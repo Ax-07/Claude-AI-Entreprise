@@ -123,6 +123,12 @@ _Mis à jour le 27/11/2026_
 
 - Bâtiments du Studio vidéo (Studio de tournage / Tour média / Plateau de diffusion) et de l'E-commerce (Entrepôt logistique / Boutique en ligne / Hub de livraison) construits à la place des chantiers, à la demande du propriétaire, même si ces divisions n'ont pas encore d'agent : `planned: true` dans carte.json, pas de robots, « En préparation » au survol et dans la fiche ; bâtiment au choix comme les autres pôles.
 
+## Place de rassemblement, Direction élargie, pôle Tech & Données (27/11/2026)
+- Décision du propriétaire : Juridique et Trésorerie rejoignent la Direction (coin du haut : Command HQ, Trésorerie, Juridique, **Ressources humaines**). `DIVISIONS` : Direction = pdg, finance, juridique ; Tech & Données = data, securite ; la division Administration disparaît.
+- Ressources humaines : bâtiment en préparation (Maison des talents / Tour des experts / Campus RH, hologramme d'équipe). Rôle prévu : réserve d'agents spécialisés mobilisables à la demande (mécanisme à concevoir).
+- Coin du bas renommé **Tech & Données** (bordure blanche) : Data Core (coin avant) et Cybersécurité + 2 emplacements libres.
+- Case centrale : **place de rassemblement** (dallage, bassin lumineux). Chaque agent y a un personnage à sa couleur, visible quand il est au repos ; quand il travaille ou a du travail en attente, ses robots apparaissent devant son bâtiment (3 s'il travaille, 1 s'il attend). Clic sur un personnage : fiche de son pôle.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

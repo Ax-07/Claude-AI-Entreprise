@@ -73,8 +73,9 @@ class ServerTest(unittest.TestCase):
         by = {a["name"]: a for a in ag}
         self.assertEqual(len(ag), 11)
         self.assertEqual(by["atelier"]["division"], "Division production")
-        self.assertEqual(by["data"]["division"], "Direction & Tech")
-        self.assertEqual(by["securite"]["division"], "Direction & Tech")
+        self.assertEqual(by["data"]["division"], "Tech & Données")
+        self.assertEqual(by["securite"]["division"], "Tech & Données")
+        self.assertEqual(by["finance"]["division"], "Direction")
         self.assertEqual(by["recherche"]["done"], 1)
         self.assertEqual((by["recherche"]["level"], by["ventes"]["level"]), (1, 1))   # 10 tâches réussies par niveau
         for i in range(10):
@@ -185,19 +186,20 @@ class MaquetteTest(ServerTest):
             self.assertIn(f'class="office" data-pole="{p["id"]}"', svg)
         q = {x["id"]: x for x in meta["quarters"]}
         self.assertEqual(q["commercial"]["poles"], ["marketing", "sales", "support", "ecommerce"])
-        self.assertEqual(sorted(q["administration"]["poles"]), ["finance", "legal"])
-        self.assertEqual(sorted(q["direction"]["poles"]), ["data", "hq", "security"])
+        self.assertEqual(sorted(q["tech"]["poles"]), ["data", "security"])
+        self.assertEqual(sorted(q["direction"]["poles"]), ["finance", "hq", "legal", "rh"])
         # plateau « ville » : enseigne à l'avant de chaque îlot, pas de nom de code (rester professionnel)
         for p in meta["poles"]:
             self.assertNotIn("code", p)
             self.assertIn(">%s</text>" % p["name"].upper(), svg)
-        # grille impaire : le Data Core est exactement au centre du plateau (500, 330 sur 1000 × 620)
-        data = next(p for p in meta["poles"] if p["id"] == "data")
-        self.assertEqual(data["left"], "50.00%")
-        # chaque pôle occupe un coin de 4 emplacements (le Data Core est au centre)
-        slots = {k: len([p for p in q[k]["poles"] if p != "data"]) + q[k]["free"] for k in ("direction", "commercial", "production", "administration")}
+        # case centrale : place de rassemblement avec un personnage par agent (affiché quand il est au repos)
+        from ai_studio.agents import ROLES as R2
+        for name in R2:
+            self.assertIn('class="idle" data-agent="%s"' % name, svg)
+        # chaque pôle occupe un coin de 4 emplacements
+        slots = {k: len(q[k]["poles"]) + q[k]["free"] for k in ("direction", "commercial", "production", "tech")}
         planned = {p["id"] for p in meta["poles"] if p["planned"]}
-        self.assertEqual(planned, {"video", "ecommerce"})                     # bâtiments des divisions en préparation
+        self.assertEqual(planned, {"video", "ecommerce", "rh"})               # bâtiments des divisions en préparation
         self.assertEqual((meta["agents_of_pole"]["video"], "video" in meta["agent_of_pole"]), ([], False))
         self.assertEqual(set(slots.values()), {4})
 
