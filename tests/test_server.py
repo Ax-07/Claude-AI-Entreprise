@@ -166,23 +166,21 @@ class MaquetteTest(ServerTest):
         svg = gz.decompress(raw).decode("utf-8")
         self.assertLess(len(raw), len(svg) / 3)
         self.assertNotIn("{{", svg)
-        # un bâtiment par pôle ; un pôle regroupé propose tous les bâtiments de ses anciens pôles
-        letters = {"hq": "ABC", "data": "ABCDEF", "commercial": "ABCDEFGHI", "production": "ABCDEF", "administration": "ABCDEF"}
-        for pole, vs in letters.items():
-            for v in vs:
-                self.assertIn(f'class="bld" data-pole="{pole}" data-variant="{v}"', svg)
-            self.assertIn(f'class="office" data-pole="{pole}"', svg)
-        self.assertNotIn('data-pole="marketing"', svg)
+        # quartiers par pôle, un bâtiment par agent (3 au choix, 6 pour le Data Core), 2 terrains réservés
+        from ai_studio.agents import ROLES
         st, meta, _ = self.req("GET", "/carte.json")
         self.assertEqual(st, 200)
-        self.assertEqual(len(meta["poles"]), 5)
-        self.assertEqual(meta["agents_of_pole"]["commercial"], ["marketing", "ventes", "support"])
-        self.assertEqual(meta["agents_of_pole"]["production"], ["atelier", "recherche"])
-        self.assertEqual(meta["agents_of_pole"]["administration"], ["finance", "juridique", "securite"])
-        from ai_studio.agents import ROLES
-        self.assertEqual(sorted(a for ags in meta["agents_of_pole"].values() for a in ags), sorted(ROLES))
+        self.assertEqual(sorted(meta["agent_of_pole"].values()), sorted(ROLES))
         for p in meta["poles"]:
-            self.assertEqual("".join(v["L"] for v in p["variants"]), letters[p["id"]])
+            letters = "ABCDEF" if p["id"] == "data" else "ABC"
+            self.assertEqual("".join(v["L"] for v in p["variants"]), letters)
+            for v in letters:
+                self.assertIn(f'class="bld" data-pole="{p["id"]}" data-variant="{v}"', svg)
+            self.assertIn(f'class="office" data-pole="{p["id"]}"', svg)
+        q = {x["id"]: x for x in meta["quarters"]}
+        self.assertEqual(q["commercial"]["poles"], ["marketing", "sales", "support"])
+        self.assertEqual(q["administration"]["poles"], ["legal", "finance", "security"])
+        self.assertTrue(q["video"]["planned"] and q["ecommerce"]["planned"])
 
     def test_static_files_revalidated_not_stale(self):
         c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
@@ -215,16 +213,16 @@ class MaquetteTest(ServerTest):
     def test_map_settings_persist(self):
         _, m, _ = self.req("GET", "/api/map")
         self.assertEqual(m["view"], "ville")
-        st, m, _ = self.post("/api/map", {"pole": "commercial", "variant": "I"})
+        st, m, _ = self.post("/api/map", {"pole": "security", "variant": "C"})
         self.assertEqual(st, 200)
         self.post("/api/map", {"view": "bureaux"})
         _, m, _ = self.req("GET", "/api/map")
-        self.assertEqual(m, {"variants": {"commercial": "I"}, "view": "bureaux"})
+        self.assertEqual(m, {"variants": {"security": "C"}, "view": "bureaux"})
         st, m, _ = self.post("/api/map", {"pole": "data", "variant": "F"})
         self.assertEqual((st, m["variants"]["data"]), (200, "F"))
-        st, _, _ = self.post("/api/map", {"pole": "support", "variant": "A"})       # ancien pôle : n'existe plus
+        st, _, _ = self.post("/api/map", {"pole": "commercial", "variant": "A"})    # un quartier n'a pas de bâtiment propre
         self.assertEqual(st, 400)
-        st, _, _ = self.post("/api/map", {"pole": "commercial", "variant": "Z"})
+        st, _, _ = self.post("/api/map", {"pole": "support", "variant": "Z"})
         self.assertEqual(st, 400)
 
     def test_insights_are_real(self):

@@ -605,6 +605,38 @@ def ju_c(s):
     s.line(s.p(0, 0, 52), (x, y + 22), 1.5, s.hi, .6)
     s.beam(-40, 34, 0, 56); s.beam(40, -34, 0, 56)
 
+def se_a(s):
+    """Bouclier : coupole de verre sous un bouclier hexagonal lumineux."""
+    s.slab()
+    f = circ(0, 0, 34); s.prism(f, 0, 16, "office", smooth=True); s.cornice(f, 16, 2, smooth=True)
+    s.dome(0, 0, 28, 18.5, glass=True)
+    x, y = s.p(0, 0, 60)
+    hexa = " ".join("%.1f,%.1f" % (x + 30*math.cos(math.radians(a)), y + 30*math.sin(math.radians(a))*0.9) for a in range(30, 390, 60))
+    s.raw('<g class="pulse" style="animation-duration: 3s" filter="url(#nf%s)"><polygon points="%s" fill="%s" fill-opacity=".14" stroke="%s" stroke-width="2.5"/>'
+          '<path d="M%.1f %.1f l0 -12 l10 -4 l10 4 l0 12 q-10 10 -10 10 q0 0 -10 -10 z" transform="translate(-10 0)" fill="none" stroke="#FFFFFF" stroke-width="2"/></g>'
+          % (s.uid, hexa, s.c, mixw(s.c, .3), x, y + 4))
+    s.beam(-34, 34, 0, 50)
+def se_b(s):
+    """Pare-feu : muraille de panneaux lumineux devant une tour de contrôle."""
+    s.slab()
+    for k, u in enumerate((-30, -10, 10, 30)):
+        f = rect(u - 8, u + 8, 18, 30); s.prism(f, 0, 30 + (k % 2) * 8, "dark"); s.crown(f, 30 + (k % 2) * 8)
+    f = cham(-18, 18, -32, 4, 5); s.prism(f, 0, 96, "bands"); s.cornice(f, 96); s.crown(cham(-14, 14, -28, 0, 4), 99)
+    for u in (-30, -10, 10, 30):
+        x, y = s.p(u, 30, 22)
+        s.raw('<path class="pulse" d="M%.1f %.1f q4 -10 0 -18 q8 6 4 18 z" fill="%s" fill-opacity=".85" filter="url(#nf%s)" style="animation-delay: %.1fs"/>' % (x, y, s.c, s.uid, (u + 30) / 40))
+    s.antenna(0, -14, 99, 122)
+def se_c(s):
+    """Centre de veille : salle d'écrans et radar qui balaie l'horizon."""
+    s.slab()
+    f = rect(-38, 38, -30, 30); s.prism(f, 0, 34, "office"); s.cornice(f, 34)
+    s.screen("l", -30, 30, 30, 40, 22, s.c); s.screen("r", 38, 22, 30, 36, 22, mixw(s.c, .2))
+    c = circ(-16, -12, 8); s.prism(c, 36.5, 70, "bands", smooth=True); s.dish(-16, -12, 73, 20)
+    x, y = s.p(-16, -12, 90)
+    s.raw('<g filter="url(#nf%s)"><ellipse cx="%.1f" cy="%.1f" rx="34" ry="14" fill="none" stroke="%s" stroke-opacity=".5"/>'
+          '<path class="pulse" d="M%.1f %.1f L%.1f %.1f A34 14 0 0 1 %.1f %.1f Z" fill="%s" fill-opacity=".35"/></g>' % (s.uid, x, y, s.c, x, y, x + 34, y, x + 24, y + 10, s.c))
+    s.beam(-38, 30, 0, 56)
+
 POLES = [
  ("hq", "Command HQ", "Orchestration", "#818CF8", [("A", "Spire de commandement", "Tour à pans coupés, bandeaux vitrés lumineux et couronne qui brille.", hq_a), ("B", "Citadelle", "Deux tours noires à enseignes néon reliées par une passerelle de verre.", hq_b), ("C", "Anneau orbital", "Tour cylindrique vitrée entourée d’anneaux de données en orbite.", hq_c)]),
  ("research", "Labo Recherche", "Veille et opportunités", "#34D399", [("A", "Observatoire", "Rotonde nervurée, coupole et télescope pointé vers les marchés.", re_a), ("B", "Serre de verre", "Laboratoire transparent : on voit les idées pousser à l’intérieur.", re_b), ("C", "Labo à antenne", "Labo vitré aux écrans allumés et tour équipée d’une parabole.", re_c)]),
@@ -614,6 +646,7 @@ POLES = [
  ("data", "Data Core", "Mémoire et données", "#22D3EE", [("A", "Réacteur de données", "Cœur lumineux sous verre, entouré d’anneaux d’énergie.", da_a), ("B", "Ferme de serveurs", "Rangées de baies noires et leurs voyants qui clignotent.", da_b), ("C", "Cristal de mémoire", "Cristal flottant au-dessus de son socle : la mémoire partagée.", da_c), ("D", "L’Archive circulaire", "Cylindres de verre empilés, cerclés d’anneaux lumineux, disque et anneau flottant.", da_d), ("E", "Le Prisme neural", "Grand prisme de verre traversé d’un réseau de neurones, livre holographique au sommet.", da_e), ("F", "L’Agora en spirale", "Rampe hélicoïdale lumineuse qui s’enroule autour d’une colonne de lumière.", da_f)]),
  ("atelier", "Atelier", "Production", "#FB923C", [("A", "Manufacture", "Halle de production et cheminées qui fument : on fabrique les livrables.", at_a), ("B", "Atelier à sheds", "Toits vitrés en dents de scie et pont roulant au-dessus des postes.", at_b), ("C", "Tour-atelier", "Fût vitré surmonté d’un engrenage lumineux qui tourne.", at_c)]),
  ("legal", "Juridique", "Conformité", "#CBD5E1", [("A", "Palais de justice", "Colonnade, fronton et coupole de verre : le droit au cœur de la cité.", ju_a), ("B", "Tour de la balance", "Tour élancée surmontée d’une balance lumineuse.", ju_b), ("C", "Archives scellées", "Salle des registres sous un sceau officiel flottant.", ju_c)]),
+ ("security", "Cybersécurité", "Protection", "#F87171", [("A", "Bouclier", "Coupole de verre sous un bouclier hexagonal lumineux.", se_a), ("B", "Pare-feu", "Muraille de panneaux en flammes devant une tour de contrôle.", se_b), ("C", "Centre de veille", "Salle d’écrans et radar qui balaie l’horizon 24 h/24.", se_c)]),
  ("finance", "Trésorerie", "Finances", "#F472B6", [("A", "Coffre-fort", "Bloc noir, porte de coffre circulaire et lames dorées.", fi_a), ("B", "Temple financier", "Colonnade dorée et fronton : la solidité des comptes.", fi_b), ("C", "Tour des pièces", "Pile de pièces géante et pièce d’or flottante.", fi_c)]),
 ]
 
@@ -696,6 +729,9 @@ def _holo(s, u, v, kind, col, size=1.0):
         g += '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2"/>' % (x - R*1.2, cy - R*.7, x + R*1.2, cy - R*.9, hc)
         for sx, sy in ((x - R*1.2, cy - R*.7), (x + R*1.2, cy - R*.9)):
             g += '<path d="M%.1f %.1f l-5 9 h10 z" fill="%s" fill-opacity=".4" stroke="%s"/>' % (sx, sy, col, hc)
+    elif kind == "shield":
+        g += '<path d="M%.1f %.1f l%.1f %.1f v%.1f q0 %.1f %.1f %.1f q%.1f %.1f %.1f %.1f v%.1f z" fill="%s" fill-opacity=".3" stroke="%s" stroke-width="2"/>' % (
+            x, cy - R, R, R*.35, R*.8, R*.9, -R, R*.9, -R, -R*.9, -R, -R*.9, -R*.8, col, hc)
     elif kind == "coin":
         g += '<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="#FBBF24" stroke="#FFF1B8" stroke-width="1.5"/><ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="none" stroke="#B45309" stroke-width="1.2"/>' % (x, cy, R*.9, R*1.1, x, cy, R*.55, R*.7)
     g += '</g>'
