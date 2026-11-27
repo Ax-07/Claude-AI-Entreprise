@@ -231,7 +231,8 @@ function applyMap(){
   const byAgent = Object.fromEntries(AG.map(a => [a.name, a]));
   // robots devant chaque bâtiment : un par agent du pôle, plus ceux qui travaillent (6 au maximum)
   document.querySelectorAll("#map .bot").forEach(g => { const ags = agentsOfPole(g.dataset.pole);
-    const n = !city ? 0 : Math.min(6, Math.max(1, ags.length) + ags.reduce((s,a) => s + (a.state==="running" ? 2 : a.state==="waiting" ? 1 : 0), 0)); g.style.display = +g.dataset.i < n ? "inline" : "none"; });
+    const pl = (META.poles.find(p => p.id === g.dataset.pole) || {}).planned;
+    const n = !city || pl ? 0 : Math.min(6, Math.max(1, ags.length) + ags.reduce((s,a) => s + (a.state==="running" ? 2 : a.state==="waiting" ? 1 : 0), 0)); g.style.display = +g.dataset.i < n ? "inline" : "none"; });
   document.querySelectorAll(".seg [data-view]").forEach(b => { const on = b.dataset.view === (MAP.view||"ville"); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
 }
 document.querySelectorAll(".seg [data-view]").forEach(b => b.onclick = async () => { MAP.view = b.dataset.view; applyMap(); renderDetail(); try { MAP = await api("POST","/api/map",{view: MAP.view}); } catch(e){ toast(e.message,false); } });
@@ -261,7 +262,7 @@ function renderLabels(){
       h("span",{class: ps.running?"live":null,style:{width:"7px",height:"7px",borderRadius:"50%",background:st[1],boxShadow:`0 0 6px ${st[1]}`}}),
       h("span",{style:{display:"flex",flexDirection:"column",alignItems:"flex-start",lineHeight:"1.25"}},
         h("span",{class:"gro",style:{fontSize:"12px",fontWeight:"700",letterSpacing:".06em",textTransform:"uppercase",color:"#F4F6FF"}}, p.name),
-        h("span",{style:{fontSize:"10px",color:"#AEB6DA",whiteSpace:"nowrap"}}, [ags.length ? "Niveau " + Math.max(...ags.map(a => a.level||1)) : null, n ? `${n} tâche${n>1?"s":""}` : "au repos"].filter(Boolean).join(" · "))),
+        h("span",{style:{fontSize:"10px",color:"#AEB6DA",whiteSpace:"nowrap"}}, [p.planned ? "En préparation" : null, ags.length ? "Niveau " + Math.max(...ags.map(a => a.level||1)) : null, n ? `${n} tâche${n>1?"s":""}` : p.planned ? null : "au repos"].filter(Boolean).join(" · "))),
       n ? h("span",{style:{fontSize:"11px",fontWeight:"700",color:"#0B1029",background:p.color,borderRadius:"999px",padding:"0 6px"}}, String(n)) : null); }));
 }
 function renderDetail(){
@@ -287,7 +288,7 @@ function renderDetail(){
   $("#detail").style.borderColor = p.color + "88";
   put($("#detail"),
     h("div",{style:{flex:"1 1 280px",display:"flex",flexDirection:"column",gap:"6px"}}, h("span",{style:{fontSize:"11px",letterSpacing:".14em",textTransform:"uppercase",color:p.color}}, p.role), h("span",{class:"gro",style:{fontSize:"22px",fontWeight:"700",color:"#F4F6FF"}}, p.name),
-      h("span",{style:{fontSize:"13px",lineHeight:"1.5",color:"#B4BCDD"}}, p.desc), team),
+      h("span",{style:{fontSize:"13px",lineHeight:"1.5",color:"#B4BCDD"}}, p.desc), p.planned ? h("span",{class:"small",style:{color:p.color}},"Division en préparation : aucun agent pour l’instant.") : team),
     tasksBox,
     h("div",{style:{flex:"0 0 auto",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"4px"}}, h("span",{class:"gro",style:{fontSize:"34px",fontWeight:"700",color:p.color}}, String(active)), h("span",{class:"small muted"}, active>1?"tâches actives":"tâche active")),
     variants);

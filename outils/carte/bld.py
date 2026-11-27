@@ -677,6 +677,82 @@ def de_c(s):
     x, y = s.p(0, 0, 150); s.raw(_code_holo(s, x, y, .7))
     s.beam(-36, 36, 0, 56); s.beam(36, -36, 0, 56)
 
+def _sym_holo(s, x, y, inner, size=1.0):
+    """Panneau lumineux flottant avec un pictogramme (lecture, caddie…)."""
+    return ('<g class="pulse" style="animation-duration: 3s" filter="url(#nf%s)"><g transform="translate(%.1f %.1f) scale(%.2f)">'
+            '<rect x="-30" y="-18" width="60" height="36" rx="5" fill="%s" fill-opacity=".22" stroke="%s" stroke-width="2"/>%s</g></g>') % (
+        s.uid, x, y, size, s.c, mixw(s.c, .3), inner)
+PLAY = '<path d="M-7 -11 L12 0 L-7 11 Z" fill="#FFFFFF"/>'
+CART = ('<path d="M-17 -10 h6 l5 15 h17 l5 -11 h-25" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>'
+        '<circle cx="-4" cy="10" r="2.6" fill="#FFFFFF"/><circle cx="9" cy="10" r="2.6" fill="#FFFFFF"/>')
+def vi_a(s):
+    """Studio de tournage : grand plateau, écran géant avec bouton lecture, projecteurs."""
+    s.slab()
+    f = rect(-42, 42, -34, 34); s.prism(f, 0, 40, "dark"); s.cornice(f, 40, 2.5)
+    s.screen("l", -34, 34, 36, 58, 28, s.c, lines=False)
+    x, y = s.p(-5, 34, 22); s.raw('<path d="M%.1f %.1f l12 6 l-12 8 z" fill="#FFFFFF"/>' % (x - 4, y - 9))
+    s.screen("r", 42, 26, 36, 46, 22, mixw(s.c, .2))
+    for u in (-30, 0, 30):
+        x, y = s.p(u, -34, 52); s.line(s.p(u, -34, 40), (x, y), 2, mix(s.c, .6))
+        s.raw('<circle class="pulse" cx="%.1f" cy="%.1f" r="3.5" fill="#FEF3C7" filter="url(#nf%s)" style="animation-delay: %.1fs"/>' % (x, y, s.uid, (u + 30) / 40))
+    x, y = s.p(0, 0, 92); s.raw(_sym_holo(s, x, y, PLAY))
+    s.beam(-42, 34, 0, 56); s.beam(42, -34, 0, 56)
+def vi_b(s):
+    """Tour média : tour vitrée, bandeau « REC » et lecteur vidéo flottant."""
+    s.slab()
+    f0 = cham(-30, 30, -30, 30, 8); s.prism(f0, 0, 18, "office"); s.cornice(f0, 18, 2.5)
+    f = cham(-20, 20, -20, 20, 5); s.prism(f, 20.5, 118, "glass"); s.cornice(f, 118)
+    s.screen("l", -15, 20, 110, 30, 40, s.c, lines=False)
+    x, y = s.p(0, 20, 94); s.raw('<path d="M%.1f %.1f l10 5 l-10 7 z" fill="#FFFFFF"/>' % (x - 4, y - 8))
+    x, y = s.p(20, 0, 60); s.raw('<circle class="pulse" cx="%.1f" cy="%.1f" r="4" fill="#EF4444" filter="url(#nf%s)"/>' % (x + 6, y - 4, s.uid))
+    x, y = s.p(0, 0, 150); s.raw(_sym_holo(s, x, y, PLAY, .85))
+    s.line(s.p(0, 0, 121), (x, y + 16), 1.5, s.hi, .6)
+    s.beam(-30, 30, 0, 60)
+def vi_c(s):
+    """Plateau de diffusion : coupole, antenne d'émission et ondes."""
+    s.slab()
+    f = circ(0, 0, 34); s.prism(f, 0, 24, "bands", smooth=True); s.cornice(f, 24, 2, smooth=True)
+    s.dome(0, 0, 26, 26.5, glass=True)
+    s.antenna(0, 0, 52, 112)
+    x, y = s.p(0, 0, 112)
+    s.raw('<g class="pulse" filter="url(#nf%s)" fill="none" stroke="%s" stroke-width="2">%s</g>' % (s.uid, mixw(s.c, .3),
+          "".join('<path d="M%.1f %.1f a%d %d 0 0 1 0 %d M%.1f %.1f a%d %d 0 0 0 0 %d"/>' % (x + 6 + 5*k, y - 6 - 4*k, 6 + 4*k, 6 + 4*k, 12 + 8*k, x - 6 - 5*k, y - 6 - 4*k, 6 + 4*k, 6 + 4*k, 12 + 8*k) for k in range(3))))
+    x, y = s.p(0, 0, 70); s.raw(_sym_holo(s, x - 54, y, PLAY, .6))
+    s.beam(-34, 34, 0, 50)
+def ec_a(s):
+    """Entrepôt logistique : halle, quais de chargement et colis empilés."""
+    s.slab()
+    f = rect(-42, 42, -34, 34); s.prism(f, 0, 34, "ribs"); s.cornice(f, 34, 2)
+    for k, u in enumerate((-30, -12, 6)):
+        s.screen("l", u, 34, 18, 12, 18, mix(s.c, .55), lines=False)
+    for (u, v, z) in [(24, 40, 0), (32, 40, 0), (28, 40, 7)]:
+        s.prism(rect(u - 3.5, u + 3.5, v - 3.5, v + 3.5), z, z + 7, "plain", col="#B45309", glow=False)
+    x, y = s.p(0, 0, 76); s.raw(_sym_holo(s, x, y, CART))
+    s.beam(-42, 34, 0, 56); s.beam(42, -34, 0, 56)
+def ec_b(s):
+    """Boutique en ligne : tour vitrée et caddie lumineux au sommet."""
+    s.slab()
+    f0 = rect(-32, 32, -28, 28); s.prism(f0, 0, 22, "glass"); s.cornice(f0, 22, 2.5)
+    f = cham(-18, 18, -18, 18, 4); s.prism(f, 24.5, 112, "bands"); s.cornice(f, 112)
+    s.sign((18, -10), (18, 10), .1, .9, 60, 96, s.c)
+    x, y = s.p(0, 0, 144); s.raw(_sym_holo(s, x, y, CART, .9))
+    s.line(s.p(0, 0, 115), (x, y + 17), 1.5, s.hi, .6)
+    s.beam(-32, 28, 0, 56)
+def ec_c(s):
+    """Hub de livraison : centre de tri, tapis de colis et drone de livraison."""
+    s.slab()
+    f = cham(-40, 40, -32, 32, 6); s.prism(f, 0, 28, "office"); s.cornice(f, 28, 2)
+    f2 = rect(-18, 18, -24, 4); s.prism(f2, 30.5, 54, "glass"); s.cornice(f2, 54)
+    for k in range(5):
+        u = -34 + k*14
+        s.prism(rect(u - 3, u + 3, 36, 42), 0, 6, "plain", col="#B45309", glow=False)
+    x, y = s.p(20, 10, 96)
+    s.raw('<g class="pulse" filter="url(#nf%s)"><rect x="%.1f" y="%.1f" width="16" height="5" rx="2" fill="%s"/>'
+          '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2"/><line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2"/>'
+          '<rect x="%.1f" y="%.1f" width="7" height="7" fill="#B45309"/></g>' % (s.uid, x - 8, y, s.c, x - 14, y - 2, x - 2, y - 2, mixw(s.c, .3), x + 2, y - 2, x + 14, y - 2, mixw(s.c, .3), x - 3.5, y + 7))
+    x, y = s.p(0, -10, 86); s.raw(_sym_holo(s, x - 30, y, CART, .7))
+    s.beam(-40, 32, 0, 56)
+
 POLES = [
  ("hq", "Command HQ", "Orchestration", "#818CF8", [("A", "Spire de commandement", "Tour à pans coupés, bandeaux vitrés lumineux et couronne qui brille.", hq_a), ("B", "Citadelle", "Deux tours noires à enseignes néon reliées par une passerelle de verre.", hq_b), ("C", "Anneau orbital", "Tour cylindrique vitrée entourée d’anneaux de données en orbite.", hq_c)]),
  ("research", "Labo Recherche", "Veille et opportunités", "#34D399", [("A", "Observatoire", "Rotonde nervurée, coupole et télescope pointé vers les marchés.", re_a), ("B", "Serre de verre", "Laboratoire transparent : on voit les idées pousser à l’intérieur.", re_b), ("C", "Labo à antenne", "Labo vitré aux écrans allumés et tour équipée d’une parabole.", re_c)]),
@@ -688,6 +764,8 @@ POLES = [
  ("legal", "Juridique", "Conformité", "#CBD5E1", [("A", "Palais de justice", "Colonnade, fronton et coupole de verre : le droit au cœur de la cité.", ju_a), ("B", "Tour de la balance", "Tour élancée surmontée d’une balance lumineuse.", ju_b), ("C", "Archives scellées", "Salle des registres sous un sceau officiel flottant.", ju_c)]),
  ("security", "Cybersécurité", "Protection", "#F87171", [("A", "Bouclier", "Coupole de verre sous un bouclier hexagonal lumineux.", se_a), ("B", "Pare-feu", "Muraille de panneaux en flammes devant une tour de contrôle.", se_b), ("C", "Centre de veille", "Salle d’écrans et radar qui balaie l’horizon 24 h/24.", se_c)]),
  ("dev", "Développement", "Sites et applications", "#22D3EE", [("A", "Tour du code", "Tour sombre couverte d’écrans de code, symbole </> flottant au sommet.", de_a), ("B", "Campus tech", "Open-space vitré et baies de serveurs qui clignotent sur le toit.", de_b), ("C", "Pile logicielle", "Couches empilées comme une architecture logicielle, sous une antenne de déploiement.", de_c)]),
+ ("video", "Studio vidéo", "Vidéo · en préparation", "#F43F5E", [("A", "Studio de tournage", "Grand plateau, écran géant et projecteurs.", vi_a), ("B", "Tour média", "Tour vitrée, voyant REC et lecteur vidéo flottant.", vi_b), ("C", "Plateau de diffusion", "Coupole, antenne d’émission et ondes.", vi_c)]),
+ ("ecommerce", "E-commerce", "Boutique · en préparation", "#A3E635", [("A", "Entrepôt logistique", "Halle, quais de chargement et colis empilés.", ec_a), ("B", "Boutique en ligne", "Tour vitrée et caddie lumineux au sommet.", ec_b), ("C", "Hub de livraison", "Centre de tri, tapis de colis et drone de livraison.", ec_c)]),
  ("finance", "Trésorerie", "Finances", "#F472B6", [("A", "Coffre-fort", "Bloc noir, porte de coffre circulaire et lames dorées.", fi_a), ("B", "Temple financier", "Colonnade dorée et fronton : la solidité des comptes.", fi_b), ("C", "Tour des pièces", "Pile de pièces géante et pièce d’or flottante.", fi_c)]),
 ]
 
@@ -777,6 +855,13 @@ def _holo(s, u, v, kind, col, size=1.0):
         g += '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="3" fill="%s" fill-opacity=".18" stroke="%s"/>' % (x - R*1.4, cy - R, R*2.8, R*2, col, hc)
         g += '<path d="M%.1f %.1f l-%.1f %.1f l%.1f %.1f M%.1f %.1f l%.1f %.1f l-%.1f %.1f M%.1f %.1f l-%.1f %.1f" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/>' % (
             x - R*.45, cy - R*.5, R*.5, R*.5, R*.5, R*.5, x + R*.45, cy - R*.5, R*.5, R*.5, R*.5, R*.5, x + R*.15, cy - R*.6, R*.3, R*1.2)
+    elif kind == "play":
+        g += '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="4" fill="%s" fill-opacity=".22" stroke="%s"/>' % (x - R*1.4, cy - R, R*2.8, R*2, col, hc)
+        g += '<path d="M%.1f %.1f l%.1f %.1f l-%.1f %.1f z" fill="#FFFFFF"/>' % (x - R*.35, cy - R*.55, R*.9, R*.55, R*.9, R*.55)
+    elif kind == "cart":
+        g += '<path d="M%.1f %.1f h%.1f l%.1f %.1f h%.1f l%.1f -%.1f h-%.1f" fill="%s" fill-opacity=".25" stroke="%s" stroke-width="1.8" stroke-linejoin="round"/>' % (
+            x - R*1.3, cy - R*.8, R*.4, R*.35, R*1.2, R*1.4, R*.35, R*.9, R*1.9, col, hc)
+        g += '<circle cx="%.1f" cy="%.1f" r="%.1f" fill="#FFFFFF"/><circle cx="%.1f" cy="%.1f" r="%.1f" fill="#FFFFFF"/>' % (x - R*.4, cy + R*.75, R*.18, x + R*.75, cy + R*.75, R*.18)
     elif kind == "coin":
         g += '<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="#FBBF24" stroke="#FFF1B8" stroke-width="1.5"/><ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="none" stroke="#B45309" stroke-width="1.2"/>' % (x, cy, R*.9, R*1.1, x, cy, R*.55, R*.7)
     g += '</g>'
