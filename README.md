@@ -81,6 +81,16 @@ Pour le fonctionnement 24 h/24 : double-clique sur `demarrer.bat`. Il lance le m
 - Sauvegarde automatique chaque jour dans `data/sauvegardes` (14 jours gardés). `sauvegardes` pour la liste, `restaurer NOM` pour revenir en arrière, moteur arrêté.
 Pense à désactiver la mise en veille du PC.
 
+### Activités et sécurité
+
+L'entreprise suit plusieurs activités (services numériques, studio vidéo, e-commerce) : `python -m ai_studio activites`
+montre les coûts d'API, les revenus et les tâches de chacune, pour ajuster le budget sur des chiffres réels.
+Un objectif se rattache à une activité : `objectif "texte" -a video`.
+
+L'agent Cybersécurité vérifie chaque jour la configuration (clés trop puissantes, fichiers sensibles exposés, secrets
+recopiés, sauvegardes) et les anomalies, et signale les emails suspects. Les problèmes critiques déclenchent une
+notification immédiate, sans coût d'API.
+
 ### Offres et commandes
 
 Chaque offre a une fiche (prix, livrable, délai, informations à demander, agent qui produit) : `python -m ai_studio offres`.

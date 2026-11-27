@@ -27,7 +27,8 @@ from .db import DB, now
 WEB_DIR = Path(__file__).resolve().parent / "web"
 POLE_COLORS = {"pdg": "#818CF8", "recherche": "#34D399", "marketing": "#60A5FA", "ventes": "#A78BFA",
                "support": "#FBBF24", "data": "#22D3EE", "finance": "#F472B6",
-               "atelier": "#FB923C", "juridique": "#CBD5E1"}
+               "atelier": "#FB923C", "juridique": "#CBD5E1",
+               "securite": "#F87171"}
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 
 
@@ -193,6 +194,11 @@ def costs(cfg, db) -> dict:
     return {"days": list(reversed(days)), "by_agent": by_agent}
 
 
+def activities(cfg, db) -> list[dict]:
+    from .activities import report
+    return report(db)
+
+
 def objectives(cfg, db) -> list[dict]:
     out = []
     for o in db.q("SELECT * FROM objectives ORDER BY id DESC"):
@@ -335,7 +341,11 @@ def add_objective(cfg, db, body: dict) -> dict:
     text = str(body.get("text") or "").strip()
     if len(text) < 5:
         raise ApiError(400, "Objectif trop court")
-    oid = db.add_objective(text[:1000])
+    from .activities import exists
+    act = body.get("activity") or None
+    if act and not exists(db, act):
+        raise ApiError(400, "Activité inconnue")
+    oid = db.add_objective(text[:1000], act)
     db.log("proprietaire", "objective", f"Nouvel objectif #{oid} : {text[:300]}")
     return {"ok": True, "id": oid}
 
@@ -443,6 +453,7 @@ def make_handler(cfg):
                         "objectives": lambda: objectives(cfg, db), "files": lambda: files(cfg, db),
                         "map": lambda: map_settings(cfg, db), "integrations": lambda: integrations(cfg, db),
                         "sales": lambda: sales(cfg, db), "inbox": lambda: inbox(cfg, db),
+                        "activities": lambda: activities(cfg, db),
                     }
                     if parts == ["tasks"]:
                         return self._send(200, tasks(cfg, db, q("status"), q("agent"), int(q("limit", "50") or 50)))

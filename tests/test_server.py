@@ -23,6 +23,7 @@ class ServerTest(unittest.TestCase):
         self.dir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.dir, True)
         self.cfg = load_config(self.dir)
+        self.cfg.data["security"]["daily_review"] = False   # revue quotidienne testée à part
         self.db = DB(self.cfg.db_path)
         self.addCleanup(self.db.conn.close)
         self.srv = make_server(self.cfg, 0)
@@ -70,7 +71,7 @@ class ServerTest(unittest.TestCase):
         self.assertFalse(s["engine"]["running"])
         st, ag, _ = self.req("GET", "/api/agents")
         by = {a["name"]: a for a in ag}
-        self.assertEqual(len(ag), 9)
+        self.assertEqual(len(ag), 10)
         self.assertEqual(by["atelier"]["division"], "Division production")
         self.assertEqual(by["data"]["division"], "Direction")
         self.assertEqual(by["recherche"]["done"], 1)
@@ -177,7 +178,7 @@ class MaquetteTest(ServerTest):
         self.assertEqual(len(meta["poles"]), 5)
         self.assertEqual(meta["agents_of_pole"]["commercial"], ["marketing", "ventes", "support"])
         self.assertEqual(meta["agents_of_pole"]["production"], ["atelier", "recherche"])
-        self.assertEqual(meta["agents_of_pole"]["administration"], ["finance", "juridique"])
+        self.assertEqual(meta["agents_of_pole"]["administration"], ["finance", "juridique", "securite"])
         from ai_studio.agents import ROLES
         self.assertEqual(sorted(a for ags in meta["agents_of_pole"].values() for a in ags), sorted(ROLES))
         for p in meta["poles"]:
@@ -193,6 +194,16 @@ class MaquetteTest(ServerTest):
         c.request("GET", "/carte.svg", headers={"Host": f"127.0.0.1:{self.port}", "If-None-Match": etag})
         r = c.getresponse(); body = r.read(); c.close()
         self.assertEqual((r.status, body), (304, b""))
+
+    def test_activities_api(self):
+        st, _, _ = self.post("/api/objectives", {"text": "Lancer la boutique", "activity": "ecommerce"})
+        self.assertEqual(st, 200)
+        st, _, _ = self.post("/api/objectives", {"text": "Objectif inconnu", "activity": "lune"})
+        self.assertEqual(st, 400)
+        _, objs, _ = self.req("GET", "/api/objectives")
+        self.assertEqual(objs[0]["activity"], "ecommerce")
+        _, acts, _ = self.req("GET", "/api/activities")
+        self.assertEqual([a["id"] for a in acts], ["services", "video", "ecommerce", None])
 
     def test_page_follows_mockup_sections(self):
         _, html, _ = self.req("GET", "/")

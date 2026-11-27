@@ -62,6 +62,7 @@ class Base(unittest.TestCase):
         self.dir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.dir, True)
         self.cfg = load_config(self.dir)
+        self.cfg.data["security"]["daily_review"] = False   # revue quotidienne testée à part
         self.cfg.ensure_dirs()
         self.db = DB(self.cfg.db_path)
         self.addCleanup(self.db.conn.close)

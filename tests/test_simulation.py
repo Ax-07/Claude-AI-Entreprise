@@ -81,6 +81,7 @@ class TestSimulation(unittest.TestCase):
             os.environ.pop(k, None)
         self.dir = Path(tempfile.mkdtemp())
         self.cfg = load_config(self.dir)
+        self.cfg.data["security"]["daily_review"] = False   # revue quotidienne testée à part
         self.db = DB(self.cfg.db_path)
 
     def tearDown(self):
