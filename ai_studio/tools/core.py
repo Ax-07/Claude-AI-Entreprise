@@ -1,0 +1,223 @@
+"""Outils communs : fin de tâche, mémoire partagée, délégation, fichiers, lecture web, validations."""
+from __future__ import annotations
+
+import html
+import ipaddress
+import re
+import socket
+import urllib.parse
+import urllib.request
+from html.parser import HTMLParser
+from pathlib import Path
+
+from . import tool, ToolContext
+
+
+# ---------------------------------------------------------------- tâche
+@tool("complete_task",
+      "Termine la tâche en cours avec un résultat clair et exploitable (livrable, conclusions, prochaines étapes). "
+      "Appelle cet outil une seule fois, quand le travail est fini.",
+      {"result": {"type": "string", "description": "Résultat complet de la tâche."}},
+      ["result"])
+def complete_task(ctx: ToolContext, result: str) -> str:
+    ctx.finished = True
+    ctx.result = result
+    return "Tâche marquée comme terminée."
+
+
+@tool("delegate_task",
+      "Crée une tâche pour un autre agent (ou pour toi-même plus tard). Utilise-la pour découper le travail. "
+      "Sois précis : objectif, contexte, livrable attendu.",
+      {"agent": {"type": "string", "description": "Nom de l'agent destinataire."},
+       "title": {"type": "string"},
+       "description": {"type": "string", "description": "Contexte et livrable attendu."},
+       "priority": {"type": "integer", "description": "1 = urgent … 5 = faible", "default": 3}},
+      ["agent", "title", "description"])
+def delegate_task(ctx: ToolContext, agent: str, title: str, description: str, priority: int = 3) -> str:
+    agent = agent.strip().lower()
+    if agent not in ctx.agent_names:
+        return f"Agent inconnu. Agents disponibles : {', '.join(ctx.agent_names)}"
+    rt = ctx.cfg["runtime"]
+    depth = int(ctx.task["depth"]) + 1 if ctx.task is not None else 0
+    if depth > rt["max_delegation_depth"]:
+        return "Refusé : profondeur de délégation maximale atteinte. Fais le travail toi-même ou termine la tâche."
+    if ctx.db.open_task_count() >= rt["max_open_tasks"]:
+        return "Refusé : trop de tâches ouvertes. Termine d'abord les tâches en cours."
+    tid = ctx.db.add_task(title, agent, description, priority,
+                          parent_id=ctx.task["id"] if ctx.task is not None else None,
+                          objective_id=ctx.task["objective_id"] if ctx.task is not None else None,
+                          created_by=ctx.agent, depth=depth)
+    ctx.db.log(ctx.agent, "delegation", f"Tâche #{tid} confiée à {agent} : {title}", tid)
+    return f"Tâche #{tid} créée pour {agent}."
+
+
+@tool("list_tasks", "Liste les tâches récentes (pour savoir ce qui est en cours ou terminé).",
+      {"status": {"type": "string", "description": "pending, running, done, failed, blocked ou vide pour tout"},
+       "agent": {"type": "string"}, "limit": {"type": "integer", "default": 15}})
+def list_tasks(ctx: ToolContext, status: str = "", agent: str = "", limit: int = 15) -> str:
+    sql, params = "SELECT id, agent, status, priority, title, substr(COALESCE(result,''),1,300) AS r FROM tasks WHERE 1=1", []
+    if status:
+        sql += " AND status=?"; params.append(status)
+    if agent:
+        sql += " AND agent=?"; params.append(agent.lower())
+    sql += " ORDER BY id DESC LIMIT ?"; params.append(min(int(limit), 40))
+    rows = ctx.db.q(sql, tuple(params))
+    if not rows:
+        return "Aucune tâche."
+    return "\n".join(f"#{r['id']} [{r['status']}] ({r['agent']}, P{r['priority']}) {r['title']}" + (f" → {r['r']}" if r['r'] else "") for r in rows)
+
+
+@tool("get_task_result", "Lit le résultat complet d'une tâche terminée.", {"task_id": {"type": "integer"}}, ["task_id"])
+def get_task_result(ctx: ToolContext, task_id: int) -> str:
+    t = ctx.db.task(int(task_id))
+    if not t:
+        return "Tâche introuvable."
+    return f"#{t['id']} [{t['status']}] {t['title']} ({t['agent']})\n{t['result'] or '(pas encore de résultat)'}"
+
+
+# ---------------------------------------------------------------- mémoire
+@tool("remember",
+      "Enregistre une information durable dans la mémoire partagée de l'entreprise (faits, décisions, sources, "
+      "contacts, apprentissages). Un sujet court et précis.",
+      {"topic": {"type": "string"}, "content": {"type": "string"}},
+      ["topic", "content"])
+def remember(ctx: ToolContext, topic: str, content: str) -> str:
+    mid = ctx.db.remember(ctx.agent, topic, content)
+    return f"Mémorisé (#{mid})."
+
+
+@tool("recall", "Cherche dans la mémoire partagée de l'entreprise.", {"query": {"type": "string"}}, ["query"])
+def recall(ctx: ToolContext, query: str) -> str:
+    rows = ctx.db.recall(query, ctx.agent)
+    if not rows:
+        return "Rien trouvé en mémoire."
+    return "\n".join(f"- [{r['topic']}] ({r['agent']}, {r['created_at'][:10]}) {r['content']}" for r in rows)
+
+
+# ---------------------------------------------------------------- fichiers
+def _safe_path(ctx: ToolContext, rel: str) -> Path:
+    base = ctx.cfg.workspace.resolve()
+    p = (base / rel.strip().lstrip("/\\")).resolve()
+    if base != p and base not in p.parents:
+        raise ValueError("chemin hors de l'espace de travail")
+    return p
+
+
+@tool("write_file", "Écrit un fichier texte (livrable, rapport, brouillon) dans l'espace de travail de l'entreprise.",
+      {"path": {"type": "string", "description": "ex. recherche/etude-marche.md"}, "content": {"type": "string"}},
+      ["path", "content"])
+def write_file(ctx: ToolContext, path: str, content: str) -> str:
+    if len(content) > 200_000:
+        return "Refusé : fichier trop gros (200 Ko max)."
+    p = _safe_path(ctx, path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content, encoding="utf-8")
+    ctx.db.log(ctx.agent, "file", f"Fichier écrit : {path}", ctx.task["id"] if ctx.task is not None else None)
+    return f"Fichier enregistré : {path}"
+
+
+@tool("read_file", "Lit un fichier de l'espace de travail.", {"path": {"type": "string"}}, ["path"])
+def read_file(ctx: ToolContext, path: str) -> str:
+    p = _safe_path(ctx, path)
+    if not p.is_file():
+        return "Fichier introuvable."
+    return p.read_text(encoding="utf-8", errors="replace")[:12000]
+
+
+@tool("list_files", "Liste les fichiers de l'espace de travail.", {"folder": {"type": "string", "default": ""}})
+def list_files(ctx: ToolContext, folder: str = "") -> str:
+    p = _safe_path(ctx, folder or ".")
+    if not p.is_dir():
+        return "Dossier introuvable."
+    base = ctx.cfg.workspace.resolve()
+    files = [str(f.relative_to(base)) for f in sorted(p.rglob("*")) if f.is_file()][:100]
+    return "\n".join(files) or "Aucun fichier."
+
+
+# ---------------------------------------------------------------- web
+class _Text(HTMLParser):
+    def __init__(self):
+        super().__init__(); self.parts = []; self.skip = 0; self.title = ""; self._in_title = False
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style", "noscript", "svg"): self.skip += 1
+        if tag == "title": self._in_title = True
+        if tag in ("p", "br", "li", "h1", "h2", "h3", "h4", "tr", "div"): self.parts.append("\n")
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "noscript", "svg") and self.skip: self.skip -= 1
+        if tag == "title": self._in_title = False
+    def handle_data(self, data):
+        if self._in_title: self.title += data
+        if not self.skip: self.parts.append(data)
+
+
+def _public_host(host: str) -> bool:
+    try:
+        for info in socket.getaddrinfo(host, None):
+            ip = ipaddress.ip_address(info[4][0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return False
+        return True
+    except Exception:
+        return False
+
+
+@tool("fetch_url", "Télécharge une page web publique et renvoie son texte (sans coût de recherche).",
+      {"url": {"type": "string"}}, ["url"])
+def fetch_url(ctx: ToolContext, url: str) -> str:
+    u = urllib.parse.urlparse(url.strip())
+    if u.scheme not in ("http", "https") or not u.hostname:
+        return "URL invalide (http/https uniquement)."
+    if not _public_host(u.hostname):
+        return "Refusé : adresse non publique."
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (AI-Enterprise-Studio research bot)"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        ctype = r.headers.get("content-type", "")
+        raw = r.read(400_000)
+    if "html" not in ctype and "text" not in ctype and "json" not in ctype:
+        return f"Contenu non textuel ({ctype})."
+    text = raw.decode("utf-8", "replace")
+    if "html" in ctype:
+        p = _Text(); p.feed(text)
+        body = re.sub(r"\n\s*\n+", "\n\n", html.unescape("".join(p.parts)))
+        body = re.sub(r"[ \t]+", " ", body).strip()
+        text = (f"Titre : {p.title.strip()}\n\n" if p.title.strip() else "") + body
+    return text[:9000]
+
+
+# ---------------------------------------------------------------- propriétaire
+@tool("request_owner_decision",
+      "Demande une décision au propriétaire (humain) quand une action est risquée, coûteuse, engage l'entreprise "
+      "ou sort de ton périmètre. Le propriétaire répondra plus tard ; continue ou termine ta tâche en attendant.",
+      {"question": {"type": "string"}, "context": {"type": "string"}},
+      ["question"])
+def request_owner_decision(ctx: ToolContext, question: str, context: str = "") -> str:
+    aid = ctx.db.add_approval(ctx.agent, ctx.task["id"] if ctx.task is not None else None,
+                              "decision", {"question": question, "context": context}, question)
+    ctx.db.log(ctx.agent, "approval", f"Décision demandée (#{aid}) : {question}")
+    return f"Demande #{aid} envoyée au propriétaire. Tu seras recontacté via une nouvelle tâche quand il aura répondu."
+
+
+@tool("list_objectives", "Liste les objectifs de l'entreprise fixés par le propriétaire.", {})
+def list_objectives(ctx: ToolContext) -> str:
+    rows = ctx.db.q("SELECT * FROM objectives ORDER BY id")
+    return "\n".join(f"#{r['id']} [{r['status']}] {r['text']}" for r in rows) or "Aucun objectif."
+
+
+@tool("set_objective_status",
+      "Marque un objectif comme atteint (done) ou en pause (paused) avec une justification factuelle.",
+      {"objective_id": {"type": "integer"}, "status": {"type": "string", "enum": ["done", "paused", "active"]},
+       "note": {"type": "string"}}, ["objective_id", "status", "note"])
+def set_objective_status(ctx: ToolContext, objective_id: int, status: str, note: str) -> str:
+    if status not in ("done", "paused", "active"):
+        return "Statut invalide."
+    ctx.db.run("UPDATE objectives SET status=? WHERE id=?", (status, int(objective_id)))
+    ctx.db.log(ctx.agent, "objective", f"Objectif #{objective_id} → {status} : {note}")
+    return "Objectif mis à jour."
+
+
+@tool("budget_status", "Affiche les dépenses API du jour et du mois par rapport aux plafonds.", {})
+def budget_status(ctx: ToolContext) -> str:
+    b = ctx.cfg["budget"]
+    return (f"Aujourd'hui : {ctx.db.spent('day'):.4f} $ / {b['daily_usd']} $\n"
+            f"Ce mois : {ctx.db.spent('month'):.4f} $ / {b['monthly_usd']} $\n"
+            f"Recherches web aujourd'hui : {ctx.db.searches_today()} / {b['web_searches_per_day']}")

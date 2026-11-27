@@ -1,0 +1,23 @@
+{
+  "company": {
+    "name": "AI Enterprise Studio",
+    "owner_name": "Propriétaire",
+    "description": "Micro-entreprise française de services numériques opérée par une équipe d'agents IA. Objectif : générer des revenus réels, de façon légale et rentable, avec un minimum d'intervention du propriétaire."
+  },
+  "models": {
+    "default": "claude-haiku-5-5",
+    "strong": "claude-sonnet-5-5"
+  },
+  "budget": {
+    "monthly_usd": 20.0,
+    "daily_usd": 0.65,
+    "per_task_usd": 0.15,
+    "web_searches_per_day": 15
+  },
+  "runtime": {
+    "cycle_seconds": 60,
+    "max_tasks_per_cycle": 3,
+    "max_steps_per_task": 8,
+    "ceo_review_minutes": 180
+  }
+}

@@ -1,0 +1,77 @@
+"""Exécution des actions validées par le propriétaire."""
+from __future__ import annotations
+
+import json
+import os
+import smtplib
+from email.message import EmailMessage
+
+from .db import iso
+from .tools.business import stripe_request
+
+
+def send_email(cfg, payload: dict) -> str:
+    host = os.environ.get("SMTP_HOST"); user = os.environ.get("SMTP_USER"); pwd = os.environ.get("SMTP_PASSWORD")
+    if not (host and user and pwd):
+        raise RuntimeError("SMTP non configuré (SMTP_HOST, SMTP_USER, SMTP_PASSWORD dans .env)")
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    sender = os.environ.get("SMTP_FROM", user)
+    msg = EmailMessage()
+    msg["From"] = f"{cfg.get('email', 'from_name', default='')} <{sender}>"
+    msg["To"] = payload["to"]
+    msg["Subject"] = payload["subject"]
+    msg.set_content(payload["body"])
+    if port == 465:
+        with smtplib.SMTP_SSL(host, port, timeout=30) as s:
+            s.login(user, pwd); s.send_message(msg)
+    else:
+        with smtplib.SMTP(host, port, timeout=30) as s:
+            s.starttls(); s.login(user, pwd); s.send_message(msg)
+    return f"Email envoyé à {payload['to']}"
+
+
+def create_payment_link(cfg, payload: dict) -> str:
+    params = {
+        "currency": "eur",
+        "unit_amount": int(round(float(payload["amount_eur"]) * 100)),
+        "product_data[name]": payload["product_name"],
+    }
+    if payload.get("recurring") in ("month", "year"):
+        params["recurring[interval]"] = payload["recurring"]
+    price = stripe_request("POST", "prices", params)
+    link = stripe_request("POST", "payment_links", {"line_items[0][price]": price["id"], "line_items[0][quantity]": 1})
+    return f"Lien de paiement créé : {link['url']}"
+
+
+EXECUTORS = {"send_email": send_email, "stripe_payment_link": create_payment_link}
+
+
+def decide(cfg, db, approval_id: int, approve: bool, note: str = "") -> str:
+    a = db.approval(approval_id)
+    if not a:
+        return "Demande introuvable."
+    if a["status"] != "pending":
+        return f"Déjà traitée ({a['status']})."
+    payload = json.loads(a["payload"])
+    if not approve:
+        db.set_approval(approval_id, status="rejected", decided_at=iso(), result=note or "Refusé")
+        outcome = f"REFUSÉ par le propriétaire. {note}".strip()
+    elif a["action"] in EXECUTORS:
+        try:
+            res = EXECUTORS[a["action"]](cfg, payload)
+            db.set_approval(approval_id, status="executed", decided_at=iso(), result=res)
+            outcome = f"VALIDÉ et exécuté : {res}. {note}".strip()
+        except Exception as e:
+            db.set_approval(approval_id, status="error", decided_at=iso(), result=str(e))
+            outcome = f"VALIDÉ mais l'exécution a échoué : {e}"
+    else:
+        db.set_approval(approval_id, status="approved", decided_at=iso(), result=note or "Validé")
+        outcome = f"Réponse du propriétaire : {note or 'OK, validé.'}"
+    db.log("proprietaire", "decision", f"Demande #{approval_id} ({a['action']}) : {outcome}")
+    # On informe l'agent demandeur via une nouvelle tâche pour qu'il poursuive le travail.
+    summary = payload.get("question") or payload.get("subject") or payload.get("product_name") or a["action"]
+    db.add_task(f"Suite à la demande #{approval_id} : {summary}"[:120], a["agent"],
+                f"Ta demande #{approval_id} ({a['action']}) a reçu une réponse.\n{outcome}\n"
+                f"Contexte initial : {a['reason']}\nPoursuis le travail en conséquence, puis termine la tâche.",
+                priority=2, parent_id=a["task_id"], created_by="proprietaire")
+    return outcome

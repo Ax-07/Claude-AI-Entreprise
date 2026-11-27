@@ -1,0 +1,119 @@
+"""Chargement de la configuration (config.json) et des secrets (.env).
+
+Les secrets (clé API, clés Stripe, SMTP) ne sont JAMAIS écrits dans config.json :
+ils restent dans le fichier .env, qui n'est pas versionné.
+"""
+from __future__ import annotations
+
+import copy
+import json
+import os
+from pathlib import Path
+
+ROOT = Path(os.environ.get("AI_STUDIO_HOME", Path(__file__).resolve().parent.parent))
+
+DEFAULTS: dict = {
+    "company": {
+        "name": "AI Enterprise Studio",
+        "owner_name": "Propriétaire",
+        "language": "fr",
+        "description": "Micro-entreprise française de services numériques opérée par des agents IA.",
+    },
+    "models": {
+        # Modèle économique pour le travail courant, modèle plus fort pour l'agent PDG.
+        "default": "claude-haiku-5-5",
+        "strong": "claude-sonnet-5-5",
+    },
+    # Prix en USD par million de tokens (à mettre à jour si Anthropic change ses tarifs).
+    "prices": {
+        "claude-haiku-5-5": {"input": 0.10, "output": 0.50, "long_input": 0.50, "long_output": 2.50, "long_threshold": 100000},
+        "claude-sonnet-5-5": {"input": 2.0, "output": 10.0},
+        "claude-opus-5-5": {"input": 4.0, "output": 20.0},
+        "web_search_per_call": 0.01,
+    },
+    "budget": {
+        "monthly_usd": 20.0,
+        "daily_usd": 0.65,
+        "per_task_usd": 0.15,
+        "web_searches_per_day": 15,
+    },
+    "runtime": {
+        "cycle_seconds": 60,
+        "max_tasks_per_cycle": 3,
+        "max_steps_per_task": 8,
+        "max_output_tokens": 2000,
+        "max_open_tasks": 30,
+        "max_delegation_depth": 3,
+        "max_attempts": 2,
+        "ceo_review_minutes": 180,
+        "request_timeout_seconds": 120,
+    },
+    "server_tools": {
+        "web_search": {"enabled": True, "type": "web_search_20260209", "max_uses": 3},
+        "web_fetch": {"enabled": False, "type": "web_fetch_20260209", "max_uses": 3, "max_content_tokens": 6000},
+    },
+    "email": {
+        "from_name": "AI Enterprise Studio",
+        "daily_limit": 20,
+    },
+}
+
+
+def _deep_merge(base: dict, extra: dict) -> dict:
+    out = copy.deepcopy(base)
+    for k, v in (extra or {}).items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def load_env(path: Path | None = None) -> None:
+    """Charge un fichier .env simple (CLE=valeur) sans écraser l'environnement existant."""
+    path = path or ROOT / ".env"
+    if not path.exists():
+        return
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, val = line.split("=", 1)
+        key, val = key.strip(), val.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = val
+
+
+class Config:
+    def __init__(self, data: dict, root: Path):
+        self.data = data
+        self.root = root
+        self.data_dir = root / "data"
+        self.workspace = self.data_dir / "workspace"
+        self.db_path = self.data_dir / "studio.db"
+
+    def __getitem__(self, key):
+        return self.data[key]
+
+    def get(self, *keys, default=None):
+        cur = self.data
+        for k in keys:
+            if not isinstance(cur, dict) or k not in cur:
+                return default
+            cur = cur[k]
+        return cur
+
+    def ensure_dirs(self) -> None:
+        self.workspace.mkdir(parents=True, exist_ok=True)
+
+
+def load_config(root: Path | None = None) -> Config:
+    root = Path(root) if root else ROOT
+    load_env(root / ".env")
+    user = {}
+    cfg_file = root / "config.json"
+    if cfg_file.exists():
+        user = json.loads(cfg_file.read_text(encoding="utf-8"))
+    cfg = Config(_deep_merge(DEFAULTS, user), root)
+    cfg.ensure_dirs()
+    return cfg
