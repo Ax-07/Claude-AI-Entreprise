@@ -152,5 +152,68 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(len(c["days"]), 1)
 
 
+class MaquetteTest(ServerTest):
+    def test_map_assets_served_compressed(self):
+        import gzip as gz
+        c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+        c.request("GET", "/carte.svg", headers={"Host": f"127.0.0.1:{self.port}", "Accept-Encoding": "gzip"})
+        r = c.getresponse(); raw = r.read(); c.close()
+        self.assertEqual(r.status, 200)
+        self.assertEqual(r.getheader("Content-Encoding"), "gzip")
+        svg = gz.decompress(raw).decode("utf-8")
+        self.assertLess(len(raw), len(svg) / 3)
+        self.assertNotIn("{{", svg)
+        for pole in ("hq", "research", "marketing", "sales", "support", "data", "finance"):
+            for v in "ABC":
+                self.assertIn(f'class="bld" data-pole="{pole}" data-variant="{v}"', svg)
+            self.assertIn(f'class="office" data-pole="{pole}"', svg)
+        st, meta, _ = self.req("GET", "/carte.json")
+        self.assertEqual(st, 200)
+        self.assertEqual(meta["agent_of_pole"]["sales"], "ventes")
+        self.assertEqual(len(meta["poles"]), 7)
+
+    def test_page_follows_mockup_sections(self):
+        _, html, _ = self.req("GET", "/")
+        for s in ("Carte de l’entreprise", "Vue bureaux", "Bâtiment du pôle", "Performance", "Fil d’activité", "Succès",
+                  "Escouade d’agents", "File de tâches", "Pipeline de revenus", "Prochains événements", "Niveau du HQ", "Progression globale"):
+            self.assertIn(s, html)
+        self.assertNotIn("__ICONS__", html)
+
+    def test_map_settings_persist(self):
+        _, m, _ = self.req("GET", "/api/map")
+        self.assertEqual(m["view"], "ville")
+        st, m, _ = self.post("/api/map", {"pole": "support", "variant": "C"})
+        self.assertEqual(st, 200)
+        self.post("/api/map", {"view": "bureaux"})
+        _, m, _ = self.req("GET", "/api/map")
+        self.assertEqual(m, {"variants": {"support": "C"}, "view": "bureaux"})
+        st, _, _ = self.post("/api/map", {"pole": "support", "variant": "Z"})
+        self.assertEqual(st, 400)
+
+    def test_insights_are_real(self):
+        from ai_studio.db import iso
+        t = self.db.add_task("A", "data"); self.db.set_task(t, status="done")
+        t2 = self.db.add_task("B", "data"); self.db.set_task(t2, status="failed")
+        self.db.add_cost("data", t, "gpt-6-luna", 10, 10, 0, 0.02)
+        self.db.add_objective("Objectif")
+        self.db.add_approval("ventes", None, "send_email", {"to": "a@b.fr", "subject": "s", "body": "b"}, "r")
+        _, d, _ = self.req("GET", "/api/insights?days=7")
+        self.assertEqual(len(d["days"]), 7)
+        self.assertEqual(d["done"][-1], 1)
+        self.assertEqual(d["success_rate"][-1], 50)
+        self.assertAlmostEqual(d["cost"][-1], 0.02)
+        self.assertEqual({p["stage"]: p["value"] for p in d["pipeline"]}["Emails préparés"], 1)
+        self.assertTrue(any("Revue de l'objectif" in s["title"] for s in d["schedule"]))
+        _, d30, _ = self.req("GET", "/api/insights?days=30")
+        self.assertEqual(len(d30["days"]), 30)
+
+    def test_integrations(self):
+        os.environ["BRAVE_API_KEY"] = "x"
+        _, lst, _ = self.req("GET", "/api/integrations")
+        by = {i["name"]: i["ok"] for i in lst}
+        self.assertTrue(by["Brave Search"])
+        self.assertFalse(by["Stripe"])
+
+
 if __name__ == "__main__":
     unittest.main()

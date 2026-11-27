@@ -253,6 +253,9 @@ Sécurité : écoute sur 127.0.0.1 uniquement ; en-tête Host limité à 127.0.0
 | GET /api/events?since= | Fil d'activité |
 | GET /api/approvals | Validations en attente |
 | POST /api/approvals/{id} | Valider ou refuser, avec une note |
+| GET /api/insights?days=7 | Séries réelles du panneau Performance, pipeline commercial, prochaines échéances |
+| GET, POST /api/map | Vue (ville ou bureaux) et bâtiment choisi par pôle, mémorisés |
+| GET /api/integrations | État des connexions (IA, Brave, Stripe, SMTP) |
 | GET /api/objectives | Objectifs et avancement |
 | POST /api/objectives | Ajouter un objectif |
 | POST /api/objectives/{id} | Mettre en pause, réactiver, marquer atteint |

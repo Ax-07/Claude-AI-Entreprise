@@ -1,0 +1,211 @@
+{
+ "default_variants": {
+  "hq": "A",
+  "research": "A",
+  "marketing": "A",
+  "sales": "A",
+  "support": "B",
+  "data": "A",
+  "finance": "A"
+ },
+ "agent_of_pole": {
+  "hq": "pdg",
+  "research": "recherche",
+  "marketing": "marketing",
+  "sales": "ventes",
+  "support": "support",
+  "data": "data",
+  "finance": "finance"
+ },
+ "poles": [
+  {
+   "id": "research",
+   "name": "Labo Recherche",
+   "color": "#34D399",
+   "left": "31.00%",
+   "top": "49.19%",
+   "role": "Veille et opportunités",
+   "desc": "Analyse des marchés, détection de niches rentables et étude de la concurrence.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Observatoire",
+     "text": "Rotonde nervurée, coupole et télescope pointé vers les marchés."
+    },
+    {
+     "L": "B",
+     "name": "Serre de verre",
+     "text": "Laboratoire transparent : on voit les idées pousser à l’intérieur."
+    },
+    {
+     "L": "C",
+     "name": "Labo à antenne",
+     "text": "Labo vitré aux écrans allumés et tour équipée d’une parabole."
+    }
+   ],
+   "agent": "recherche"
+  },
+  {
+   "id": "marketing",
+   "name": "Hub Marketing",
+   "color": "#60A5FA",
+   "left": "69.00%",
+   "top": "49.19%",
+   "role": "Acquisition",
+   "desc": "Création de contenus, campagnes et pages de vente dans plusieurs langues.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Tour média",
+     "text": "Tour noire couverte d’écrans géants et d’enseignes néon."
+    },
+    {
+     "L": "B",
+     "name": "Studio de diffusion",
+     "text": "Pylône émetteur qui propage les ondes de la marque."
+    },
+    {
+     "L": "C",
+     "name": "Place des panneaux",
+     "text": "Panneaux publicitaires flottants au-dessus d’un studio."
+    }
+   ],
+   "agent": "marketing"
+  },
+  {
+   "id": "hq",
+   "name": "Command HQ",
+   "color": "#818CF8",
+   "left": "50.00%",
+   "top": "64.52%",
+   "role": "Orchestration",
+   "desc": "Le PDG IA répartit les missions, arbitre les budgets et valide les décisions sensibles.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Spire de commandement",
+     "text": "Tour à pans coupés, bandeaux vitrés lumineux et couronne qui brille."
+    },
+    {
+     "L": "B",
+     "name": "Citadelle",
+     "text": "Deux tours noires à enseignes néon reliées par une passerelle de verre."
+    },
+    {
+     "L": "C",
+     "name": "Anneau orbital",
+     "text": "Tour cylindrique vitrée entourée d’anneaux de données en orbite."
+    }
+   ],
+   "agent": "pdg"
+  },
+  {
+   "id": "sales",
+   "name": "Centre Ventes",
+   "color": "#A78BFA",
+   "left": "16.00%",
+   "top": "64.52%",
+   "role": "Revenus",
+   "desc": "Prospection, qualification des leads et préparation des offres.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Tour de verre",
+     "text": "Gradins vitrés, corniches dorées et flèche de croissance."
+    },
+    {
+     "L": "B",
+     "name": "Ziggurat des deals",
+     "text": "Pyramide à étages : chaque niveau est une étape du pipeline."
+    },
+    {
+     "L": "C",
+     "name": "Tours jumelles",
+     "text": "Deux tours de bureaux illuminées reliées par un pont de verre."
+    }
+   ],
+   "agent": "ventes"
+  },
+  {
+   "id": "support",
+   "name": "Zone Support",
+   "color": "#FBBF24",
+   "left": "84.00%",
+   "top": "64.52%",
+   "role": "Clients",
+   "desc": "Réponses aux clients 24 h/24, gestion des retours et satisfaction.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Centre d’écoute",
+     "text": "Rotonde à bandeaux lumineux surmontée d’une parabole."
+    },
+    {
+     "L": "B",
+     "name": "Phare",
+     "text": "Le phare qui guide les clients, 24 h/24."
+    },
+    {
+     "L": "C",
+     "name": "Hub en anneau",
+     "text": "Bâtiment circulaire autour d’une tour relais qui émet."
+    }
+   ],
+   "agent": "support"
+  },
+  {
+   "id": "data",
+   "name": "Data Core",
+   "color": "#22D3EE",
+   "left": "33.00%",
+   "top": "78.23%",
+   "role": "Mémoire et données",
+   "desc": "Base de connaissances partagée, métriques et apprentissage des agents.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Réacteur de données",
+     "text": "Cœur lumineux sous verre, entouré d’anneaux d’énergie."
+    },
+    {
+     "L": "B",
+     "name": "Ferme de serveurs",
+     "text": "Rangées de baies noires et leurs voyants qui clignotent."
+    },
+    {
+     "L": "C",
+     "name": "Cristal de mémoire",
+     "text": "Cristal flottant au-dessus de son socle : la mémoire partagée."
+    }
+   ],
+   "agent": "data"
+  },
+  {
+   "id": "finance",
+   "name": "Trésorerie",
+   "color": "#F472B6",
+   "left": "67.00%",
+   "top": "78.23%",
+   "role": "Finances",
+   "desc": "Suivi des revenus, contrôle des coûts API et rentabilité par activité.",
+   "variants": [
+    {
+     "L": "A",
+     "name": "Coffre-fort",
+     "text": "Bloc noir, porte de coffre circulaire et lames dorées."
+    },
+    {
+     "L": "B",
+     "name": "Temple financier",
+     "text": "Colonnade dorée et fronton : la solidité des comptes."
+    },
+    {
+     "L": "C",
+     "name": "Tour des pièces",
+     "text": "Pile de pièces géante et pièce d’or flottante."
+    }
+   ],
+   "agent": "finance"
+  }
+ ]
+}
