@@ -185,6 +185,12 @@ class DB:
     # Colonnes ajoutées après coup : ajoutées aux bases existantes sans perte de données.
     MIGRATIONS = (
         ("chat", "thread_id", "INTEGER"),                 # discussion à laquelle appartient le message
+        ("objectives", "owner_check", "TEXT"),            # vérification du propriétaire : ok | issue
+        ("objectives", "owner_note", "TEXT"),
+        ("objectives", "checked_at", "TEXT"),
+        ("objectives", "done_at", "TEXT"),
+        ("sales", "owner_check", "TEXT"),
+        ("sales", "checked_at", "TEXT"),
         ("tasks", "order_ref", "INTEGER"),                # commande concernée (suivi jusqu'à la livraison)
         ("sales", "offer_id", "INTEGER"),
         ("sales", "stage", "TEXT"),                       # a_livrer | attente_client | livree | historique
@@ -265,10 +271,11 @@ class DB:
                  created_by: str = "owner", depth: int = 0, order_ref: int | None = None) -> int:
         t = iso()
         activity = None
-        if parent_id is not None:          # une sous-tâche reste rattachée à la même commande et à la même activité
-            p = self.one("SELECT order_ref, activity FROM tasks WHERE id=?", (parent_id,))
+        if parent_id is not None:          # une sous-tâche reste rattachée à la même mission, commande et activité
+            p = self.one("SELECT order_ref, activity, objective_id FROM tasks WHERE id=?", (parent_id,))
             if p:
                 order_ref = order_ref if order_ref is not None else p[0]
+                objective_id = objective_id if objective_id is not None else p[2]
                 activity = p[1]
         if activity is None and objective_id is not None:
             o = self.one("SELECT activity FROM objectives WHERE id=?", (objective_id,))
