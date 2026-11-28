@@ -314,7 +314,8 @@ def cmd_supprimer_mission(cfg, db, a):
     from .reset import delete_mission
     kind = "commande" if a.commande else "objectif"
     if not a.confirmer:
-        _out(f"Supprime la {'commande d\'essai n°' if a.commande else 'mission #'}{a.id}, ses tâches, validations et "
+        what = "commande d'essai n°" if a.commande else "mission #"
+        _out(f"Supprime la {what}{a.id}, ses tâches, validations et "
              "son journal (sauvegarde faite avant ; coûts, bibliothèque, mémoire et fichiers conservés). "
              "Ajoute --confirmer pour le faire.")
         return
