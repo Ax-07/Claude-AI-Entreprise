@@ -3,6 +3,7 @@ client et délai qui démarre à leur réception."""
 import json
 import os
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from test_commerce import Base, FakeIMAP, mail
@@ -92,6 +93,34 @@ class IntakeTest(Base):
         n = commerce.test_order(self.cfg, self.db, "Diagnostic SEO local", "marie@cafe-lumiere.fr")
         t = self.db.one("SELECT description FROM tasks WHERE order_ref=? AND agent='support'", (n,))[0]
         self.assertIn("DÉJÀ écrit", t); self.assertIn("#1 du 2026-11-28", t); self.assertIn("ne lui redemande rien", t)
+
+
+    def test_no_second_email_before_reply(self):
+        """Scénario réel du 28/11 : Ventes demande les informations, le client paie, et Support les redemandait."""
+        from datetime import timedelta
+        from ai_studio import approvals, prospects
+        from ai_studio.db import iso, now
+        from ai_studio.tools.business import duplicate_contact
+        prospects.save(self.db, "marie@cafe-lumiere.fr", "https://cafe-lumiere.fr")
+        out = run_tool("send_email", self.ctx("ventes"), {"to": "marie@cafe-lumiere.fr", "subject": "Une piste", "body": "Bonjour", "reason": "r"})
+        self.assertIn("en attente", out)
+        self.assertIn("attend déjà la validation", run_tool("send_email", self.ctx("support"), {"to": "marie@cafe-lumiere.fr", "subject": "x", "body": "y", "reason": "r"}))
+        aid = self.db.pending_approvals()[0]["id"]
+        os.environ.update(SMTP_HOST="h", SMTP_USER="u", SMTP_PASSWORD="p")
+        with unittest.mock.patch.dict(approvals.EXECUTORS, {"send_email": lambda c, p: "Email envoyé"}):
+            approvals.decide(self.cfg, self.db, aid, True)
+        self.assertIn("pas encore répondu", duplicate_contact(self.cfg, self.db, "Marie@Cafe-Lumiere.fr"))
+        # le client paie avant de répondre : la tâche du Service Client le sait
+        n = commerce.test_order(self.cfg, self.db, "Diagnostic SEO local", "marie@cafe-lumiere.fr")
+        t = self.db.one("SELECT description FROM tasks WHERE order_ref=? AND agent='support'", (n,))[0]
+        self.assertIn("on lui a déjà écrit récemment", t); self.assertIn("n'envoie RIEN", t)
+        # dès qu'il répond, on peut lui écrire de nouveau
+        self.db.run("INSERT INTO inbox(uid, message_id, from_addr, subject, body, status, received_at, recorded_at) VALUES (9,'<r@x>','marie@cafe-lumiere.fr','Re','ok','queued',?,'x')",
+                    (iso(now() + timedelta(seconds=5)),))
+        self.assertIsNone(duplicate_contact(self.cfg, self.db, "marie@cafe-lumiere.fr"))
+        # et au-delà du délai, même sans réponse
+        self.db.run("DELETE FROM inbox"); self.db.run("UPDATE approvals SET decided_at=?", (iso(now() - timedelta(hours=49)),))
+        self.assertIsNone(duplicate_contact(self.cfg, self.db, "marie@cafe-lumiere.fr"))
 
 
 if __name__ == "__main__":

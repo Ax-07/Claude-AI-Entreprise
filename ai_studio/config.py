@@ -107,6 +107,8 @@ DEFAULTS: dict = {
     "email": {
         "from_name": "AI Enterprise Studio",
         "daily_limit": 20,
+        # anti-doublon : pas de nouvel email à un destinataire qui n'a pas encore répondu au précédent (heures)
+        "min_gap_hours": 48,
     },
 }
 

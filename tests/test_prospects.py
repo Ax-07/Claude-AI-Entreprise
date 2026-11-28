@@ -51,7 +51,9 @@ class ProspectsTest(Base):
         p = prospects.get(self.db, "contact@ax-07.fr")
         self.assertEqual(p["status"], "contacte")
         self.assertEqual(p["next_action_at"][:10], iso(now() + timedelta(days=7))[:10])
-        self.assertIn("déjà contacté", self.send())                                # pas de second premier email
+        self.assertIn("pas encore répondu", self.send())                           # pas de second email sans réponse
+        self.db.run("UPDATE approvals SET decided_at=?", (iso(now() - timedelta(days=8)),))      # 8 jours plus tard
+        self.assertIn("déjà contacté", self.send())                                # et jamais de second premier email
         self.assertEqual(prospects.due_followups(self.cfg, self.db), {"followups": [], "closed": []})   # trop tôt
         self.db.run("UPDATE prospects SET next_action_at=? WHERE email=?", (iso(now() - timedelta(minutes=1)), "contact@ax-07.fr"))
         self.assertEqual(prospects.due_followups(self.cfg, self.db)["followups"], ["contact@ax-07.fr"])
@@ -65,6 +67,7 @@ class ProspectsTest(Base):
         self.assertIn("en attente de validation", out)
         self.approve_last()
         self.assertEqual(prospects.get(self.db, "contact@ax-07.fr")["status"], "relance")
+        self.db.run("UPDATE approvals SET decided_at=?", (iso(now() - timedelta(days=8)),))
         self.assertIn("relance impossible", self.send(template="relance", fields={}))   # une seule relance
         self.db.run("UPDATE prospects SET next_action_at=? WHERE email=?", (iso(now() - timedelta(minutes=1)), "contact@ax-07.fr"))
         self.assertEqual(prospects.due_followups(self.cfg, self.db)["closed"], ["contact@ax-07.fr"])
