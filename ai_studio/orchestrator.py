@@ -130,6 +130,10 @@ class Studio:
 
     def run_forever(self, echo=print) -> None:
         self.recover()
+        from . import mail_watch
+        from .db import DB
+        if mail_watch.start(self.cfg, lambda: DB(self.cfg.db_path)):
+            echo("Boîte mail surveillée en temps réel : notification dès qu'un email arrive.")
         pause = int(self.cfg["runtime"]["cycle_seconds"])
         echo(f"Moteur démarré — cycle toutes les {pause} s. Ctrl+C pour arrêter.")
         while True:
