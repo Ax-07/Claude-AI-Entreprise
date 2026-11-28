@@ -91,7 +91,7 @@ class StripeTest(Base):
                     "has_more": False}
         r = commerce.sync_stripe(self.cfg, self.db, req)
         self.assertEqual(r["new"], 1)
-        self.assertEqual(calls[0]["created[gt]"], old)
+        self.assertLessEqual(calls[0]["created[gte]"], old)          # fenêtre qui recouvre le passage précédent (sessions encore ouvertes)
         self.assertEqual(calls[0]["expand[]"], "data.line_items")
         t = self.db.one("SELECT * FROM tasks WHERE agent='chef_projet'")    # chaque commande a son chef de projet
         self.assertEqual(t["priority"], 1)
