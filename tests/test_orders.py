@@ -176,6 +176,47 @@ class OrdersTest(Base):
             approvals.decide(self.cfg, self.db, aid, True)
         self.assertEqual(sent, [1, "Déjà traitée (processing)."])
 
+    def test_bounce_reopens_order_and_alerts(self):
+        from test_commerce import FakeIMAP, mail
+        os.environ.update(SMTP_HOST="smtp.gmail.com", SMTP_USER="studio@gmail.com", SMTP_PASSWORD="x")
+        n = self.sell(email="ton@email.fr")
+        aid = self.db.add_approval("support", None, "send_email", {"to": "ton@email.fr", "subject": "Votre diagnostic", "body": "b",
+                                                                   "attachment": "livraisons/commande-1/rapport.html", "order": n}, "r")
+        with unittest.mock.patch.dict(approvals.EXECUTORS, {"send_email": lambda c, p: "Email envoyé"}):
+            approvals.decide(self.cfg, self.db, aid, True)
+        self.assertEqual(commerce.get_order(self.db, n)["stage"], "livree")
+        self.db.kv_set("inbox_last_uid", "0"); self.db.kv_set("inbox_uidvalidity", "7")
+        bounce = mail("Mail Delivery Subsystem <mailer-daemon@googlemail.com>", "Delivery Status Notification (Failure)",
+                      "Your message wasn't delivered to ton@email.fr because the address couldn't be found.\n"
+                      "The response was: 550 5.1.1 The email account that you tried to reach does not exist.", "<b@x>")
+        normal = mail("Marie <marie@cafe.fr>", "Question", "Bonjour", "<m@x>")
+        out = commerce.sync_inbox(self.cfg, self.db, connect=lambda: FakeIMAP({1: bounce, 2: normal}))
+        self.assertEqual(out["bounces"], 1)
+        self.assertEqual(self.db.approval(aid)["status"], "bounced")
+        self.assertIn("550 5.1.1", self.db.approval(aid)["result"])
+        o = commerce.get_order(self.db, n)
+        self.assertEqual(o["stage"], "a_livrer")                                 # la livraison est à refaire
+        self.assertIn("pas été distribuée", o["owner_notes"])
+        t = self.db.one("SELECT * FROM tasks WHERE title LIKE 'Email non distribué%'")
+        self.assertEqual((t["agent"], t["order_ref"], t["priority"]), ("support", n, 1))
+        self.assertEqual(self.db.one("SELECT status FROM inbox WHERE from_addr='mailer-daemon@googlemail.com'")[0], "bounce")
+        # un email ordinaire n'est pas pris pour un rebond
+        self.assertEqual(commerce.bounce_recipients("marie@cafe.fr", "Question", "écrivez à paul@cafe.fr", "studio@gmail.com"), [])
+        self.assertEqual(commerce.bounce_recipients("mailer-daemon@x.fr", "Undelivered Mail Returned to Sender",
+                                                    "Final-Recipient: rfc822; Paul@Cafe.fr\nDiagnostic-Code: smtp; 550 user unknown", "s@g.com"), ["paul@cafe.fr"])
+
+    def test_bounce_backfill_from_stored_inbox(self):
+        os.environ.update(IMAP_USER="studio@gmail.com", SMTP_HOST="h", SMTP_USER="studio@gmail.com", SMTP_PASSWORD="p")
+        aid = self.db.add_approval("ventes", None, "send_email", {"to": "prospect@exemple.fr", "subject": "Offre", "body": "b"}, "r")
+        with unittest.mock.patch.dict(approvals.EXECUTORS, {"send_email": lambda c, p: "Email envoyé"}):
+            approvals.decide(self.cfg, self.db, aid, True)
+        self.db.run("INSERT INTO inbox(uid, message_id, from_addr, from_name, subject, received_at, body, status, reason, recorded_at) "
+                    "VALUES (1,'<b>','mailer-daemon@googlemail.com','','Delivery Status Notification (Failure)',?,?, 'ignored', 'expéditeur automatique', ?)",
+                    (iso(), "Your message wasn't delivered to prospect@exemple.fr. 550 5.1.1 does not exist", iso()))
+        self.assertEqual(commerce.recheck_stored_bounces(self.cfg, self.db), [aid])
+        self.assertEqual(self.db.approval(aid)["status"], "bounced")
+        self.assertEqual(self.db.one("SELECT agent FROM tasks WHERE title LIKE 'Email non distribué%'")[0], "ventes")
+
     def test_refusal_note_sticks_to_order_and_resumes_it(self):
         n = self.sell()
         pdg = self.db.one("SELECT * FROM tasks WHERE order_ref=?", (n,))
