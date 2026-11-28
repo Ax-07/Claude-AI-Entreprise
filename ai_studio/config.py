@@ -43,6 +43,7 @@ DEFAULTS: dict = {
         "gpt-5-nano": {"input": 0.05, "cached_input": 0.005, "output": 0.40},
         "gpt-5-mini": {"input": 0.25, "cached_input": 0.025, "output": 2.0},
         "web_search_per_call": 0.01,          # recherche web serveur Anthropic
+        "usd_to_eur": 0.92,                   # conversion des coûts d'API (USD) pour calculer les marges en euros
         "brave_search_per_call": 0.005,       # Brave Search API (5 $ / 1 000 requêtes)
     },
     "budget": {

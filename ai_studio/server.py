@@ -241,7 +241,26 @@ def costs(cfg, db) -> dict:
     month = now().strftime("%Y-%m")
     by_agent = [_row(r) for r in db.q("SELECT agent, ROUND(SUM(usd),4) usd, SUM(input_tokens) input_tokens, SUM(output_tokens) output_tokens "
                                          "FROM costs WHERE month=? GROUP BY agent ORDER BY usd DESC", (month,))]
-    return {"days": list(reversed(days)), "by_agent": by_agent}
+    # par mission : coût d'API, et pour une commande le chiffre d'affaires et la marge (en euros)
+    from .missions import missions
+    rate = float(cfg["prices"].get("usd_to_eur", 0.92))
+    sales = {r["n"]: r for r in db.q("SELECT rowid AS n, amount, currency, livemode FROM sales")}
+    by_mission = []
+    for m in missions(db):
+        if not m["cost_usd"] and m["kind"] == "objectif" and not m["total"]:
+            continue
+        row = {"kind": m["kind"], "id": m["id"], "title": m["title"], "state": m["state"], "tasks": m["total"],
+               "cost_usd": m["cost_usd"], "cost_eur": round(m["cost_usd"] * rate, 4), "test": m.get("test", False)}
+        s = sales.get(m["id"]) if m["kind"] == "commande" else None
+        if s and s["currency"] == "EUR":
+            row["revenue_eur"] = s["amount"]
+            row["margin_eur"] = round(s["amount"] - row["cost_eur"], 2)
+        by_mission.append(row)
+    by_mission.sort(key=lambda r: -r["cost_usd"])
+    outside = db.one("SELECT COALESCE(SUM(c.usd),0) FROM costs c LEFT JOIN tasks t ON t.id=c.task_id "
+                     "WHERE c.month=? AND (t.id IS NULL OR (t.objective_id IS NULL AND t.order_ref IS NULL))", (month,))[0]
+    return {"days": list(reversed(days)), "by_agent": by_agent, "by_mission": by_mission, "usd_to_eur": rate,
+            "outside_missions_month_usd": round(outside, 4)}
 
 
 def activities(cfg, db) -> list[dict]:
