@@ -133,7 +133,11 @@ def send_email(ctx: ToolContext, to: str, reason: str, subject: str = "", body: 
             return f"Pièce jointe introuvable : {attachment}"
         if p.stat().st_size > 10_000_000:
             return "Pièce jointe trop lourde (10 Mo maximum)."
-        extra["attachment"] = attachment
+        from ..outgoing import OutgoingError, freeze
+        try:
+            extra.update(freeze(ctx.cfg, p.relative_to(ctx.cfg.workspace.resolve()).as_posix()))
+        except OutgoingError as e:
+            return f"Refusé : {e}"
     added = []
     if prospect:                             # premier contact (prospection) : identité de l'expéditeur et droit d'opposition ajoutés d'office
         body, added = sender_footer(ctx.cfg, body)
