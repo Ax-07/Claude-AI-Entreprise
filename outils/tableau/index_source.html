@@ -381,7 +381,7 @@ function approvalLines(a){ const pl = a.payload, lines = [];
   else lines.push(pl.question || "", pl.context ? "\n" + pl.context : "");
   return lines.join("\n"); }
 const agentPill = a => h("span",{style:{fontSize:"11px",color:C[a.agent],border:`1px solid ${C[a.agent]}88`,borderRadius:"999px",padding:"2px 9px",whiteSpace:"nowrap",alignSelf:"flex-start"}}, a.agent);
-const reviewBox = a => a.review ? h("div",{style:{fontSize:"12px",lineHeight:"1.45",padding:"8px 10px",borderRadius:"10px",background:"rgba(203,213,225,.07)",border:"1px solid rgba(203,213,225,.35)"}}, h("b",{},"Avis juridique : "), a.review)
+const reviewBox = a => a.review ? h("div",{style:{fontSize:"12px",lineHeight:"1.45",padding:"8px 10px",borderRadius:"10px",background:"rgba(203,213,225,.07)",border:"1px solid rgba(203,213,225,.35)"}}, h("b",{},"Avis juridique (relu avant de t’arriver) : "), a.review)
   : a.review_pending ? h("span",{class:"small muted"},"Relecture juridique en cours…") : null;
 // La décision se prend dans une fenêtre : le rafraîchissement automatique de la colonne n'efface plus ce que tu écris.
 function openApproval(a){
@@ -424,9 +424,12 @@ function openApproval(a){
 let LAST_APPR = "";
 function renderApprovals(list){
   const sig = JSON.stringify(list); if (sig === LAST_APPR) return; LAST_APPR = sig;     // rien de neuf : on ne redessine pas
+  const inReview = list.filter(a => a.in_review); list = list.filter(a => !a.in_review);
   const head = hd("Validations", "SHIELD", "#FBBF24", h("span",{style:{fontSize:"12px",fontWeight:"600",color:list.length?"#0B1029":"#C7CEF0",background:list.length?"#FBBF24":"rgba(255,255,255,.06)",borderRadius:"999px",padding:"3px 10px"}}, String(list.length)));
-  if (!list.length) return put($("#validations"), head, h("div",{class:"empty"},"Rien à valider pour l’instant. Les emails et paiements préparés par les agents apparaîtront ici."));
-  put($("#validations"), head, list.map(a => h("div",{class:"appr click",role:"button",tabindex:"0",onclick:()=>openApproval(a),onkeydown:e=>{ if(e.key==="Enter") openApproval(a); },title:"Ouvrir pour décider"},
+  const rv = inReview.length ? h("div",{class:"small muted",style:{padding:"8px 10px",borderRadius:"10px",border:"1px dashed rgba(203,213,225,.3)",marginBottom:"8px"},title:"Le Juridique relit ces demandes ; elles t’arriveront une fois conformes, ou corrigées par l’agent."},
+    `⚖ ${inReview.length} demande(s) en relecture juridique : ` + inReview.map(a => `#${a.id} ${ACTION[a.action]||a.action} (${a.agent})`).join(", ")) : null;
+  if (!list.length) return put($("#validations"), head, rv, h("div",{class:"empty"},"Rien à valider pour l’instant. Les emails et paiements préparés par les agents apparaîtront ici."));
+  put($("#validations"), head, rv, list.map(a => h("div",{class:"appr click",role:"button",tabindex:"0",onclick:()=>openApproval(a),onkeydown:e=>{ if(e.key==="Enter") openApproval(a); },title:"Ouvrir pour décider"},
     h("div",{style:{display:"flex",justifyContent:"space-between",gap:"8px"}}, h("b",{}, `#${a.id} · ${ACTION[a.action]||a.action}`), agentPill(a)),
     a.reason ? h("span",{class:"small muted"}, a.reason) : null,
     h("pre",{class:"pre",style:{maxHeight:"92px",overflow:"hidden"}}, approvalLines(a)),

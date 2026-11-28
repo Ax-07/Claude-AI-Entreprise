@@ -81,7 +81,10 @@ DEFAULTS: dict = {
     "security": {"daily_review": True},
     "finance": {"daily_review": True},                  # contrôle quotidien des dépenses par la Trésorerie
     "missions": {"max_usd_per_mission": 3.0},           # plafond de dépense d'une mission pilotée par un chef de projet
-    "legal_review": {"enabled": True, "actions": ["publish_page", "stripe_payment_link"], "prospection_emails": False},
+    # Relecture juridique AVANT ta décision : la demande n'arrive dans tes validations qu'avec l'accord du Juridique, ou
+    # après max_rounds corrections (tu tranches), ou sans avis au bout de max_wait_hours.
+    "legal_review": {"enabled": True, "actions": ["publish_page", "stripe_payment_link"], "prospection_emails": False,
+                     "max_rounds": 2, "max_wait_hours": 3},
     # Suivi des commandes : relance du PDG si plus personne ne travaille sur une commande non livrée.
     "commerce": {"stripe_sync_minutes": 10, "inbox_sync_minutes": 5, "inbox_tasks_per_day": 10,
                  "order_nudge_minutes": 30, "order_max_nudges": 3, "client_wait_hours": 48,

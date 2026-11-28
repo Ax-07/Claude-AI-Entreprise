@@ -59,7 +59,7 @@ def _waiting(db) -> dict:
     import json
     out = {}
     for a in db.q("SELECT a.id, a.payload, t.objective_id, t.order_ref FROM approvals a LEFT JOIN tasks t ON t.id=a.task_id "
-                  "WHERE a.status='pending'"):
+                  "WHERE a.status IN ('pending','review')"):
         order = json.loads(a["payload"]).get("order") or a["order_ref"]
         if order:
             out.setdefault(("commande", int(order)), []).append(a["id"])

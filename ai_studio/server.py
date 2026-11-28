@@ -224,6 +224,11 @@ def events(cfg, db, since_id: int = 0, limit: int = 40) -> list[dict]:
 
 def approvals(cfg, db) -> list[dict]:
     out = []
+    for a in db.q("SELECT * FROM approvals WHERE status='review' ORDER BY id"):     # en relecture : visibles, pas encore à décider
+        d = _row(a)
+        d["payload"] = {k: v for k, v in json.loads(a["payload"]).items() if k != "html"}
+        d["in_review"] = True
+        out.append(d)
     for a in db.pending_approvals():
         d = _row(a)
         d["payload"] = json.loads(a["payload"])

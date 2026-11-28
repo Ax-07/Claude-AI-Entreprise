@@ -320,7 +320,7 @@ def open_work(db, n: int) -> bool:
     """Quelqu'un travaille-t-il sur la commande (tâche ouverte, ou validation en attente du propriétaire) ?"""
     if db.one("SELECT 1 FROM tasks WHERE order_ref=? AND status IN ('pending','running','blocked')", (n,)):
         return True
-    return bool(db.one("SELECT 1 FROM approvals a LEFT JOIN tasks t ON t.id=a.task_id WHERE a.status='pending' "
+    return bool(db.one("SELECT 1 FROM approvals a LEFT JOIN tasks t ON t.id=a.task_id WHERE a.status IN ('pending','review') "
                        "AND (t.order_ref=? OR json_extract(a.payload,'$.order')=?)", (n, n)))
 
 
