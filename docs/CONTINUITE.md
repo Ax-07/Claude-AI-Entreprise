@@ -215,7 +215,7 @@ _Mis à jour le 27/11/2026_
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.
 
 ## Prochaines étapes
-1. Configuration chez le propriétaire : Gmail (mot de passe d'application), dépôt public du site + jeton GitHub, clé Stripe (lecture Checkout Sessions), mentions légales dans config.json.
-3. Notes du propriétaire sur les livrables, pour l'amélioration des agents.
-4. Phase « Prêt à vendre » : domaine, email pro, CGV, n8n.
-3. Choisir l'activité (piste : diagnostic SEO local) et viser le premier paiement Stripe.
+1. Propriétaire (après `git pull`, `importer-offres`, redémarrage) : prospection ax-07.fr en mode test ; commande d'essai Diagnostic SEO local pour vérifier le PDF généré par Edge sous Windows.
+2. Auditeur RH (validé) : évaluation des agents indépendante du PDG (performances, qualité, circulation de l'information), revue hebdomadaire, règles d'agents proposées via validation.
+3. Avant de vendre réellement : `mode-test off`, `company.legal` réel, `offers.social_rate` à ajuster (0,212 si BIC), factures automatiques conformes, domaine, email pro, CGV ; Gmail, dépôt public du site + jeton GitHub, clé Stripe déjà prévus.
+4. Ensuite : ordre de lancement vidéo / e-commerce ; export des sprites PNG.
