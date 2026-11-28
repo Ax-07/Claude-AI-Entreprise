@@ -118,7 +118,8 @@ class IsolationTest(Base):
                           "<img src='x.png' onerror=\"document.getElementById('t').textContent='PIRATE'\">"
                           "<script>document.getElementById('t').textContent='PIRATE'</script></body></html>")
         out = pdf.html_to_pdf(self.cfg, src, src.with_suffix(".pdf"))
-        text = subprocess.run(["pdftotext", str(out), "-"], capture_output=True, text=True).stdout
+        text = subprocess.run(["pdftotext", "-enc", "UTF-8", str(out), "-"], capture_output=True,
+                              encoding="utf-8", errors="replace").stdout or ""     # Windows : décodage UTF-8 explicite
         self.assertIn("ORIGINAL", text)
         self.assertNotIn("PIRATE", text)
         self.assertNotIn("SECRET-DU-PROPRIETAIRE", text)
