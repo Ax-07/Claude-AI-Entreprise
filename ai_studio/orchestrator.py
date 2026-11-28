@@ -89,6 +89,11 @@ class Studio:
             self.db.purge_cache(30); self.db.kv_set("cache_purged_on", day)
         commerce.sync_all(self.cfg, self.db)        # ventes Stripe et emails reçus (sans coût d'API)
         try:
+            from .approvals import reconcile
+            reconcile(self.cfg, self.db)            # opérations externes interrompues ou incertaines (audit FIN-03)
+        except Exception as e:
+            self.db.log("systeme", "erreur", f"Réconciliation des opérations externes impossible : {e}")
+        try:
             from . import prospects
             prospects.due_followups(self.cfg, self.db)   # relance unique à J+7, puis « sans suite » (sans coût d'API)
             from . import aftercare

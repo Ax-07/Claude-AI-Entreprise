@@ -26,6 +26,10 @@ class Role:
     def all_tools(self) -> list[str]:
         return list(dict.fromkeys(COMMON_TOOLS + self.tools))
 
+    def granted_tools(self) -> list[str]:
+        """Tout ce que ce rôle a le droit d'exécuter : ses outils + la recherche Brave s'il a la recherche web."""
+        return self.all_tools() + (["brave_search"] if self.web_search else [])
+
 
 # Divisions de l'entreprise : elles regroupent les pôles qui travaillent ensemble (même découpage que la carte).
 DIVISIONS = {

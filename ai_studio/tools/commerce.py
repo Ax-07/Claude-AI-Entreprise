@@ -303,9 +303,42 @@ def confirm_content_review(ctx: ToolContext, order: int, file: str, checked: str
     if len(checked.strip()) < 40:
         return "Décris concrètement ce que tu as vérifié (au moins une phrase précise : quoi, combien)."
     text = f"{file} — vérifié : {checked.strip()[:600]} — corrections : {corrections.strip()[:300] or 'aucune'} ({ctx.agent})"
-    ctx.db.run("UPDATE sales SET content_review=?, content_review_at=? WHERE rowid=?", (text, iso(), int(order)))
+    from ..outgoing import sha256_file
+    rel = p.relative_to(ctx.cfg.workspace.resolve()).as_posix()
+    ctx.db.run("UPDATE sales SET content_review=?, content_review_at=?, content_review_file=?, content_review_sha=? WHERE rowid=?",
+               (text, iso(), rel, sha256_file(p), int(order)))
     ctx.db.log(ctx.agent, "commande", f"Commande n°{order} : fond du livrable relu ({file})")
     return "Relecture enregistrée : la livraison peut être confiée au Service Client (deliver_order)."
+
+
+def review_mismatch(ctx: ToolContext, s, p) -> str | None:
+    """La relecture du fond porte-t-elle sur la version exacte de ce qui est livré ? (audit SEC-06)
+
+    Document livré tel quel : même fichier, même empreinte. Archive .zip (site) : le fichier relu n'a pas changé
+    depuis la relecture, et l'archive en contient exactement cette version."""
+    from ..outgoing import sha256_file
+    rel, digest = s["content_review_file"], s["content_review_sha"]
+    if not (rel and digest):
+        return "la relecture enregistrée ne précise pas la version relue (relecture ancienne)."
+    base = ctx.cfg.workspace.resolve()
+    reviewed = (base / rel).resolve()
+    if reviewed == p:
+        return None if sha256_file(p) == digest else f"{rel} a été modifié depuis la relecture."
+    if p.suffix.lower() == ".zip":
+        import hashlib
+        import zipfile
+        if not reviewed.is_file() or sha256_file(reviewed) != digest:
+            return f"{rel} a été modifié (ou supprimé) depuis la relecture."
+        try:
+            with zipfile.ZipFile(p) as z:
+                for info in z.infolist():
+                    if not info.is_dir() and info.filename.rsplit("/", 1)[-1] == reviewed.name \
+                            and hashlib.sha256(z.read(info)).hexdigest() == digest:
+                        return None
+        except zipfile.BadZipFile:
+            return "l'archive est illisible."
+        return f"l'archive ne contient pas la version relue de {rel} (refais l'archive avec package_files)."
+    return f"le fichier relu ({rel}) n'est pas celui que tu livres."
 
 
 @tool("deliver_order",
@@ -323,6 +356,11 @@ def deliver_order(ctx: ToolContext, order: int, attachment: str, subject: str, b
         return "Cette commande est déjà livrée."
     if not s["customer_email"]:
         return "Email du client inconnu : impossible de livrer par email. Signale-le dans le résultat de ta tâche."
+    from ..outgoing import OutgoingError, check_recipient, freeze, sha256_file
+    try:
+        check_recipient(ctx.cfg, s["customer_email"])
+    except OutgoingError as e:
+        return f"Livraison refusée : {e} Indique-le dans ton résultat."
     p = _safe_path(ctx, attachment)
     if not p.is_file():
         return f"Livrable introuvable : {attachment}. Il faut d'abord le produire."
@@ -336,6 +374,10 @@ def deliver_order(ctx: ToolContext, order: int, attachment: str, subject: str, b
     if qa["errors"]:
         return ("Livraison refusée : le contrôle qualité a trouvé des erreurs. Corrige-les (ou délègue la correction au "
                 "producteur du livrable), relance check_deliverable, puis livre.\n" + report(qa))
+    mismatch = review_mismatch(ctx, s, p)
+    if mismatch:
+        return (f"Livraison refusée : {mismatch} Le chef de projet doit relire la version finale (confirm_content_review, "
+                f"order={order}) avant la livraison. Signale-le-lui dans ton résultat.")
     if ctx.db.one("SELECT 1 FROM approvals WHERE status IN ('pending','review') AND action='send_email' AND json_extract(payload,'$.order')=?", (int(order),)):
         return "Une livraison de cette commande attend déjà la validation du propriétaire. Rien d'autre à faire."
     extra, sent = {}, attachment
@@ -350,8 +392,12 @@ def deliver_order(ctx: ToolContext, order: int, attachment: str, subject: str, b
         sent = pdf.relative_to(ctx.cfg.workspace.resolve()).as_posix()
         extra = {"source": attachment, "pages": page_count(pdf)}
         ctx.db.log(ctx.agent, "file", f"Rapport converti en PDF : {sent} ({extra['pages']} page(s))")
+    try:
+        frozen = freeze(ctx.cfg, sent)                  # ce qui sera validé puis envoyé, octet pour octet
+    except OutgoingError as e:
+        return f"Livraison impossible : {e}"
     aid = ctx.db.add_approval(ctx.agent, ctx.task["id"] if ctx.task is not None else None, "send_email",
-                              {"to": s["customer_email"], "subject": subject, "body": body, "attachment": sent,
+                              {"to": s["customer_email"], "subject": subject, "body": body, **frozen,
                                "order": int(order), "qa": summary(qa), "review": s["content_review"], **extra}, f"Livraison de la commande n°{order} ({s['product'] or 'commande'})")
     ctx.db.log(ctx.agent, "approval", f"Livraison de la commande n°{order} en attente de validation (#{aid})")
     return (f"Livraison #{aid} en attente de validation" + (f" (pièce jointe : {sent}, converti en PDF)" if extra else "") +

@@ -2,9 +2,7 @@
 from __future__ import annotations
 
 import html
-import ipaddress
 import re
-import socket
 import urllib.parse
 import urllib.request
 from html.parser import HTMLParser
@@ -281,14 +279,9 @@ class _Text(HTMLParser):
 
 
 def _public_host(host: str) -> bool:
-    try:
-        for info in socket.getaddrinfo(host, None):
-            ip = ipaddress.ip_address(info[4][0])
-            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-                return False
-        return True
-    except Exception:
-        return False
+    """Le nom ne désigne que des adresses publiques d'Internet (voir ai_studio/net.py)."""
+    from ..net import is_public_host
+    return is_public_host(host)
 
 
 @tool("fetch_url", "Télécharge une page web publique et renvoie son texte (sans coût de recherche).",
@@ -298,15 +291,17 @@ def fetch_url(ctx: ToolContext, url: str) -> str:
     u = urllib.parse.urlparse(url)
     if u.scheme not in ("http", "https") or not u.hostname:
         return "URL invalide (http/https uniquement)."
-    if not _public_host(u.hostname):
-        return "Refusé : adresse non publique."
-    hit = ctx.db.cache_get("page", url, PAGE_CACHE_DAYS)
+    hit = ctx.db.cache_get("page", url, PAGE_CACHE_DAYS)       # adresse vérifiée au téléchargement (net.safe_get)
     if hit:
         return f"[Page lue le {hit['created_at'][:10]} par {hit['agent']}, reprise de la bibliothèque sans nouveau téléchargement]\n" + hit["content"]
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (AI-Enterprise-Studio research bot)"})
-    with urllib.request.urlopen(req, timeout=20) as r:
-        ctype = r.headers.get("content-type", "")
-        raw = r.read(400_000)
+    from .. import net
+    try:      # chaque redirection est revérifiée, et la connexion va vers l'IP contrôlée (audit SEC-02)
+        r = net.safe_get(url, timeout=20, max_bytes=400_000, headers={"User-Agent": "Mozilla/5.0 (AI-Enterprise-Studio research bot)"})
+    except net.NetError as e:
+        return f"Refusé : {e}."
+    if r["status"] >= 400:
+        return f"Erreur HTTP {r['status']} pour {r['url']}."
+    ctype, raw = r["headers"].get("content-type", ""), r["body"]
     if "html" not in ctype and "text" not in ctype and "json" not in ctype:
         return f"Contenu non textuel ({ctype})."
     text = raw.decode("utf-8", "replace")

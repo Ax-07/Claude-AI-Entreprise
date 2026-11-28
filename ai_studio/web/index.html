@@ -424,12 +424,23 @@ function openApproval(a){
 let LAST_APPR = "";
 function renderApprovals(list){
   const sig = JSON.stringify(list); if (sig === LAST_APPR) return; LAST_APPR = sig;     // rien de neuf : on ne redessine pas
+  const unsure = list.filter(a => a.uncertain); list = list.filter(a => !a.uncertain);
   const inReview = list.filter(a => a.in_review); list = list.filter(a => !a.in_review);
   const head = hd("Validations", "SHIELD", "#FBBF24", h("span",{style:{fontSize:"12px",fontWeight:"600",color:list.length?"#0B1029":"#C7CEF0",background:list.length?"#FBBF24":"rgba(255,255,255,.06)",borderRadius:"999px",padding:"3px 10px"}}, String(list.length)));
   const rv = inReview.length ? h("div",{class:"small muted",style:{padding:"8px 10px",borderRadius:"10px",border:"1px dashed rgba(203,213,225,.3)",marginBottom:"8px"},title:"Le Juridique relit ces demandes ; elles t’arriveront une fois conformes, ou corrigées par l’agent."},
     `⚖ ${inReview.length} demande(s) en relecture juridique : ` + inReview.map(a => `#${a.id} ${ACTION[a.action]||a.action} (${a.agent})`).join(", ")) : null;
-  if (!list.length) return put($("#validations"), head, rv, h("div",{class:"empty"},"Rien à valider pour l’instant. Les emails et paiements préparés par les agents apparaîtront ici."));
-  put($("#validations"), head, rv, list.map(a => h("div",{class:"appr click",role:"button",tabindex:"0",onclick:()=>openApproval(a),onkeydown:e=>{ if(e.key==="Enter") openApproval(a); },title:"Ouvrir pour décider"},
+  const resolve = async (a, done) => {
+    try { const r = await api("POST", `/api/approvals/${a.id}/resolve`, {done}); toast(r.message, true); LAST_APPR = ""; refresh(); }
+    catch(e){ toast(e.message, false); } };
+  const un = unsure.map(a => h("div",{style:{padding:"10px",borderRadius:"10px",border:"1px solid rgba(248,113,113,.55)",background:"rgba(248,113,113,.07)",marginBottom:"8px",display:"flex",flexDirection:"column",gap:"6px"}},
+    h("b",{}, `⚠ #${a.id} · ${ACTION[a.action]||a.action} : issue incertaine`),
+    h("span",{class:"small"}, (a.result || "Coupure pendant l’exécution.") + (a.action==="send_email" ? ` Vérifie dans Gmail (Messages envoyés) si l’email à ${a.payload.to} « ${a.payload.subject||""} » est parti.` : " Vérifie dans Stripe / GitHub.")),
+    h("span",{class:"small muted"}, "Rien ne sera renvoyé sans ta réponse."),
+    h("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
+      h("button",{class:"btn ok",onclick:()=>resolve(a, true)}, a.action==="send_email" ? "Il est bien parti" : "C’est fait"),
+      h("button",{class:"btn",onclick:()=>resolve(a, false)}, a.action==="send_email" ? "Il n’est pas parti (le remettre à valider)" : "Pas fait (le remettre à valider)"))));
+  if (!list.length) return put($("#validations"), head, ...un, rv, h("div",{class:"empty"},"Rien à valider pour l’instant. Les emails et paiements préparés par les agents apparaîtront ici."));
+  put($("#validations"), head, ...un, rv, list.map(a => h("div",{class:"appr click",role:"button",tabindex:"0",onclick:()=>openApproval(a),onkeydown:e=>{ if(e.key==="Enter") openApproval(a); },title:"Ouvrir pour décider"},
     h("div",{style:{display:"flex",justifyContent:"space-between",gap:"8px"}}, h("b",{}, `#${a.id} · ${ACTION[a.action]||a.action}`), agentPill(a)),
     a.reason ? h("span",{class:"small muted"}, a.reason) : null,
     h("pre",{class:"pre",style:{maxHeight:"92px",overflow:"hidden"}}, approvalLines(a)),
@@ -699,7 +710,7 @@ async function openSales(){
       h("td",{class:{livree:"st-done",a_livrer:"st-running",attente_client:"st-pending"}[s.stage]||"muted"}, ({a_livrer:"À livrer",attente_client:"Attente client",livree:"Livrée",historique:"Historique"})[s.stage]||"—", s.due_at && s.stage!=="livree" ? h("div",{class:"small muted"}, "avant le " + new Date(s.due_at).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"})) : null))))) : h("div",{class:"empty"},"Aucune vente pour l’instant. Elles apparaîtront ici dans les 10 minutes qui suivent un paiement Stripe.")));
 }
 async function openInbox(){
-  const list = await api("GET","/api/inbox"), LBL = {new:"Nouveau",queued:"Confié à un agent",ignored:"Ignoré",replied:"Répondu"};
+  const list = await api("GET","/api/inbox"), LBL = {new:"En attente",received:"Reçu, en cours de traitement",waiting:"En attente (plafond du jour)",queued:"Confié à un agent",ignored:"Ignoré",replied:"Répondu",bounce:"Non distribué"};
   modal("Emails reçus", h("div",{}, list.length ? list.map(m => h("details",{class:"box",style:{marginBottom:"8px"}},
     h("summary",{style:{cursor:"pointer",display:"flex",gap:"10px",flexWrap:"wrap",justifyContent:"space-between"}}, h("span",{}, h("b",{}, m.from_name || m.from_addr), " — ", m.subject), h("span",{class:"small muted"}, `${LBL[m.status]||m.status}${m.reason?" ("+m.reason+")":""} · ${ago(m.received_at)}`)),
     h("div",{class:"small muted",style:{margin:"6px 0"}}, m.from_addr, m.task_id ? h("button",{class:"link",style:{marginLeft:"10px"},onclick:()=>openTask(m.task_id)}, `tâche #${m.task_id} →`) : null),

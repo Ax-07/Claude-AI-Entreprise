@@ -42,6 +42,10 @@ class SeoTest(Base):
         super().setUp()
         os.environ["NO_PROXY"] = os.environ["no_proxy"] = "127.0.0.1,localhost"
         self.local = lambda h: h == "127.0.0.1"                      # seul le serveur de test est « public »
+        from ai_studio import net                                     # … y compris pour la connexion à l'IP vérifiée
+        real = net.ip_allowed
+        p = unittest.mock.patch.object(net, "ip_allowed", lambda ip: ip == "127.0.0.1" or real(ip))
+        p.start(); self.addCleanup(p.stop)
 
     def test_site_analysis_facts_and_issues(self):
         r = seo.check_site(self.url + "/ancien", 5, is_public=self.local)
