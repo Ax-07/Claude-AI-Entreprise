@@ -103,7 +103,7 @@ DEFAULTS: dict = {
     # Prospection : une seule relance, N jours après le premier email sans réponse ; sans suite N jours après la relance.
     "prospects": {"followup_days": 7, "close_after_days": 7},
     # Sauvegarde quotidienne de la base et des livrables dans data/sauvegardes (les N plus récentes sont gardées).
-    "backup": {"enabled": True, "keep": 14},
+    "backup": {"enabled": True, "keep": 14, "external_dir": ""},   # external_dir : OneDrive, clé USB… (copie hors du PC)
     "email": {
         "from_name": "AI Enterprise Studio",
         "daily_limit": 20,

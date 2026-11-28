@@ -78,7 +78,8 @@ Pour le fonctionnement 24 h/24 : double-clique sur `demarrer.bat`. Il lance le m
 
 - `python -m ai_studio demarrage-auto` : le lance automatiquement à chaque ouverture de session Windows (`--retirer` pour annuler).
 - Notifications Windows : tu es prévenu dès qu'une validation t'attend, que le budget est atteint ou que le moteur est bloqué. Clique sur la notification pour ouvrir le tableau de bord. Test : `python -m ai_studio notifier-test`.
-- Sauvegarde automatique chaque jour dans `data/sauvegardes` (14 jours gardés). `sauvegardes` pour la liste, `restaurer NOM` pour revenir en arrière, moteur arrêté.
+- Sauvegarde automatique chaque jour dans `data/sauvegardes` (14 jours gardés) : base, livrables, pièces jointes validées et `config.json` (jamais `.env`), avec des empreintes vérifiées à la création. `sauvegardes` pour la liste, `verifier-sauvegarde [NOM]` pour contrôler, `restaurer NOM` pour tout remettre comme à cette date, moteur arrêté (l'état actuel est mis de côté dans `data/archives/`).
+- **Copie hors du PC** (recommandé) : indique un dossier dans `config.json`, `"backup": {"external_dir": "C:/Users/toi/OneDrive/Sauvegardes"}` (OneDrive, clé USB, disque réseau). Chaque sauvegarde y est copiée et vérifiée ; tu es prévenu si la copie échoue. Les sauvegardes ne sont pas chiffrées : choisis un emplacement protégé (BitLocker, coffre-fort OneDrive).
 Pense à désactiver la mise en veille du PC.
 
 ### Activités et sécurité

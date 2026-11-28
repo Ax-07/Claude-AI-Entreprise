@@ -288,6 +288,14 @@ _Mis à jour le 27/11/2026_
   - Réponse d'un client dont la commande attend des informations : la commande reste en « attente_client », la relance est remise à zéro, et la tâche liste les informations attendues et demande `set_order_status(n, 'a_livrer')` seulement si tout est fourni. **Le délai démarre à ce moment-là.**
   - Tableau de bord : libellés « Reçu, en cours de traitement », « En attente (plafond du jour) », « Non distribué ».
   - `tests/test_inbox_recovery.py` : 5 tests, dont 4 échouent sur l'ancien code. Tests adaptés au nouveau comportement : `test_daily_cap` (reprise le lendemain), `test_intake` et `test_orders` (délai démarré par `set_order_status`). `test_quality` saute la conversion réelle en root sans `PDF_NO_SANDBOX=1`. 270 tests.
+- Phase 2, OPS-01 corrigé (28/11) : `backup.py` réécrit. Défauts confirmés : `restore()` ne remettait que la base (livrables et coffre `pieces_validees` désynchronisés), aucun contrôle d'intégrité, et tout restait sur le même disque.
+  - Une sauvegarde contient `studio.db`, `livrables.zip`, `pieces_validees.zip`, `config.json` (jamais `.env`) et `manifeste.json` (SHA-256 et taille). Elle est construite dans `<nom>.en-cours` puis renommée.
+  - `verify_dir` contrôle le manifeste, les empreintes, `PRAGMA integrity_check` et `testzip`. Il tourne juste après la création, sinon `BackupError`.
+  - `restore(cfg, nom, force=False)` : vérification d'abord (rien n'est touché si la sauvegarde est abîmée ou ancienne, sans manifeste) ; refus si le moteur a fait un cycle il y a moins de 3 min ; dossiers préparés en `.restauration` (chemins du zip contrôlés), puis échange ; coffre remis en lecture seule. L'état actuel est conservé dans `data/archives/avant-restauration-<date>/`.
+  - `backup.external_dir` : copie vérifiée dans `<dossier>/AI-Enterprise-Studio/<date>`, même rotation (`keep`). Un échec déclenche une notification, et la sauvegarde locale reste faite.
+  - **Pas de chiffrement** : la bibliothèque standard ne sait pas écrire de zip chiffré. Il est recommandé de choisir un emplacement chiffré (BitLocker, coffre-fort OneDrive). À rediscuter si le propriétaire accepte une dépendance.
+  - Commandes : `verifier-sauvegarde [NOM]` ; `restaurer NOM [--forcer]` ; `sauvegardes` indique « complète » ou « ancienne » et la copie externe.
+  - `tests/test_backup_full.py` : 8 tests. `test_maintenance` : l'ancienne base est désormais dans `data/archives/`. 278 tests.
 
 ## Non vérifié
 - Contre les vrais services (seulement avec des simulations) : la synchronisation Stripe et les clés d'idempotence, la recherche dans « Messages envoyés » (IMAP \Sent), le client réseau sur de vrais sites.

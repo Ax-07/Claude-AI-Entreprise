@@ -126,7 +126,8 @@ class BackupTest(Base):
         db2 = DB(self.cfg.db_path)
         self.assertEqual([r[0] for r in db2.q("SELECT text FROM objectives")], ["Avant"])
         db2.conn.close()
-        self.assertTrue(any(p.name.startswith("studio.avant-restauration") for p in self.cfg.db_path.parent.iterdir()))
+        kept = list((self.cfg.data_dir / "archives").glob("avant-restauration-*/studio.db"))
+        self.assertEqual(len(kept), 1)                    # ancienne base mise de côté, jamais effacée
         self.db = DB(":memory:")         # pour le nettoyage
 
     def test_disabled(self):
