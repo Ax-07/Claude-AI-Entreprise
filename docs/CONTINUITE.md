@@ -163,6 +163,13 @@ _Mis à jour le 27/11/2026_
 
 - Retour du propriétaire sur le premier tableau réel (28/11) : mission #6 avec 12/12 tâches réussies mais restée « En cours » ; commandes n°2 et n°3 « À livrer » avec 13/13 tâches réussies ; missions #2 à #4 en double de #1 avec d'anciens échecs. Améliorations : « À vérifier » inclut aussi les missions dont toutes les tâches sont finies sans rien en attente ; anomalie « plus personne n'y travaille » ; validations en attente rattachées à leur mission (« elle attend ta décision #N ») ; une mission en pause n'affiche plus ses tâches suspendues comme anomalie ; verdict « Archiver » (objectif `archived`, commande `historique` + owner_check `archived`, tâches en attente annulées) et onglet « Archivées ». 134 tests.
 
+## Outils de production : audit et contrôle qualité (28/11/2026)
+- Audit demandé par le propriétaire. Déjà en place : write_file (200 Ko/fichier, append), read_file, list_files, fetch_url, recherche web, package_files (.zip sans secrets ni .js), deliver_order (email + pièce jointe), envoi SMTP avec type MIME. Manquait : aucun moyen de vérifier un livrable, lecture tronquée à 12 000 caractères, aucun aperçu pour le propriétaire.
+- `ai_studio/quality.py` + outil `check_deliverable` (Atelier, Développement) : site (dossier ou .zip) → index.html, title, meta description, viewport, lang, un seul h1, alt des images, liens internes cassés, mentions légales, lien de contact, fichiers bloqués par Gmail, texte provisoire ; document HTML/MD → longueur, titres de sections, sources citées, CSS externe (erreur : non autonome), texte provisoire. Erreurs = lorem/TODO/FIXME/XXX/{{…}}, liens cassés, pas de title, CSS local externe.
+- `deliver_order` refuse la livraison s'il reste des erreurs et joint le résumé du contrôle (`qa`) à la validation. Consignes Atelier/Développement : check_deliverable avant livraison ; rapport HTML autonome. `read_file` accepte `offset`.
+- Aperçu du livrable dans la fenêtre de validation : GET /api/approvals/ID/livrable[/chemin] (page HTML, document, ou fichiers d'une archive de site avec navigation entre pages), isolé (CSP sandbox, aucun script). 139 tests.
+- Limites restantes : pas de génération d'images ni de PDF (rapports HTML imprimables) ; pas de rendu visuel automatique (le propriétaire juge via l'aperçu).
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

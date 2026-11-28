@@ -142,12 +142,18 @@ def write_file(ctx: ToolContext, path: str, content: str, append: bool = False) 
     return f"Fichier {'complété' if append else 'enregistré'} : {path} ({size} octets)"
 
 
-@tool("read_file", "Lit un fichier de l'espace de travail.", {"path": {"type": "string"}}, ["path"])
-def read_file(ctx: ToolContext, path: str) -> str:
+@tool("read_file", "Lit un fichier de l'espace de travail (12 000 caractères à la fois ; offset pour lire la suite).",
+      {"path": {"type": "string"}, "offset": {"type": "integer", "description": "position de départ (0 par défaut)", "default": 0}}, ["path"])
+def read_file(ctx: ToolContext, path: str, offset: int = 0) -> str:
     p = _safe_path(ctx, path)
     if not p.is_file():
         return "Fichier introuvable."
-    return p.read_text(encoding="utf-8", errors="replace")[:12000]
+    text = p.read_text(encoding="utf-8", errors="replace")
+    offset = max(0, int(offset or 0))
+    part = text[offset:offset + 12000]
+    if offset + 12000 < len(text):
+        part += f"\n\n[… suite non affichée : {len(text) - offset - 12000} caractères. read_file avec offset={offset + 12000}]"
+    return part
 
 
 @tool("list_files", "Liste les fichiers de l'espace de travail.", {"folder": {"type": "string", "default": ""}})
