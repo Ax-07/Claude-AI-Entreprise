@@ -329,30 +329,54 @@ def relaunch_if_stalled(db, task) -> int | None:
 
 def relaunch_mission(db, kind: str, mid: int, request: str = "") -> int | None:
     """Mission pilotée ni close ni livrée, sans rien en cours ni en attente de validation : le chef de projet est relancé.
-    Après 2 relances sans qu'aucun autre agent n'ait travaillé, le PDG arbitre. `request` : consigne du PDG ou du propriétaire."""
+    Après 2 relances (comptées depuis la dernière intervention du propriétaire), le PDG arbitre ; si cela ne
+    suffit pas, une décision est demandée au propriétaire. `request` : consigne du PDG ou du propriétaire."""
     m = (kind, int(mid))
     d = detail(db, *m)
     if d["archived"] or (d["kind"] == "objectif" and d["status"] in ("done", "paused")) or (d["kind"] == "commande" and d["status"] == "livree"):
         return None
-    if d["counts"]["pending"] or d["counts"]["running"] or d["waiting"]:
+    if d["counts"]["pending"] or d["counts"]["running"]:
         return None
+    if d["waiting"]:
+        stuck = [a["id"] for a in db.q("SELECT id, reason FROM approvals WHERE status='pending' AND action='decision'")
+                 if a["id"] in d["waiting"] and (a["reason"] or "").startswith("Mission bloquée")]
+        if not request or set(stuck) != set(d["waiting"]):
+            return None
+        for aid in stuck:                   # une consigne explicite remplace la demande de décision « mission bloquée »
+            db.set_approval(aid, status="approved", decided_at=iso(), result=f"Remplacée par la consigne : {request}"[:500])
     col = "objective_id" if m[0] == "objectif" else "order_ref"
-    recent = db.q(f"SELECT agent, title FROM tasks WHERE {col}=? ORDER BY id DESC LIMIT 3", (m[1],))
-    if recent and recent[0]["agent"] == "pdg" and recent[0]["title"].startswith("Arbitrage") and not request:
-        # même l'arbitrage du PDG n'a rien relancé : on s'arrête et on prévient le propriétaire, une seule fois
-        key = f"mission_stuck_{m[0]}_{m[1]}"
+    # On compte depuis la dernière intervention du propriétaire : les relances et arbitrages déjà faits, même si
+    # d'autres agents ont travaillé entre-temps (sinon une mission qui tourne en rond n'est jamais escaladée).
+    base = db.one(f"SELECT COALESCE(MAX(id), 0) FROM tasks WHERE {col}=? AND created_by='proprietaire'", (m[1],))[0]
+    rows = db.q(f"SELECT id, agent, title FROM tasks WHERE {col}=? AND id>? ORDER BY id", (m[1], base))
+    arbs = [r["id"] for r in rows if r["agent"] == "pdg" and r["title"].startswith("Arbitrage")]
+    since = arbs[-1] if arbs else 0
+    stalls = sum(1 for r in rows if r["id"] > since and r["agent"] == PM and r["title"].startswith("Relance :"))
+    last_is_arb = bool(rows) and rows[-1]["id"] == since and since > 0
+    kw = {"objective_id": m[1] if m[0] == "objectif" else None, "order_ref": m[1] if m[0] == "commande" else None}
+    if not request and arbs and (last_is_arb or stalls >= 2):
+        # même l'arbitrage du PDG n'a rien débloqué : on s'arrête et on demande au propriétaire, une seule fois
+        key = f"mission_stuck_{m[0]}_{m[1]}_{base}"
         if not db.kv_get(key):
             db.kv_set(key, iso())
+            last_pm = db.one(f"SELECT id, result FROM tasks WHERE {col}=? AND agent=? ORDER BY id DESC LIMIT 1", (m[1], PM))
+            db.add_approval(PM, last_pm["id"] if last_pm else None, "decision",
+                            {"question": f"Mission bloquée : {d['title']}"[:200],
+                             "context": ("Le chef de projet a été relancé et le PDG a arbitré, sans progrès. Dernier point du "
+                                         "chef de projet :\n" + ((last_pm["result"] or "")[:1500] if last_pm else "—") +
+                                         "\n\nRéponds avec une consigne (elle relance la mission) ou refuse pour l'abandonner.")},
+                            f"Mission bloquée : {d['title']}"[:200])
             db.log("systeme", "mission", f"{d['title']} : bloquée malgré les relances et l'arbitrage du PDG — ta décision est nécessaire")
         return None
-    stalls = sum(1 for r in recent if r["agent"] == PM and r["title"].startswith("Relance :"))
-    kw = {"objective_id": m[1] if m[0] == "objectif" else None, "order_ref": m[1] if m[0] == "commande" else None}
     if stalls >= 2 and not request:         # une consigne explicite (PDG, propriétaire) relance toujours le chef de projet
         db.log("systeme", "mission", f"{d['title']} : à l'arrêt malgré 2 relances du chef de projet → arbitrage du PDG")
         return db.add_task(f"Arbitrage : mission à l'arrêt — {d['title']}"[:120], "pdg",
                            "Le chef de projet a été relancé deux fois sans faire avancer la mission. Lance mission_status, "
-                           "identifie le blocage (étape manquante, avis bloquant, agent qui échoue) et décide : relancer une "
-                           "étape précise, changer d'approche, ou demander une décision au propriétaire (request_owner_decision).",
+                           "identifie le blocage (étape manquante, avis bloquant, agent qui échoue) et décide : relancer le "
+                           "chef de projet avec une consigne précise (assign_project_manager avec un brief), changer "
+                           "d'approche, clôturer, ou demander une décision au propriétaire (request_owner_decision). "
+                           "Un avis juridique qui ajoute des conditions non imposées par la loi n'est pas un blocage : "
+                           "tranche toi-même.",
                            priority=1, created_by="systeme", **kw)
     return db.add_task(f"Relance : la mission n'avance plus"[:120], PM,
                        (f"CONSIGNE DE RELANCE : {request}\n\n" if request else "") +
