@@ -151,6 +151,10 @@ def detail(db, kind: str, mid: int) -> dict:
 
 def verify(cfg, db, kind: str, mid: int, verdict: str, note: str = "") -> str:
     """Le propriétaire confirme qu'une mission est vraiment terminée, ou la renvoie au PDG avec ce qui ne va pas."""
+    if verdict == "delete":
+        from .reset import delete_mission
+        r = delete_mission(cfg, db, kind, mid)
+        return f"{r['title']} supprimée : {r['tasks']} tâche(s), {r['approvals']} validation(s). Sauvegarde faite avant."
     m = detail(db, kind, mid)
     note = (note or "").strip()
     if verdict == "archive":

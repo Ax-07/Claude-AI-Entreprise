@@ -532,7 +532,10 @@ async function openMissions(filter){
 async function openMission(kind, id){
   let m; try { m = await api("GET",`/api/missions/${kind}/${id}`); } catch(e){ return toast(e.message,false); }
   const note = h("textarea",{rows:"3",placeholder:"Ce qui manque ou ce qui ne va pas (obligatoire pour la renvoyer au PDG)…",style:{width:"100%",resize:"vertical"}});
-  const send = async verdict => { try { const r = await api("POST",`/api/missions/${kind}/${id}`,{verdict, note: note.value}); toast(r.message, verdict==="ok"); openMissions(verdict==="ok" ? "todo" : "open"); refresh(); } catch(e){ toast(e.message,false); } };
+  const send = async verdict => { try { const r = await api("POST",`/api/missions/${kind}/${id}`,{verdict, note: note.value}); toast(r.message, verdict==="ok" || verdict==="delete"); openMissions(verdict==="ok" ? "todo" : verdict==="delete" ? "all" : "open"); refresh(); } catch(e){ toast(e.message,false); } };
+  const canDel = m.kind === "objectif" || m.test;          // une commande réellement payée ne se supprime pas
+  const del = h("button",{class:"btn no",title:"Efface la mission, ses tâches, validations et son journal (sauvegarde faite avant ; coûts, bibliothèque et mémoire conservés)",
+    onclick:()=>{ if (del.dataset.armed) return send("delete"); del.dataset.armed = "1"; del.textContent = "Confirmer la suppression"; setTimeout(()=>{ delete del.dataset.armed; del.textContent = "Supprimer"; }, 5000); }},"Supprimer");
   const kids = {}; m.tasks.forEach(t => (kids[t.parent_id||0] = kids[t.parent_id||0]||[]).push(t));
   const ids = new Set(m.tasks.map(t=>t.id)), roots = m.tasks.filter(t => !t.parent_id || !ids.has(t.parent_id));
   const row = (t, depth) => [h("div",{class:"feedrow click",style:{paddingLeft:(depth*18)+"px",alignItems:"flex-start"},onclick:()=>openTask(t.id)},
@@ -551,9 +554,9 @@ async function openMission(kind, id){
     h("span",{class:"lab"},"Tâches (clique pour le détail et le résultat complet)"),
     h("div",{style:{maxHeight:"40vh",overflow:"auto"}}, roots.length ? roots.map(t => row(t,0)).flat() : h("div",{class:"empty"},"Aucune tâche pour cette mission.")),
     h("span",{class:"lab"},"Ta vérification"), note,
-    m.archived ? h("span",{class:"small muted"},"Mission archivée : elle n’est plus suivie.") :
+    m.archived ? h("div",{style:{display:"flex",gap:"10px",alignItems:"center",flexWrap:"wrap"}}, h("span",{class:"small muted"},"Mission archivée : elle n’est plus suivie."), canDel ? del : null) :
     h("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}}, h("button",{class:"btn ok",onclick:()=>send("ok")},"Confirmer : terminée"), h("button",{class:"btn no",onclick:()=>send("issue")},"Pas terminée : renvoyer au PDG"),
-      h("button",{class:"btn",title:"Doublon, essai ou mission abandonnée : ses tâches en attente sont annulées",onclick:()=>send("archive")},"Archiver"))));
+      h("button",{class:"btn",title:"Doublon, essai ou mission abandonnée : ses tâches en attente sont annulées",onclick:()=>send("archive")},"Archiver"), canDel ? del : null)));
 }
 async function openTask(id){
   const t = await api("GET",`/api/tasks/${id}`);

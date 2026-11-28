@@ -46,3 +46,47 @@ def fresh_start(cfg, db, agent_memory: bool = False) -> dict:
     db.log("proprietaire", "systeme", f"Remise à zéro : {out['tasks']} tâche(s), {out['objectives']} mission(s), "
            f"{out['test_orders']} commande(s) d'essai supprimées ; sauvegarde {saved.name}")
     return out
+
+
+def delete_mission(cfg, db, kind: str, mid: int) -> dict:
+    """Supprime une mission et tout ce qui s'y rattache (tâches, validations, journal), après une sauvegarde.
+    Conservés : coûts (le budget reste exact), bibliothèque de recherches, mémoire des agents, fichiers de travail.
+    Refusé si un agent travaille dessus en ce moment, et pour une commande réellement payée."""
+    from .backup import make_backup
+    if kind not in ("objectif", "commande"):
+        raise ValueError("Type de mission inconnu")
+    mid = int(mid)
+    col = "objective_id" if kind == "objectif" else "order_ref"
+    if kind == "objectif":
+        row = db.one("SELECT id, text FROM objectives WHERE id=?", (mid,))
+        if not row:
+            raise KeyError(f"Mission #{mid} introuvable")
+        title = f"Mission #{mid} · {row['text'][:80]}"
+    else:
+        row = db.one("SELECT rowid AS n, * FROM sales WHERE rowid=?", (mid,))
+        if not row:
+            raise KeyError(f"Commande n°{mid} introuvable")
+        if row["livemode"]:
+            raise ValueError("Commande réellement payée : elle ne peut pas être supprimée (archive-la).")
+        title = f"Commande d'essai n°{mid}"
+    if db.one(f"SELECT 1 FROM tasks WHERE {col}=? AND status='running'", (mid,)):
+        raise ValueError("Un agent travaille sur cette mission en ce moment : attends la fin de sa tâche (ou arrête le "
+                         "moteur), puis recommence.")
+    ids = [r[0] for r in db.q(f"SELECT id FROM tasks WHERE {col}=?", (mid,))]
+    saved = make_backup(cfg, db, datetime.now().strftime("%Y-%m-%d_%H%M%S") + f"_avant-suppression-{kind}-{mid}")
+    marks = ",".join("?" * len(ids)) or "NULL"
+    with db.conn:
+        n_appr = db.conn.execute(f"DELETE FROM approvals WHERE task_id IN ({marks})", ids).rowcount
+        if kind == "commande":
+            n_appr += db.conn.execute("DELETE FROM approvals WHERE json_extract(payload, '$.order')=?", (mid,)).rowcount
+        db.conn.execute(f"DELETE FROM events WHERE task_id IN ({marks})", ids)
+        db.conn.execute(f"UPDATE inbox SET task_id=NULL WHERE task_id IN ({marks})", ids)
+        db.conn.execute(f"DELETE FROM tasks WHERE {col}=?", (mid,))
+        db.conn.execute("DELETE FROM kv WHERE k LIKE ?", (f"mission_stuck_{kind}_{mid}_%",))
+        if kind == "objectif":
+            db.conn.execute("DELETE FROM objectives WHERE id=?", (mid,))
+        else:
+            db.conn.execute("DELETE FROM sales WHERE rowid=?", (mid,))
+            db.conn.execute("DELETE FROM kv WHERE k IN (?, ?)", (f"order_stuck_{mid}", f"order_late_{mid}"))
+    db.log("proprietaire", "mission", f"{title} supprimée ({len(ids)} tâche(s), {n_appr} validation(s)) ; sauvegarde {saved.name}")
+    return {"title": title, "tasks": len(ids), "approvals": n_appr, "backup": str(saved)}

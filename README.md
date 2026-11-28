@@ -97,6 +97,8 @@ Chaque offre a une fiche (prix, livrable, délai, informations à demander, agen
 Le catalogue de départ est dans `catalogue/offres.json` (Diagnostic SEO local, Site vitrine) : `python -m ai_studio importer-offres` le charge ou le met à jour (les liens de paiement déjà créés sont gardés).
 Pour repartir sur une base propre (après une phase d'essais) : arrête le moteur puis `python -m ai_studio repartir-propre --confirmer` (ajoute `--memoire-agents` pour effacer aussi les souvenirs des agents). Une sauvegarde est faite avant.
 
+Pour supprimer une seule mission : bouton « Supprimer » dans sa fiche (tableau des missions, deux clics), ou `python -m ai_studio supprimer-mission ID --confirmer` (`--commande` pour une commande d'essai). Sauvegarde faite avant ; coûts, bibliothèque, mémoire des agents et fichiers conservés ; refusé si un agent y travaille ou pour une commande réellement payée.
+
 Mode test (le temps du développement) : `python -m ai_studio mode-test on ton@adresse.fr` — identité légale fictive dans les emails, envoi possible uniquement vers les adresses données (les tiennes), et le Juridique valide sans condition pour elles. `mode-test` affiche l'état, `mode-test off` le coupe. Redémarre le moteur après un changement.
 Pour essayer une offre sans paiement : `python -m ai_studio commande-test "Site vitrine" -e ADRESSE_RÉELLE -i "informations du client"`. La commande suit exactement le parcours d'une vente (mode test) et la livraison t'est envoyée après ta validation.
 Chaque paiement devient une commande suivie jusqu'à la livraison : `python -m ai_studio commandes`. Le moteur relance

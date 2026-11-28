@@ -310,6 +310,18 @@ def cmd_commandes(cfg, db, a):
              + (f"  promise avant {s['due_at'][:16]}" if s["due_at"] else "") + (f"  relances : {s['nudges']}" if s["nudges"] else ""))
 
 
+def cmd_supprimer_mission(cfg, db, a):
+    from .reset import delete_mission
+    kind = "commande" if a.commande else "objectif"
+    if not a.confirmer:
+        _out(f"Supprime la {'commande d\'essai n°' if a.commande else 'mission #'}{a.id}, ses tâches, validations et "
+             "son journal (sauvegarde faite avant ; coûts, bibliothèque, mémoire et fichiers conservés). "
+             "Ajoute --confirmer pour le faire.")
+        return
+    r = delete_mission(cfg, db, kind, a.id)
+    _out(f"{r['title']} supprimée : {r['tasks']} tâche(s), {r['approvals']} validation(s).\nSauvegarde : {r['backup']}")
+
+
 def cmd_mode_test(cfg, db, a):
     """Active ou coupe le mode test dans config.json (le reste du fichier est conservé)."""
     import json as _json
@@ -486,6 +498,7 @@ def main(argv=None):
     s = sub.add_parser("importer-offres"); s.add_argument("fichier", nargs="?")
     s = sub.add_parser("commande-test"); s.add_argument("offre"); s.add_argument("-e", "--email", required=True); s.add_argument("-i", "--infos")
     s = sub.add_parser("commandes"); s.add_argument("-t", "--toutes", action="store_true")
+    s = sub.add_parser("supprimer-mission"); s.add_argument("id", type=int); s.add_argument("--commande", action="store_true"); s.add_argument("--confirmer", action="store_true")
     s = sub.add_parser("mode-test"); s.add_argument("etat", nargs="?", choices=["on", "off"]); s.add_argument("emails", nargs="*")
     s = sub.add_parser("consigne"); s.add_argument("n", type=int); s.add_argument("texte")
     s = sub.add_parser("livree"); s.add_argument("n", type=int); s.add_argument("-n", "--note")
@@ -503,7 +516,7 @@ def main(argv=None):
                 "validations": cmd_validations, "taches": cmd_taches, "voir": cmd_voir, "journal": cmd_journal,
                 "couts": cmd_couts, "agents": cmd_agents, "relancer": cmd_relancer, "objectifs": cmd_objectifs, "activites": cmd_activites,
                 "archiver": cmd_archiver, "serveur": cmd_serveur, "notifier-test": cmd_notifier_test,
-                "offres": cmd_offres, "client": cmd_client, "repartir-propre": cmd_repartir_propre, "importer-offres": cmd_importer_offres, "commande-test": cmd_commande_test, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne, "mode-test": cmd_mode_test,
+                "offres": cmd_offres, "client": cmd_client, "repartir-propre": cmd_repartir_propre, "importer-offres": cmd_importer_offres, "commande-test": cmd_commande_test, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne, "mode-test": cmd_mode_test, "supprimer-mission": cmd_supprimer_mission,
                 "memoire": cmd_memoire, "oublier": cmd_oublier, "retenir": cmd_retenir,
                 "sauvegarder": cmd_sauvegarder, "sauvegardes": cmd_sauvegardes, "restaurer": cmd_restaurer,
                 "demarrage-auto": cmd_demarrage_auto,
