@@ -121,6 +121,12 @@ CREATE TABLE IF NOT EXISTS web_cache (               -- bibliothèque de recherc
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_web_cache ON web_cache(kind, key);
+CREATE TABLE IF NOT EXISTS chat_threads (           -- discussions avec le PDG
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS chat (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     role TEXT NOT NULL,                              -- owner | pdg
@@ -178,6 +184,7 @@ class DB:
 
     # Colonnes ajoutées après coup : ajoutées aux bases existantes sans perte de données.
     MIGRATIONS = (
+        ("chat", "thread_id", "INTEGER"),                 # discussion à laquelle appartient le message
         ("tasks", "order_ref", "INTEGER"),                # commande concernée (suivi jusqu'à la livraison)
         ("sales", "offer_id", "INTEGER"),
         ("sales", "stage", "TEXT"),                       # a_livrer | attente_client | livree | historique
@@ -210,6 +217,12 @@ class DB:
         self.conn.execute("UPDATE tasks SET activity='services' WHERE activity IS NULL AND order_ref IS NOT NULL")
         self.conn.execute("UPDATE costs SET activity=(SELECT t.activity FROM tasks t WHERE t.id=costs.task_id) "
                           "WHERE activity IS NULL AND task_id IS NOT NULL")
+        # messages échangés avant les discussions multiples : regroupés dans une première discussion
+        if self.conn.execute("SELECT 1 FROM chat WHERE thread_id IS NULL LIMIT 1").fetchone():
+            first = self.conn.execute("SELECT MIN(created_at), MAX(created_at) FROM chat WHERE thread_id IS NULL").fetchone()
+            tid = self.conn.execute("INSERT INTO chat_threads(title, created_at, updated_at) VALUES (?,?,?)",
+                                    ("Première discussion", first[0], first[1])).lastrowid
+            self.conn.execute("UPDATE chat SET thread_id=? WHERE thread_id IS NULL", (tid,))
         self.conn.execute("UPDATE sales SET stage = CASE WHEN task_id IS NULL THEN 'historique' ELSE 'a_livrer' END WHERE stage IS NULL")
         self.conn.execute("UPDATE tasks SET order_ref = (SELECT s.rowid FROM sales s WHERE s.task_id = tasks.id) "
                           "WHERE order_ref IS NULL AND id IN (SELECT task_id FROM sales WHERE task_id IS NOT NULL)")

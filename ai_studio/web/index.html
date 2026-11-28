@@ -153,7 +153,9 @@ tr.click{cursor:pointer}tr.click:hover td{background:rgba(255,255,255,.03)}
 <aside id="chat" role="dialog" aria-label="Discussion avec le PDG">
   <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid rgba(130,150,255,.16)">
     <span style="width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(129,140,248,.18)"><span data-ico="BOT" data-col="#A5B4FC" data-size="18"></span></span>
-    <span style="flex:1;display:flex;flex-direction:column"><span class="gro" style="font-weight:700">PDG · Command HQ</span><span class="small muted">Donne-lui une mission ou pose une question</span></span>
+    <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span class="gro" style="font-weight:700">PDG · Command HQ</span><span class="small muted" id="chattitle" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Nouvelle discussion</span></span>
+    <button class="btn" id="chatnew" title="Nouvelle discussion" aria-label="Nouvelle discussion">＋</button>
+    <button class="btn" id="chathist" title="Discussions précédentes" aria-label="Discussions précédentes">☰</button>
     <button class="btn" id="chatclose" aria-label="Fermer">✕</button>
   </div>
   <div id="chatlog"></div>
@@ -206,17 +208,29 @@ function chatMsg(m){ const me = m.role === "owner";
   return h("div",{class:"msg " + (me ? "me" : "pdg"),style:{whiteSpace:me?"pre-wrap":"normal"}}, ...(me ? [m.text] : mdNodes(m.text)),
     (m.actions||[]).length ? h("span",{style:{display:"flex",flexDirection:"column",gap:"4px",marginTop:"8px"}}, m.actions.map(a => h("span",{style:{fontSize:"12px",padding:"4px 8px",borderRadius:"8px",background:"rgba(52,211,153,.15)",border:"1px solid rgba(52,211,153,.4)"}}, "✓ " + a))) : null,
     h("span",{class:"meta"}, new Date(m.created_at || Date.now()).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) + (!me && m.cost_usd ? ` · ${money4(m.cost_usd)}` : ""))); }
-async function openChat(){ $("#chat").classList.add("on"); $("#chatin").focus();
-  try { const list = await api("GET","/api/chat");
-    put($("#chatlog"), list.length ? list.map(chatMsg) : h("div",{class:"msg pdg"}, "Bonjour ! Je suis le PDG. Confie-moi une mission ou demande-moi où en est l’entreprise."));
-    $("#chatlog").scrollTop = 1e9; } catch(e){ toast(e.message,false); } }
+let CHAT_THREAD = null;     // discussion ouverte (null = nouvelle, créée au premier message)
+const chatHello = () => h("div",{class:"msg pdg"}, "Bonjour ! Je suis le PDG. Confie-moi une mission ou demande-moi où en est l’entreprise.");
+function showChat(thread, messages){ CHAT_THREAD = thread ? thread.id : null;
+  $("#chattitle").textContent = thread ? thread.title : "Nouvelle discussion";
+  $("#chatform").style.display = "flex";
+  put($("#chatlog"), messages.length ? messages.map(chatMsg) : chatHello()); $("#chatlog").scrollTop = 1e9; $("#chatin").focus(); }
+async function loadChat(id){ try { const r = await api("GET","/api/chat" + (id ? "?thread=" + id : "")); showChat(r.thread, r.messages); } catch(e){ toast(e.message,false); } }
+async function openChat(){ $("#chat").classList.add("on"); if (CHAT_THREAD === "new") return showChat(null, []); await loadChat(CHAT_THREAD); }
+async function chatHistory(){ let list; try { list = await api("GET","/api/chat/threads"); } catch(e){ return toast(e.message,false); }
+  $("#chattitle").textContent = "Discussions précédentes"; $("#chatform").style.display = "none";
+  put($("#chatlog"), list.length ? list.map(t => h("button",{class:"appr click",style:{textAlign:"left",color:"inherit",font:"inherit",borderColor:t.id===CHAT_THREAD?"rgba(165,180,252,.7)":"rgba(130,150,255,.2)",background:"rgba(255,255,255,.03)"},onclick:()=>loadChat(t.id)},
+      h("b",{}, t.title), h("span",{class:"small muted"}, `${new Date(t.updated_at).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"})} · ${t.messages} message(s)` + (t.cost_usd ? ` · ${money4(t.cost_usd)}` : ""))))
+    : h("div",{class:"empty"},"Aucune discussion pour l’instant.")); }
+$("#chatnew").onclick = () => { showChat(null, []); CHAT_THREAD = "new"; };
+$("#chathist").onclick = chatHistory;
 $("#btnchat").onclick = openChat; $("#chatclose").onclick = () => $("#chat").classList.remove("on");
 $("#chatin").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); $("#chatform").requestSubmit(); } });
 $("#chatform").onsubmit = async e => { e.preventDefault(); const text = $("#chatin").value.trim(); if (!text) return;
   const log = $("#chatlog"); log.append(chatMsg({role:"owner", text}));
   const wait = h("div",{class:"msg pdg live"}, "Le PDG réfléchit…"); log.append(wait); log.scrollTop = 1e9;
   $("#chatin").value = ""; $("#chatsend").disabled = true;
-  try { const r = await api("POST","/api/chat",{text}); wait.replaceWith(chatMsg(r));
+  try { const r = await api("POST","/api/chat",{text, thread: typeof CHAT_THREAD === "number" ? CHAT_THREAD : null}); wait.replaceWith(chatMsg(r));
+    if (CHAT_THREAD !== r.thread){ CHAT_THREAD = r.thread; $("#chattitle").textContent = text.split("\n")[0].slice(0,60); }
     if ((r.actions||[]).length) refresh && refresh(); }
   catch(err){ wait.replaceWith(h("div",{class:"msg pdg"}, "Erreur : " + err.message)); }
   finally { $("#chatsend").disabled = false; log.scrollTop = 1e9; $("#chatin").focus(); } };

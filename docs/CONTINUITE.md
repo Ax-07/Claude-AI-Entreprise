@@ -148,6 +148,8 @@ _Mis à jour le 27/11/2026_
 
 - Bug signalé par le propriétaire (28/11) : le rafraîchissement automatique redessinait la colonne Validations et effaçait la note en cours de saisie. Correction : les cartes sont des résumés cliquables ; la décision se prend dans une fenêtre (contenu complet, avis juridique, note sur plusieurs lignes, Valider / Refuser / Aperçu) que le rafraîchissement ne touche pas ; la colonne n'est redessinée que si la liste a changé ; une réponse vide à une décision est refusée.
 
+- Discussions multiples avec le PDG (28/11, demande du propriétaire) : table `chat_threads`, colonne `chat.thread_id` (les anciens messages sont regroupés dans « Première discussion » à la migration). Boutons ＋ (nouvelle discussion, créée au premier message, titre = premier message) et ☰ (historique : titre, date, nombre de messages, coût). Le PDG ne reçoit que le contexte de la discussion ouverte. API : GET /api/chat?thread=, GET/POST /api/chat/threads, POST /api/chat {text, thread}. 126 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

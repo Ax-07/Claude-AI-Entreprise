@@ -21,7 +21,8 @@ class ChatTest(Base):
         r = chat.send(self.cfg, self.db, "Où en est-on ?")
         self.assertEqual((r["text"], r["actions"]), ("Aucune vente pour l'instant, 0 tâche en cours.", []))
         self.assertGreater(r["cost_usd"], 0)
-        r = chat.send(self.cfg, self.db, "Lance la prospection des artisans à Lyon")
+        t1 = r["thread"]
+        r = chat.send(self.cfg, self.db, "Lance la prospection des artisans à Lyon", t1)
         self.assertEqual(len(r["actions"]), 2)
         self.assertEqual(self.db.one("SELECT text, activity FROM objectives")[1], "services")
         t = self.db.one("SELECT agent, created_by FROM tasks")
@@ -29,9 +30,33 @@ class ChatTest(Base):
         # l'historique est repris comme contexte : 3e appel = 2 messages du propriétaire + 1 réponse
         third = llm.calls[2]["messages"]
         self.assertEqual([m["role"] for m in third], ["user", "assistant", "user"])
-        self.assertEqual([m["role"] for m in chat.history(self.db)], ["owner", "pdg", "owner", "pdg"])
+        self.assertEqual([m["role"] for m in chat.history(self.db, t1)], ["owner", "pdg", "owner", "pdg"])
+        self.assertEqual(chat.threads(self.db)[0]["title"], "Où en est-on ?")       # titre = premier message
         self.assertIn("create_objective", [t["name"] for t in llm.calls[0]["tools"]])
         self.assertNotIn("send_email", [t["name"] for t in llm.calls[0]["tools"]])   # pas d'action externe directe
+
+    def test_separate_threads(self):
+        llm = FakeLLM([[{"type": "text", "text": "R1"}], [{"type": "text", "text": "R2"}], [{"type": "text", "text": "R3"}]])
+        chat.LLM_FACTORY = lambda cfg: llm
+        a = chat.send(self.cfg, self.db, "Sujet A : la prospection")["thread"]
+        b = chat.new_thread(self.db)
+        chat.send(self.cfg, self.db, "Sujet B : les factures", b)
+        self.assertEqual(len(llm.calls[1]["messages"]), 1)                       # nouvelle discussion : rien de A
+        chat.send(self.cfg, self.db, "Et la suite pour A ?", a)
+        self.assertEqual([m["role"] for m in llm.calls[2]["messages"]], ["user", "assistant", "user"])
+        ts = chat.threads(self.db)
+        self.assertEqual([t["id"] for t in ts], [a, b])                         # la plus récemment utilisée d'abord
+        self.assertEqual((ts[0]["messages"], ts[1]["title"]), (4, "Sujet B : les factures"))
+        with self.assertRaises(ValueError):
+            chat.send(self.cfg, self.db, "?", 999)
+
+    def test_legacy_messages_grouped(self):
+        from ai_studio.db import DB
+        self.db.run("INSERT INTO chat(role, text, created_at) VALUES ('owner','ancien','2026-11-27T20:00:00+00:00')")
+        DB(self.cfg.db_path).conn.close()                                      # réouverture : migration
+        db2 = DB(self.cfg.db_path)
+        self.assertEqual([t["title"] for t in chat.threads(db2)], ["Première discussion"])
+        self.assertEqual(chat.history(db2)[0]["text"], "ancien")
 
     def test_limits(self):
         chat.LLM_FACTORY = lambda cfg: FakeLLM([])
