@@ -186,6 +186,8 @@ _Mis à jour le 27/11/2026_
 - Cybersécurité : `security.anomalies` ne garde que les signaux de sécurité (envois inhabituels, emails suspects) ; `security_alert` niveau « critique » = alerte directe du propriétaire (seule exception), niveau « attention » = tâche pour le PDG. Les tâches en échec relèvent du pilotage (tableau des missions, chefs de projet).
 - Règle permanente ajoutée pour tous les agents (chaîne de commandement) et consigne d'arbitrage dans la mission du PDG. 144 tests.
 
+- Retour du premier essai après remise à zéro (28/11) : une prospection demandée dans la discussion a bien fonctionné (emails envoyés) mais n'a créé aucune mission (le PDG avait utilisé delegate_task : tâche orpheline n°15). Correction : nouvel outil `launch_mission` (PDG et discussion) qui crée la mission numérotée puis, soit la tâche de l'agent qui la réalise (mission simple), soit un chef de projet (plusieurs étapes) ; dans la discussion, delegate_task et create_objective sont retirés : toute demande du propriétaire devient une mission. La remise à zéro remet aussi à 1 la numérotation des missions, validations, journal et discussions (pas des tâches, à cause des coûts historiques). 144 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

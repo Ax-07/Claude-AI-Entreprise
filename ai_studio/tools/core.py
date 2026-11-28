@@ -52,6 +52,42 @@ def delegate_task(ctx: ToolContext, agent: str, title: str, description: str, pr
     return f"Tâche #{tid} créée pour {agent}."
 
 
+@tool("launch_mission",
+      "Lance une NOUVELLE mission demandée par le propriétaire : elle reçoit son numéro, apparaît dans le tableau des "
+      "missions et toutes ses tâches lui sont rattachées. Mission simple (une étape, un agent) : indique l'agent et la "
+      "consigne. Mission de plusieurs étapes ou agents : project_manager=true, un chef de projet la pilotera.",
+      {"title": {"type": "string", "description": "intitulé court de la mission (ce qu'on veut obtenir)"},
+       "instructions": {"type": "string", "description": "demande détaillée : contexte, livrable attendu, contraintes"},
+       "agent": {"type": "string", "description": "mission simple : agent qui la réalise"},
+       "project_manager": {"type": "boolean", "description": "true pour une mission de plusieurs étapes ou agents"},
+       "activity": {"type": "string", "description": "services, video, ecommerce ; vide si transverse"},
+       "priority": {"type": "integer", "default": 2}},
+      ["title", "instructions"])
+def launch_mission(ctx: ToolContext, title: str, instructions: str, agent: str = "", project_manager: bool = False,
+                   activity: str = "", priority: int = 2) -> str:
+    from ..activities import exists
+    from ..missions import assign_pm
+    title, instructions = " ".join(title.split())[:150], instructions.strip()[:3000]
+    if len(title) < 5:
+        return "Intitulé trop vague."
+    agent = agent.strip().lower()
+    if not project_manager and agent not in ctx.agent_names:
+        return "Précise l'agent qui réalise la mission (ou project_manager=true pour une mission de plusieurs étapes)."
+    activity = activity.strip().lower() or None
+    if activity and not exists(ctx.db, activity):
+        return "Activité inconnue (services, video, ecommerce)."
+    oid = ctx.db.add_objective(f"{title} — {instructions}" if instructions else title, activity)
+    ctx.db.log(ctx.agent, "objective", f"Mission #{oid} lancée : {title}")
+    if project_manager:
+        assign_pm(ctx.db, "objectif", oid, instructions, ctx.agent)
+        return f"Mission #{oid} lancée et confiée à un chef de projet."
+    tid = ctx.db.add_task(title, agent, instructions + "\n\nCette tâche est à elle seule la mission : quand elle est faite, "
+                          "termine-la avec un résultat clair ; la mission passera dans « À vérifier » pour le propriétaire.",
+                          max(1, min(5, int(priority or 2))), objective_id=oid, created_by=ctx.agent)
+    ctx.db.log(ctx.agent, "delegation", f"Mission #{oid} : tâche #{tid} confiée à {agent}", tid)
+    return f"Mission #{oid} lancée : tâche #{tid} confiée à {agent}."
+
+
 @tool("assign_project_manager",
       "Confie une mission (objectif ou commande) à un chef de projet qui la pilotera jusqu'au bout : planification, "
       "délégation, suivi de chaque étape, contrôle et clôture. Pour toute mission de plusieurs étapes ou agents.",

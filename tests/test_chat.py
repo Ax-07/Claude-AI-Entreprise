@@ -13,9 +13,10 @@ class ChatTest(Base):
         llm = FakeLLM([
             [tu("company_stats", {})],
             [{"type": "text", "text": "Aucune vente pour l'instant, 0 tâche en cours."}],
-            [tu("create_objective", {"text": "Trouver 20 artisans lyonnais sans site web et préparer la prospection", "activity": "services"}),
-             tu("delegate_task", {"agent": "recherche", "title": "Lister 20 artisans sans site", "description": "Lyon"})],
-            [{"type": "text", "text": "C'est lancé : objectif créé et Labo sollicité."}],
+            [tu("launch_mission", {"title": "Prospection des artisans lyonnais", "instructions": "20 artisans sans site, email Site vitrine",
+                                   "project_manager": True, "activity": "services"}),
+             tu("launch_mission", {"title": "Point sur les avis Google", "instructions": "Synthèse en 10 lignes", "agent": "recherche"})],
+            [{"type": "text", "text": "Mission #1 lancée avec un chef de projet, mission #2 confiée au Labo."}],
         ])
         chat.LLM_FACTORY = lambda cfg: llm
         r = chat.send(self.cfg, self.db, "Où en est-on ?")
@@ -24,15 +25,18 @@ class ChatTest(Base):
         t1 = r["thread"]
         r = chat.send(self.cfg, self.db, "Lance la prospection des artisans à Lyon", t1)
         self.assertEqual(len(r["actions"]), 2)
-        self.assertEqual(self.db.one("SELECT text, activity FROM objectives")[1], "services")
-        t = self.db.one("SELECT agent, created_by FROM tasks")
-        self.assertEqual((t[0], t[1]), ("recherche", "pdg"))
+        objs = self.db.q("SELECT id, activity, project_manager FROM objectives ORDER BY id")
+        self.assertEqual([(o["activity"], o["project_manager"]) for o in objs], [("services", "chef_projet"), (None, None)])
+        tasks = self.db.q("SELECT agent, objective_id FROM tasks ORDER BY id")
+        self.assertEqual([(t["agent"], t["objective_id"]) for t in tasks], [("chef_projet", objs[0]["id"]), ("recherche", objs[1]["id"])])
+        self.assertIn("Mission #", r["actions"][0])                             # chaque demande devient une mission numérotée
         # l'historique est repris comme contexte : 3e appel = 2 messages du propriétaire + 1 réponse
         third = llm.calls[2]["messages"]
         self.assertEqual([m["role"] for m in third], ["user", "assistant", "user"])
         self.assertEqual([m["role"] for m in chat.history(self.db, t1)], ["owner", "pdg", "owner", "pdg"])
         self.assertEqual(chat.threads(self.db)[0]["title"], "Où en est-on ?")       # titre = premier message
-        self.assertIn("create_objective", [t["name"] for t in llm.calls[0]["tools"]])
+        names = [t["name"] for t in llm.calls[0]["tools"]]
+        self.assertIn("launch_mission", names); self.assertNotIn("delegate_task", names)   # pas de tâche orpheline
         self.assertNotIn("send_email", [t["name"] for t in llm.calls[0]["tools"]])   # pas d'action externe directe
 
     def test_separate_threads(self):

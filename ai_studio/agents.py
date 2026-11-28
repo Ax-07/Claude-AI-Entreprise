@@ -49,7 +49,7 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "signalée par la Trésorerie sans cause interne → vérification d'intrusion par la Cybersécurité) et ce qui doit "
          "remonter au propriétaire. Production : les sites web, applications et outils sur mesure vont à l'agent "
          "developpement ; les autres livrables clients (rapports, audits, contenus) à l'atelier.",
-         ["delegate_task", "assign_project_manager", "mission_status", "budget_status", "company_stats", "set_objective_status", "list_sales", "list_inbox",
+         ["delegate_task", "launch_mission", "assign_project_manager", "mission_status", "budget_status", "company_stats", "set_objective_status", "list_sales", "list_inbox",
           "list_orders", "set_order_status", "list_offers", "save_offer"], model="strong"),
     Role("recherche", "Labo Recherche", "Agent Recherche — veille et opportunités",
          "Tu étudies les marchés, les besoins, la concurrence et les prix ; tu identifies des niches et des "

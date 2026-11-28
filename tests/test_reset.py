@@ -28,6 +28,7 @@ class ResetTest(Base):
         self.assertTrue((Path(r["backup"]) / "studio.db").exists())
         # la nouvelle tâche ne récupère pas les coûts de l'ancienne (numérotation non réutilisée)
         self.assertGreater(db.add_task("nouvelle", "pdg"), t)
+        self.assertEqual(db.add_objective("Nouvelle mission"), 1)                                  # les missions repartent à 1
 
 
 if __name__ == "__main__":

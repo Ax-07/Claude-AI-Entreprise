@@ -28,6 +28,9 @@ def fresh_start(cfg, db, agent_memory: bool = False) -> dict:
         db.conn.execute("DELETE FROM sales WHERE livemode=0")              # essais : aucune valeur comptable
         db.conn.execute("UPDATE inbox SET task_id=NULL")
         db.conn.execute("DELETE FROM kv WHERE k LIKE 'order_%' OR k IN ('security_review_day')")
+        # numérotation repartant de 1 pour les missions, validations et discussions (pas pour les tâches : les coûts
+        # historiques y sont rattachés par numéro)
+        db.conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('objectives','approvals','events','chat','chat_threads')")
         if agent_memory:                                                   # souvenirs des agents (pas ceux du propriétaire)
             db.conn.execute("DELETE FROM memory WHERE agent!='proprietaire'")
     ws = Path(cfg.workspace)
