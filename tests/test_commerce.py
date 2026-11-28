@@ -176,11 +176,11 @@ class InboxTest(Base):
         iid = self.db.run("INSERT INTO inbox(uid, message_id, from_addr, subject, body, status, recorded_at) VALUES (1,'<q@x>','marie@cafe.fr','Question','?','queued','t')")
         (self.cfg.workspace / "livraisons").mkdir()
         (self.cfg.workspace / "livraisons" / "rapport.pdf").write_bytes(b"%PDF-1.4 test")
+        bad = run_tool("send_email", self.ctx(), {"to": "marie@cafe.fr", "subject": "s", "body": "b", "reason": "r", "in_reply_to": iid, "attachment": "../../etc/passwd"})
+        self.assertIn("hors de l'espace de travail", bad)
         out = run_tool("send_email", self.ctx(), {"to": "marie@cafe.fr", "subject": "Re: Question", "body": "Voici",
                                                   "reason": "r", "in_reply_to": iid, "attachment": "livraisons/rapport.pdf"})
         self.assertIn("en attente", out)
-        bad = run_tool("send_email", self.ctx(), {"to": "marie@cafe.fr", "subject": "s", "body": "b", "reason": "r", "in_reply_to": iid, "attachment": "../../etc/passwd"})
-        self.assertIn("hors de l'espace de travail", bad)
         self.assertEqual(self.db.one("SELECT COUNT(*) FROM approvals")[0], 1)
         aid = self.db.one("SELECT id FROM approvals WHERE action='send_email'")[0]
         sent = []

@@ -158,6 +158,8 @@ def open_order(cfg, db, s: dict, infos: str = "") -> int:
     if needs_info and s.get("customer_email"):
         prior = db.q("SELECT id, received_at, subject FROM inbox WHERE lower(from_addr)=lower(?) ORDER BY id DESC LIMIT 5",
                      (s["customer_email"],))
+        from .tools.business import duplicate_contact
+        waiting = duplicate_contact(cfg, db, s["customer_email"])
         known = ("\nATTENTION : ce client nous a DÉJÀ écrit avant de payer — emails reçus "
                  + ", ".join(f"#{m['id']} du {(m['received_at'] or '')[:10]} « {m['subject']} »" for m in prior)
                  + ". Lis-les d'abord (read_email). S'ils contiennent toutes les informations : ne lui redemande rien, "
@@ -165,6 +167,10 @@ def open_order(cfg, db, s: dict, infos: str = "") -> int:
                  "note = « informations reçues par email avant le paiement ») — le délai démarre. S'il en manque, demande "
                  "SEULEMENT celles-là, avec le champ remarque du modèle (ce que l'on a déjà) — jamais ce qu'il a déjà donné."
                  ) if prior else ""
+        if waiting:
+            known += ("\nIMPORTANT : on lui a déjà écrit récemment et il n'a pas encore répondu — " + waiting.split(" N'envoie")[0]
+                      + ". Si cet email demandait déjà ces informations (formulaire), n'envoie RIEN : sa réponse fera démarrer "
+                      "le délai. Sinon, ta demande sera possible dès qu'il aura répondu.")
         db.add_task(f"Commande n°{n} : informations du client"[:120], "support",
                     f"Le client <{s['customer_email']}> vient de payer « {offer['name']} ». Pour produire, il nous faut : "
                     f"{offer['required_info']}{known}\nSi des informations manquent, prépare la demande avec send_email, "

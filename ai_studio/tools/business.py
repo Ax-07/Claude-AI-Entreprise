@@ -41,6 +41,38 @@ def sender_footer(cfg, body: str) -> tuple[str, list[str]]:
     return body, added
 
 
+def duplicate_contact(cfg, db, to: str) -> str | None:
+    """Anti-doublon, pour tous les agents : un seul email en attente par destinataire, et pas de nouvel email tant que
+    le destinataire n'a pas répondu au précédent (pendant email.min_gap_hours). Les livraisons ne passent pas ici."""
+    import json as _json
+    addr = to.strip().lower()
+    for a in db.q("SELECT id, agent, status, payload FROM approvals WHERE action='send_email' AND status IN ('pending','review')"):
+        p = _json.loads(a["payload"])
+        if str(p.get("to", "")).strip().lower() == addr:
+            return (f"un email à {addr} (#{a['id']}, préparé par {a['agent']}, « {p.get('subject', '')[:80]} ») attend déjà "
+                    "la validation du propriétaire. N'en prépare pas un second : s'il faut le changer, le propriétaire le "
+                    "modifiera ou demandera une modification. Termine ta tâche en le signalant.")
+    hours = float(cfg.get("email", "min_gap_hours", default=48))
+    last = None
+    for a in db.q("SELECT id, agent, decided_at, payload FROM approvals WHERE action='send_email' AND status IN ('executed','bounced') "
+                  "AND decided_at >= ? ORDER BY decided_at DESC", (__import__("ai_studio.db", fromlist=["iso"]).iso(
+                      __import__("ai_studio.db", fromlist=["now"]).now() - __import__("datetime").timedelta(hours=hours)),)):
+        p = _json.loads(a["payload"])
+        if str(p.get("to", "")).strip().lower() == addr and not p.get("order"):
+            last = (a, p)
+            break
+    if not last:
+        return None
+    a, p = last
+    replied = db.one("SELECT 1 FROM inbox WHERE lower(from_addr)=? AND received_at > ?", (addr, a["decided_at"]))
+    if replied:
+        return None
+    return (f"un email a déjà été envoyé à {addr} le {a['decided_at'][:16].replace('T', ' ')} (#{a['id']}, « "
+            f"{p.get('subject', '')[:80]} ») et il n'a pas encore répondu. N'envoie rien de plus : sa réponse créera une "
+            "tâche, et les relances sont automatiques. Si ce premier email demandait déjà ce dont tu as besoin, attends "
+            "simplement. Termine ta tâche en le signalant.")
+
+
 @tool("send_email",
       "Envoie un email (prospect, client, partenaire). C'est le moyen d'envoyer un email, et il suffit : l'email part "
       "AUTOMATIQUEMENT dès que le propriétaire clique sur « Valider » dans le tableau de bord. Ne passe pas par un "
@@ -61,6 +93,9 @@ def send_email(ctx: ToolContext, to: str, reason: str, subject: str = "", body: 
                attachment: str = "", template: str = "", fields: dict | None = None) -> str:
     if not EMAIL_RE.match(to.strip()):
         return "Adresse email invalide."
+    dup = duplicate_contact(ctx.cfg, ctx.db, to)
+    if dup:
+        return f"Refusé : {dup}"
     client = ctx.task is not None and ctx.task["order_ref"] is not None
     client = client or bool(ctx.db.one("SELECT 1 FROM sales WHERE lower(customer_email)=lower(?)", (to.strip(),)))
     prospect = not in_reply_to and not client
