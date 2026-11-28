@@ -180,6 +180,12 @@ _Mis à jour le 27/11/2026_
 
 - Remise à zéro opérationnelle (28/11, demande du propriétaire avant de tester les nouveautés) : `python -m ai_studio repartir-propre --confirmer [--memoire-agents]` (`ai_studio/reset.py`). Sauvegarde complète d'abord ; supprime missions, tâches, journal, validations, discussions, commandes d'essai ; déplace l'espace de travail dans data/archives/ ; conserve configuration, offres, activités, ventes réelles, coûts, emails reçus, bibliothèque de recherches, mémoire du propriétaire (et des agents sans l'option). Les numéros de tâches ne sont pas réutilisés (coûts historiques). 143 tests.
 
+## Chaîne de commandement (28/11/2026)
+- Constat du propriétaire : la Cybersécurité lui signalait des dépenses. Principe validé : chaque pôle son domaine ; ce qui en sort remonte au PDG (ou au chef de projet), qui décide quel pôle intervient et ce qui remonte au propriétaire.
+- Dépenses → Trésorerie : `finance_checks.spending_report` (jour vs moyenne 7 jours, par agent, agent inconnu), outil `spending_check`, contrôle quotidien automatique (`finance.daily_review`) ; une dérive inexpliquée est signalée au PDG, jamais au propriétaire directement. Le PDG peut alors demander à la Cybersécurité de vérifier une intrusion.
+- Cybersécurité : `security.anomalies` ne garde que les signaux de sécurité (envois inhabituels, emails suspects) ; `security_alert` niveau « critique » = alerte directe du propriétaire (seule exception), niveau « attention » = tâche pour le PDG. Les tâches en échec relèvent du pilotage (tableau des missions, chefs de projet).
+- Règle permanente ajoutée pour tous les agents (chaîne de commandement) et consigne d'arbitrage dans la mission du PDG. 144 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

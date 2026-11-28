@@ -47,12 +47,27 @@ class SecurityTest(Base):
         self.assertTrue(security.suspicious_text("Cliquez ici : http://192.168.1.5/login"))
         self.assertEqual(security.suspicious_text("Bonjour, quel est le prix du diagnostic ?"), [])
 
-    def test_anomalies(self):
+    def test_spending_is_finance_not_security(self):
         t = self.db.add_task("x", "recherche")
         self.db.add_cost("recherche", t, "m", 1, 1, 0, 0.5)
-        found = "\n".join(security.anomalies(self.db))
+        self.assertEqual(security.anomalies(self.db), ["Aucune anomalie."])          # pas le domaine de la Cybersécurité
+        from ai_studio.finance_checks import spending_report
+        found = "\n".join(spending_report(self.cfg, self.db)["anomalies"])
         self.assertIn("plus de 3 fois la moyenne", found)
         self.assertIn("L'agent recherche", found)
+        self.assertIn("spending_check", __import__("ai_studio.agents", fromlist=["ROLES"]).ROLES["finance"].all_tools())
+        self.assertNotIn("dépenses,", __import__("ai_studio.agents", fromlist=["ROLES"]).ROLES["securite"].mission)
+
+    def test_attention_goes_to_ceo_and_finance_review(self):
+        out = run_tool("security_alert", self.ctx(), {"level": "attention", "message": "Beaucoup d'emails envoyés hier"})
+        self.assertIn("transmis au PDG", out)
+        self.assertEqual(self.db.one("SELECT agent FROM tasks WHERE title LIKE 'Sécurité : point%'")[0], "pdg")
+        self.assertEqual(self.toasts, [])                                             # le propriétaire n'est pas dérangé
+        from ai_studio.orchestrator import Studio
+        self.cfg.data["finance"] = {"daily_review": True}
+        st = Studio(self.cfg, self.db, None)
+        st.schedule_reviews(); st.schedule_reviews()
+        self.assertEqual(self.db.one("SELECT COUNT(*) FROM tasks WHERE agent='finance' AND title='Contrôle quotidien des dépenses'")[0], 1)
 
     def test_alert_tool_capped(self):
         for _ in range(3):

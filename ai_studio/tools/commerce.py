@@ -243,12 +243,27 @@ def security_audit(ctx: ToolContext) -> str:
     return "\n".join(lines)
 
 
-@tool("security_alert", "Alerte le propriétaire (notification Windows + journal) pour un problème de sécurité réel. "
-      "Message court avec l'action à faire. 3 alertes par jour au maximum.",
+@tool("spending_check", "Contrôle des dépenses d'API du jour : total, moyenne, détail par agent et anomalies (écarts inhabituels).",
+      {})
+def spending_check(ctx: ToolContext) -> str:
+    from ..finance_checks import report_text, spending_report
+    return report_text(spending_report(ctx.cfg, ctx.db))
+
+
+@tool("security_alert", "Incident de sécurité réel. Niveau « critique » (clé exposée, intrusion probable, hameçonnage en "
+      "cours) : alerte directe du propriétaire, seule exception à la chaîne de commandement. Niveau « attention » : "
+      "transmis au PDG qui décide. Message court avec l'action à faire. 3 alertes critiques par jour au maximum.",
       {"level": {"type": "string", "description": "critique ou attention"}, "message": {"type": "string"}}, ["level", "message"])
 def security_alert(ctx: ToolContext, level: str, message: str) -> str:
     from .. import notify
     from ..db import now
+    if not level.strip().lower().startswith("crit"):          # point d'attention : il suit la chaîne de commandement
+        tid = ctx.db.add_task("Sécurité : point d'attention à arbitrer"[:120], "pdg",
+                              f"La Cybersécurité signale (niveau attention) : {message[:800]}\nDécide s'il faut agir, avec quel pôle, "
+                              "et si le propriétaire doit être informé (request_owner_decision).", priority=2,
+                              parent_id=ctx.task["id"] if ctx.task is not None else None, created_by=ctx.agent)
+        ctx.db.log(ctx.agent, "alerte", f"[attention → PDG, tâche #{tid}] {message[:300]}")
+        return f"Point d'attention transmis au PDG (tâche #{tid})."
     day = now().strftime("%Y-%m-%d")
     n = int(ctx.db.kv_get(f"sec_agent_alerts_{day}") or 0)
     if n >= 3:

@@ -82,6 +82,7 @@ class TestSimulation(unittest.TestCase):
         self.dir = Path(tempfile.mkdtemp())
         self.cfg = load_config(self.dir)
         self.cfg.data["security"]["daily_review"] = False   # revue quotidienne testée à part
+        self.cfg.data["finance"] = {"daily_review": False}
         self.db = DB(self.cfg.db_path)
 
     def tearDown(self):
