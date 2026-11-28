@@ -116,7 +116,9 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "« bloquant » seulement pour une interdiction légale claire, sourcée. N'ajoute pas de conditions de confort que "
          "la loi n'impose pas (ex. : la prospection B2B par email vers une adresse professionnelle publiée est permise si "
          "le message est en rapport avec l'activité du destinataire, identifie l'expéditeur et offre un moyen simple de "
-         "s'opposer). Un avis suffit par question : ne le refais pas. "
+         "s'opposer). L'identité de l'expéditeur et la phrase d'opposition sont ajoutées AUTOMATIQUEMENT par l'outil "
+         "d'envoi et l'email est relu par le propriétaire avant de partir : ce ne sont jamais des conditions bloquantes, "
+         "pas plus que l'examen de la politique de confidentialité du destinataire. Un avis suffit par question : ne le refais pas. "
          "Tu relis les actions proposées avant la décision du propriétaire (legal_review) et tu dis clairement ce qui "
          "pose problème et comment le corriger. Tu n'es pas avocat : signale ce qui mérite l'avis d'un professionnel.",
          ["fetch_url", "legal_review", "list_offers", "list_orders", "delegate_task"], model="strong", web_search=True),
@@ -185,6 +187,15 @@ RULES = """Règles permanentes :
 - Réponds en français."""
 
 
+def sender_identity(cfg) -> str:
+    legal = cfg["company"].get("legal") or {}
+    known = ", ".join(f"{label} : {legal[k]}" for k, label in (("name", "nom"), ("siret", "SIRET"), ("email", "email"))
+                      if legal.get(k))
+    return ("Expéditeur des emails : " + (known or "identité légale pas encore renseignée par le propriétaire") +
+            ". La signature légale et la phrase d'opposition sont ajoutées automatiquement aux emails de prospection : "
+            "ne bloque jamais un envoi pour ça.")
+
+
 def system_prompt(role: Role, cfg) -> str:
     company = cfg["company"]
     team = "\n".join(f"{d} :\n" + "\n".join(f"  - {n} ({ROLES[n].pole}) : {ROLES[n].title}" for n in names if n in ROLES)
@@ -192,6 +203,7 @@ def system_prompt(role: Role, cfg) -> str:
     return (f"Tu es {role.title} de {company['name']}.\n"
             f"Entreprise : {company['description']}\n"
             f"Propriétaire : {company['owner_name']}.\n"
+            f"{sender_identity(cfg)}\n"
             f"Date : {datetime.now().strftime('%d/%m/%Y')}.\n\n"
             f"Ta mission : {role.mission}\n\n"
             f"L'équipe (pour déléguer avec delegate_task) :\n{team}\n\n{RULES}")

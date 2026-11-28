@@ -18,6 +18,28 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 # ---------------------------------------------------------------- emails (validation requise)
+OPT_OUT_RE = re.compile(r"(?i)\bstop\b|d[ée]sinscri|ne plus recevoir|vous opposer|plus contact|plus sollicit")
+
+
+def sender_footer(cfg, body: str) -> tuple[str, list[str]]:
+    """Signature légale (identité de l'expéditeur) et phrase d'opposition, si l'agent ne les a pas mises."""
+    legal = cfg["company"].get("legal") or {}
+    added, lines = [], []
+    name = (legal.get("name") or "").strip()
+    if name and name.lower() not in body.lower():
+        lines.append(f"{name} — entrepreneur individuel (micro-entreprise)"
+                     + (f", SIRET {legal['siret']}" if legal.get("siret") else ""))
+        if legal.get("email") and legal["email"].lower() not in body.lower():
+            lines.append(legal["email"])
+        added.append("signature de l'expéditeur")
+    if not OPT_OUT_RE.search(body):
+        lines.append("Si vous ne souhaitez plus recevoir de message de notre part, répondez simplement « STOP ».")
+        added.append("phrase d'opposition")
+    if lines:
+        body = body.rstrip() + "\n\n--\n" + "\n".join(lines)
+    return body, added
+
+
 @tool("send_email",
       "Envoie un email (prospect, client, partenaire). C'est le moyen d'envoyer un email, et il suffit : l'email part "
       "AUTOMATIQUEMENT dès que le propriétaire clique sur « Valider » dans le tableau de bord. Ne passe pas par un "
@@ -46,6 +68,15 @@ def send_email(ctx: ToolContext, to: str, subject: str, body: str, reason: str, 
         if p.stat().st_size > 10_000_000:
             return "Pièce jointe trop lourde (10 Mo maximum)."
         extra["attachment"] = attachment
+    added = []
+    client = ctx.task is not None and ctx.task["order_ref"] is not None
+    if not in_reply_to and not client:       # premier contact (prospection) : identité de l'expéditeur et droit d'opposition ajoutés d'office
+        body, added = sender_footer(ctx.cfg, body)
+        if added:
+            reason = f"{reason}\n[Ajouté automatiquement : {', '.join(added)}]"
+    _, missing = __import__("ai_studio.commerce", fromlist=["legal_footer"]).legal_footer(ctx.cfg)
+    if not in_reply_to and not client and missing:
+        reason = f"{reason}\n⚠ Identité de l'expéditeur incomplète ({', '.join(missing)}) : renseigne company.legal dans config.json."
     today = ctx.db.one("SELECT COUNT(*) FROM approvals WHERE action='send_email' AND substr(created_at,1,10)=substr(datetime('now'),1,10)")[0]
     if today >= int(ctx.cfg.get("email", "daily_limit", default=20)):
         return "Refusé : limite quotidienne de brouillons d'emails atteinte."

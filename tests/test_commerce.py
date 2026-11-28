@@ -216,6 +216,30 @@ class AgentGuidanceTest(Base):
         self.assertIn("ne lui demande jamais de faire lui-même", RULES)
         self.assertIn("Jamais pour faire valider un email", REGISTRY["request_owner_decision"].description)
 
+    def test_prospection_email_gets_sender_identity_and_opt_out(self):
+        import json as _j
+        from ai_studio.agents import ROLES, system_prompt
+        self.cfg.data["company"]["legal"].update(name="Jean Martin", siret="123 456 789 00012", email="contact@studio.fr")
+        run_tool("send_email", self.ctx(), {"to": "a@b.fr", "subject": "Audit", "body": "Bonjour, …", "reason": "prospection"})
+        a = self.db.pending_approvals()[0]
+        body = _j.loads(a["payload"])["body"]
+        self.assertIn("Jean Martin — entrepreneur individuel", body)
+        self.assertIn("SIRET 123 456 789 00012", body)
+        self.assertIn("répondez simplement « STOP »", body)
+        self.assertIn("Ajouté automatiquement", a["reason"])
+        # déjà présentes : rien n'est ajouté en double
+        run_tool("send_email", self.ctx(), {"to": "c@d.fr", "subject": "s", "reason": "r",
+                                            "body": "Bonjour\nJean Martin\nPour ne plus recevoir nos messages, dites-le-nous."})
+        body2 = _j.loads(self.db.pending_approvals()[-1]["payload"])["body"]
+        self.assertNotIn("--", body2)
+        self.assertIn("Jean Martin", system_prompt(ROLES["juridique"], self.cfg))
+        self.assertIn("jamais des conditions bloquantes", ROLES["juridique"].mission)
+
+    def test_missing_sender_identity_is_flagged_not_blocking(self):
+        out = run_tool("send_email", self.ctx(), {"to": "a@b.fr", "subject": "s", "body": "b", "reason": "r"})
+        self.assertIn("partira automatiquement", out)
+        self.assertIn("Identité de l'expéditeur incomplète", self.db.pending_approvals()[0]["reason"])
+
     def test_approval_waits_for_setup_then_runs(self):
         from ai_studio.approvals import NotReady, decide
         run_tool("send_email", self.ctx(), {"to": "a@b.fr", "subject": "s", "body": "b", "reason": "r"})

@@ -144,6 +144,41 @@ class ProjectManagerTest(Base):
         self.assertIn("relancé", out)
         self.assertIn("Rédige et soumets", self.db.one("SELECT description FROM tasks ORDER BY id DESC LIMIT 1")[0])
 
+    def test_interleaved_relaunches_still_escalate(self):
+        # cas réel : à chaque relance le chef de projet délègue une étape qui ne débloque rien
+        oid = self.db.add_objective("Prospection")
+        kick = missions.assign_pm(self.db, "objectif", oid)
+        self.db.set_task(kick, status="done", result="plan")
+        titles = []
+        for _ in range(2):
+            r = missions.relaunch_mission(self.db, "objectif", oid)
+            titles.append(self.db.task(r)["title"])
+            self.db.set_task(r, status="done", result="délégué")
+            step = self.db.add_task("Étape", "juridique", parent_id=r)
+            self.db.set_task(step, status="done", result="avis conditionnel")
+            follow = self.db.add_task("Suivi : étape terminée", "chef_projet", parent_id=step)
+            self.db.set_task(follow, status="done", result="toujours bloqué")
+        esc = missions.relaunch_mission(self.db, "objectif", oid)
+        self.assertTrue(all(t.startswith("Relance") for t in titles))
+        self.assertEqual(self.db.task(esc)["agent"], "pdg")
+        self.db.set_task(esc, status="done", result="relancé le chef de projet")
+        r = missions.relaunch_mission(self.db, "objectif", oid)               # une relance après l'arbitrage
+        self.db.set_task(r, status="done", result="rien")
+        r = missions.relaunch_mission(self.db, "objectif", oid)
+        self.db.set_task(r, status="done", result="rien")
+        self.assertIsNone(missions.relaunch_mission(self.db, "objectif", oid))      # stop : décision du propriétaire
+        dec = self.db.one("SELECT * FROM approvals WHERE action='decision' AND status='pending'")
+        self.assertIn("Mission bloquée", dec["reason"])
+        self.assertIsNone(missions.relaunch_mission(self.db, "objectif", oid))
+        self.assertEqual(self.db.one("SELECT COUNT(*) FROM approvals WHERE action='decision'")[0], 1)
+        # la réponse du propriétaire relance la mission, et les compteurs repartent de zéro
+        from ai_studio.approvals import decide
+        decide(self.cfg, self.db, dec["id"], True, "Le juridique n'est pas bloquant : soumets l'email")
+        follow = self.db.one("SELECT * FROM tasks ORDER BY id DESC LIMIT 1")
+        self.assertEqual((follow["agent"], follow["objective_id"]), ("chef_projet", oid))
+        self.db.set_task(follow["id"], status="done", result="rien")
+        self.assertTrue(self.db.task(missions.relaunch_mission(self.db, "objectif", oid))["title"].startswith("Relance"))
+
     def test_engine_relaunches_stalled_mission_without_waiting(self):
         from ai_studio.orchestrator import Studio
         oid = self.db.add_objective("Prospection")
