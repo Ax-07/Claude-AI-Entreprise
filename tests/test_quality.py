@@ -62,5 +62,58 @@ class QualityTest(Base):
         self.assertIn("Aucun problème", self.db.pending_approvals()[0]["payload"])
 
 
+    def _report_order(self):
+        from ai_studio import commerce
+        from pathlib import Path
+        commerce.import_offers(self.db, Path(__file__).resolve().parents[1] / "catalogue" / "offres.json")
+        n = commerce.test_order(self.cfg, self.db, "Diagnostic SEO local", "proprio@studio.fr")
+        d = self.cfg.workspace / "livraisons" / f"commande-{n}"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "rapport.html").write_text(
+            "<!doctype html><html lang='fr'><head><meta charset='utf-8'><title>Diagnostic SEO local</title><style>body{font-family:sans-serif}</style></head><body>"
+            "<h1>Diagnostic SEO local — ax-07.fr</h1>" + "<h2>Section</h2><p>Constat vérifiable, source : https://www.ax-07.fr/ consultée le 28/11/2026.</p>" * 30
+            + "</body></html>", encoding="utf-8")
+        return n, {"order": n, "attachment": f"livraisons/commande-{n}/rapport.html", "subject": "Votre diagnostic", "body": "Bonjour"}
+
+    def test_html_report_delivered_as_pdf(self):
+        import json as _j
+        from unittest import mock
+        from ai_studio import pdf
+        n, args = self._report_order()
+        def fake(cfg, src, dest, timeout=120):
+            dest.write_bytes(b"%PDF-1.4\n" + b"/Type /Page\n" * 9 + b"x" * 2000)
+            return dest
+        with mock.patch.object(pdf, "html_to_pdf", fake):
+            out = run_tool("deliver_order", self.ctx("support"), args)
+        self.assertIn("converti en PDF", out)
+        p = _j.loads(self.db.pending_approvals()[0]["payload"])
+        self.assertEqual(p["attachment"], f"livraisons/commande-{n}/rapport.pdf")
+        self.assertEqual((p["source"], p["pages"]), (f"livraisons/commande-{n}/rapport.html", 9))
+        from ai_studio.server import deliverable_preview
+        body, ctype = deliverable_preview(self.cfg, self.db, self.db.pending_approvals()[0]["id"])
+        self.assertEqual(ctype, "application/pdf"); self.assertTrue(body.startswith(b"%PDF"))
+
+    def test_pdf_failure_blocks_delivery(self):
+        from unittest import mock
+        from ai_studio import pdf
+        n, args = self._report_order()
+        with mock.patch.object(pdf, "find_browser", return_value=None):
+            out = run_tool("deliver_order", self.ctx("support"), args)
+        self.assertIn("Livraison impossible", out); self.assertIn("Edge", out)
+        self.assertFalse(self.db.pending_approvals())                      # pas d'envoi du HTML à la place
+        self.cfg.data["delivery"] = {"pdf": False}                          # option : livrer le HTML tel quel
+        self.assertIn("en attente de validation", run_tool("deliver_order", self.ctx("support"), args))
+
+    def test_real_pdf_conversion_when_browser_available(self):
+        from ai_studio import pdf
+        if not pdf.find_browser(self.cfg):
+            self.skipTest("ni Edge ni Chrome sur cette machine")
+        n, args = self._report_order()
+        src = self.cfg.workspace / args["attachment"]
+        out = pdf.html_to_pdf(self.cfg, src, src.with_suffix(".pdf"))
+        self.assertTrue(out.read_bytes().startswith(b"%PDF-"))
+        self.assertGreaterEqual(pdf.page_count(out), 2)
+        self.assertFalse(any(p.name.startswith(".impression-") for p in src.parent.iterdir()))   # fichier temporaire supprimé
+
 if __name__ == "__main__":
     unittest.main()

@@ -402,7 +402,7 @@ function openApproval(a){
     h("div",{style:{display:"flex",justifyContent:"space-between",gap:"8px",alignItems:"center"}}, a.reason ? h("span",{class:"small muted"}, a.reason) : h("span",{}), agentPill(a)),
     f ? h("div",{style:{display:"flex",flexDirection:"column",gap:"8px"}}, field("Destinataire", f.to), field("Objet", f.subject),
           pl.attachment ? h("span",{class:"small muted",style:{display:"flex",gap:"10px",alignItems:"center",flexWrap:"wrap"}}, "Pièce jointe : " + pl.attachment,
-            /\.(zip|html?|md|txt)$/i.test(pl.attachment) ? h("a",{class:"btn",href:`/api/approvals/${a.id}/livrable` + (/\.zip$/i.test(pl.attachment) ? "/index.html" : ""),target:"_blank",rel:"noopener",style:{textDecoration:"none",color:"#EEF1FF"}}, "Aperçu du livrable") : null) : null,
+            /\.(zip|html?|md|txt|pdf)$/i.test(pl.attachment) ? h("a",{class:"btn",href:`/api/approvals/${a.id}/livrable` + (/\.zip$/i.test(pl.attachment) ? "/index.html" : ""),target:"_blank",rel:"noopener",style:{textDecoration:"none",color:"#EEF1FF"}}, "Aperçu du livrable") : null) : null,
           pl.qa ? h("div",{style:{fontSize:"12px",lineHeight:"1.45",padding:"8px 10px",borderRadius:"10px",background:"rgba(52,211,153,.06)",border:"1px solid rgba(52,211,153,.35)"}}, h("b",{},"Contrôle qualité : "), pl.qa) : null,
           field("Texte", f.body))
       : h("pre",{class:"pre",style:{maxHeight:"52vh"}}, approvalLines(a)),

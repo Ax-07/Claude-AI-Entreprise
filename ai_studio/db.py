@@ -235,6 +235,9 @@ class DB:
             self.conn.execute("UPDATE chat SET thread_id=? WHERE thread_id IS NULL", (tid,))
         # commandes ouvertes avant les chefs de projet : elles en reçoivent un (les relances iront vers lui)
         self.conn.execute("UPDATE sales SET project_manager='chef_projet' WHERE project_manager IS NULL AND stage IN ('a_livrer','attente_client')")
+        # le rapport du diagnostic est désormais livré en PDF (converti au moment de la livraison)
+        self.conn.execute("UPDATE offers SET deliverable=replace(deliverable, 'Rapport HTML (s''ouvre dans le navigateur, imprimable en PDF)', "
+                          "'Rapport PDF (format A4, paginé)') WHERE deliverable LIKE 'Rapport HTML (s''ouvre dans le navigateur%'")
         self.conn.execute("UPDATE sales SET stage = CASE WHEN task_id IS NULL THEN 'historique' ELSE 'a_livrer' END WHERE stage IS NULL")
         self.conn.execute("UPDATE tasks SET order_ref = (SELECT s.rowid FROM sales s WHERE s.task_id = tasks.id) "
                           "WHERE order_ref IS NULL AND id IN (SELECT task_id FROM sales WHERE task_id IS NOT NULL)")
