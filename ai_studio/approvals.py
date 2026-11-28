@@ -76,13 +76,42 @@ def missing_setup(action: str) -> str:
     return ", ".join(k for k in SETUP.get(action, ()) if not os.environ.get(k))
 
 
-def decide(cfg, db, approval_id: int, approve: bool, note: str = "") -> str:
+EMAIL_RE = __import__("re").compile(r"^[^@\s,;<>]+@[^@\s,;<>]+\.[a-zA-Z]{2,}$")
+
+
+def apply_edits(action: str, payload: dict, edits: dict | None) -> list[str]:
+    """Modifications faites par le propriétaire avant de valider (email : destinataire, objet, texte)."""
+    if not edits or action != "send_email":
+        return []
+    changed = []
+    for k in ("to", "subject", "body"):
+        if k in edits and str(edits[k]).strip() and str(edits[k]).strip() != str(payload.get(k, "")).strip():
+            v = str(edits[k]).strip()
+            if k == "to" and not EMAIL_RE.match(v):
+                raise ValueError(f"Adresse email invalide : {v}")
+            if k == "subject":
+                v = " ".join(v.split())[:200]
+            payload[k] = v
+            changed.append({"to": "destinataire", "subject": "objet", "body": "texte"}[k])
+    return changed
+
+
+def decide(cfg, db, approval_id: int, approve: bool, note: str = "", edits: dict | None = None) -> str:
     a = db.approval(approval_id)
     if not a:
         return "Demande introuvable."
     if a["status"] != "pending":
         return f"Déjà traitée ({a['status']})."
     payload = json.loads(a["payload"])
+    changed = apply_edits(a["action"], payload, edits) if approve else []
+    # Prise en charge atomique : un double clic (ou deux onglets) ne peut pas exécuter deux fois la même action.
+    cur = db.conn.execute("UPDATE approvals SET status='processing' WHERE id=? AND status='pending'", (approval_id,))
+    db.conn.commit()
+    if cur.rowcount != 1:
+        return "Déjà en cours de traitement."
+    if changed:
+        db.set_approval(approval_id, payload=json.dumps(payload, ensure_ascii=False))
+        db.log("proprietaire", "decision", f"Demande #{approval_id} modifiée avant validation : {', '.join(changed)}")
     order = payload.get("order")
     if not order and a["task_id"]:
         row = db.one("SELECT order_ref FROM tasks WHERE id=?", (a["task_id"],))
@@ -96,6 +125,7 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "") -> str:
     elif a["action"] in EXECUTORS:
         missing = missing_setup(a["action"])
         if missing:
+            db.set_approval(approval_id, status="pending")        # reste en attente
             raise NotReady(f"Impossible d'exécuter la demande #{approval_id} : {missing} manquant(s) dans .env. "
                            "Elle reste en attente : complète .env, redémarre le moteur, puis valide-la à nouveau.")
         try:
@@ -109,7 +139,7 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "") -> str:
             if a["action"] == "stripe_payment_link" and payload.get("offer_id") and payload.get("_result"):
                 db.run("UPDATE offers SET payment_link_id=?, payment_link_url=? WHERE id=?",
                        (payload["_result"]["id"], payload["_result"]["url"], payload["offer_id"]))
-            outcome = f"VALIDÉ et exécuté : {res}. {note}".strip()
+            outcome = f"VALIDÉ et exécuté : {res}." + (f" (Modifié par le propriétaire : {', '.join(changed)}.)" if changed else "") + f" {note}".rstrip()
         except Exception as e:
             db.set_approval(approval_id, status="error", decided_at=iso(), result=str(e))
             outcome = f"VALIDÉ mais l'exécution a échoué : {e}"

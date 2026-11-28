@@ -150,6 +150,9 @@ _Mis à jour le 27/11/2026_
 
 - Discussions multiples avec le PDG (28/11, demande du propriétaire) : table `chat_threads`, colonne `chat.thread_id` (les anciens messages sont regroupés dans « Première discussion » à la migration). Boutons ＋ (nouvelle discussion, créée au premier message, titre = premier message) et ☰ (historique : titre, date, nombre de messages, coût). Le PDG ne reçoit que le contexte de la discussion ouverte. API : GET /api/chat?thread=, GET/POST /api/chat/threads, POST /api/chat {text, thread}. 126 tests.
 
+- Incident du 28/11 : commande d'essai n°3 créée avec l'adresse d'exemple de ma documentation (ton@email.fr) ; le propriétaire a validé la livraison avec une note « change le destinataire », mais valider exécute l'action telle quelle (la note n'est que transmise) et l'action semble avoir été exécutée deux fois (double clic pendant l'envoi SMTP, vérification de statut non atomique).
+  Corrections : prise en charge atomique des validations (statut `processing`, une seule exécution) ; boutons désactivés pendant l'envoi ; emails modifiables avant envoi (destinataire, objet, texte : `decide(..., edits)`, adresse vérifiée, trace dans le journal et le payload) ; bouton « Demander une modification » (renvoie le travail à l'agent avec la note) ; `commande-test` refuse les adresses d'exemple ; CLI `client N email` pour corriger l'email d'une commande. 128 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

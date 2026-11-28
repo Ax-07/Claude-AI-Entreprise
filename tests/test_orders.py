@@ -1,3 +1,4 @@
+import json
 """Catalogue d'offres et suivi des commandes jusqu'à la livraison (Stripe et SMTP simulés)."""
 import os
 import sqlite3
@@ -150,6 +151,31 @@ class OrdersTest(Base):
         self.assertEqual(self.db.one("SELECT COUNT(*) FROM tasks")[0], tasks_before)    # pas de tâche de suite inutile
         self.assertEqual(run_tool("list_orders", self.ctx("pdg"), {}), "Aucune commande dans cet état.")
 
+    def test_owner_edits_email_before_sending(self):
+        os.environ.update(SMTP_HOST="h", SMTP_USER="u", SMTP_PASSWORD="p")
+        aid = self.db.add_approval("support", None, "send_email", {"to": "ton@email.fr", "subject": "Votre rapport", "body": "Bonjour"}, "r")
+        sent = []
+        with unittest.mock.patch.dict(approvals.EXECUTORS, {"send_email": lambda c, p: sent.append(dict(p)) or "Email envoyé"}):
+            with self.assertRaises(ValueError):
+                approvals.decide(self.cfg, self.db, aid, True, "", {"to": "pas-une-adresse"})
+            self.assertEqual(self.db.approval(aid)["status"], "pending")          # adresse invalide : rien d'envoyé
+            out = approvals.decide(self.cfg, self.db, aid, True, "", {"to": "xavier@exemple.fr", "subject": "Votre rapport", "body": "Bonjour Xavier"})
+            self.assertEqual(approvals.decide(self.cfg, self.db, aid, True), "Déjà traitée (executed).")
+        self.assertEqual(len(sent), 1)
+        self.assertEqual((sent[0]["to"], sent[0]["body"]), ("xavier@exemple.fr", "Bonjour Xavier"))
+        self.assertIn("destinataire, texte", out)
+        self.assertEqual(json.loads(self.db.approval(aid)["payload"])["to"], "xavier@exemple.fr")    # trace de ce qui est parti
+
+    def test_concurrent_validation_executes_once(self):
+        os.environ.update(SMTP_HOST="h", SMTP_USER="u", SMTP_PASSWORD="p")
+        aid = self.db.add_approval("support", None, "send_email", {"to": "a@b.fr", "subject": "s", "body": "b"}, "r")
+        sent = []
+        def slow(c, p):        # pendant l'envoi, un second clic arrive
+            sent.append(1); sent.append(approvals.decide(self.cfg, self.db, aid, True)); return "Email envoyé"
+        with unittest.mock.patch.dict(approvals.EXECUTORS, {"send_email": slow}):
+            approvals.decide(self.cfg, self.db, aid, True)
+        self.assertEqual(sent, [1, "Déjà traitée (processing)."])
+
     def test_refusal_note_sticks_to_order_and_resumes_it(self):
         n = self.sell()
         pdg = self.db.one("SELECT * FROM tasks WHERE order_ref=?", (n,))
@@ -253,8 +279,10 @@ class CatalogueTest(Base):
         self.assertEqual((self.db.one("SELECT COUNT(*) FROM offers")[0], site["price_eur"], site["payment_link_url"]),
                          (2, 390, "https://buy.stripe.com/x"))                  # lien de paiement conservé
         with self.assertRaises(ValueError):
-            commerce.test_order(self.cfg, self.db, "Offre inconnue", "moi@exemple.fr")
-        n = commerce.test_order(self.cfg, self.db, "site vitrine", "moi@exemple.fr", "Boulangerie Dupont, Lyon 3e, 3 pages")
+            commerce.test_order(self.cfg, self.db, "Offre inconnue", "proprio@studio.fr")
+        with self.assertRaises(ValueError):
+            commerce.test_order(self.cfg, self.db, "site vitrine", "ton@email.fr")      # adresse d'exemple de la doc
+        n = commerce.test_order(self.cfg, self.db, "site vitrine", "proprio@studio.fr", "Boulangerie Dupont, Lyon 3e, 3 pages")
         o = commerce.get_order(self.db, n)
         self.assertEqual((o["stage"], o["livemode"], o["amount"], o["offer_id"]), ("a_livrer", 0, 390, site["id"]))
         self.assertTrue(o["due_at"])
