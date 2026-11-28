@@ -4,10 +4,24 @@ from __future__ import annotations
 import json
 import os
 import smtplib
+import urllib.error
+import uuid
 from email.message import EmailMessage
 
 from .db import iso
 from .tools.business import stripe_request
+
+
+class Uncertain(Exception):
+    """L'opération externe a peut-être eu lieu : on ne sait pas (coupure réseau au mauvais moment). Elle n'est
+    jamais relancée à l'aveugle : réconciliation (Stripe et GitHub : même clé, sans doublon ; email : recherche dans
+    « Messages envoyés »), sinon décision du propriétaire (audit FIN-03)."""
+
+
+# Opérations qu'on peut relancer sans risque de doublon avec la même clé d'exécution.
+SAFE_RETRY = {"stripe_payment_link", "publish_page"}
+STUCK_MINUTES = 10           # exécution « en cours » depuis plus longtemps : le programme a été interrompu
+MAX_RECONCILE = 5
 
 
 def send_email(cfg, payload: dict) -> str:
@@ -35,12 +49,29 @@ def send_email(cfg, payload: dict) -> str:
             raise RuntimeError(f"Pièce jointe modifiée depuis la validation : {payload['attachment']}. Rien n'a été envoyé.")
         ctype = (mimetypes.guess_type(attached.name)[0] or "application/octet-stream").split("/", 1)
         msg.add_attachment(data, maintype=ctype[0], subtype=ctype[1], filename=attached.name)
-    if port == 465:
-        with smtplib.SMTP_SSL(host, port, timeout=30) as s:
-            s.login(user, pwd); s.send_message(msg)
-    else:
-        with smtplib.SMTP(host, port, timeout=30) as s:
-            s.starttls(); s.login(user, pwd); s.send_message(msg)
+    if payload.get("message_id"):
+        msg["Message-ID"] = payload["message_id"]       # permet de le retrouver dans « Messages envoyés » (réconciliation)
+    # Avant DATA (connexion, chiffrement, identification) : échec certain, rien n'est parti.
+    s = smtplib.SMTP_SSL(host, port, timeout=30) if port == 465 else smtplib.SMTP(host, port, timeout=30)
+    try:
+        if port != 465:
+            s.starttls()
+        s.login(user, pwd)
+        try:
+            s.send_message(msg)
+        except (smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused, smtplib.SMTPDataError,
+                smtplib.SMTPNotSupportedError, smtplib.SMTPHeloError):
+            raise                                        # refus explicite du serveur : pas envoyé
+        except (smtplib.SMTPException, OSError) as e:    # coupure pendant l'envoi : le serveur a peut-être accepté
+            raise Uncertain(f"connexion perdue pendant l'envoi ({type(e).__name__} : {e})") from e
+    finally:
+        try:
+            s.quit()                                     # une erreur ici (après l'acceptation) ne change rien à l'envoi
+        except Exception:
+            try:
+                s.close()
+            except Exception:
+                pass
     return f"Email envoyé à {payload['to']}"
 
 
@@ -52,15 +83,29 @@ def create_payment_link(cfg, payload: dict) -> str:
     }
     if payload.get("recurring") in ("month", "year"):
         params["recurring[interval]"] = payload["recurring"]
-    price = stripe_request("POST", "prices", params)
-    link = stripe_request("POST", "payment_links", {"line_items[0][price]": price["id"], "line_items[0][quantity]": 1})
+    key = payload.get("_exec_key") or ""
+    try:
+        price = stripe_request("POST", "prices", params, idempotency_key=f"{key}-price" if key else None)
+        link = stripe_request("POST", "payment_links", {"line_items[0][price]": price["id"], "line_items[0][quantity]": 1},
+                              idempotency_key=f"{key}-link" if key else None)
+    except urllib.error.HTTPError as e:
+        if e.code >= 500 or e.code in (409, 429):        # Stripe indisponible ou occupé : sans danger de réessayer (même clé)
+            raise Uncertain(f"Stripe {e.code}") from e
+        raise RuntimeError(f"Stripe a refusé la demande ({e.code})") from e
+    except (urllib.error.URLError, OSError) as e:
+        raise Uncertain(f"Stripe injoignable pendant la création ({e})") from e
     payload["_result"] = {"id": link["id"], "url": link["url"]}      # relié à la fiche d'offre par decide()
     return f"Lien de paiement créé : {link['url']}"
 
 
 def publish_page(cfg, payload: dict) -> str:
     from .commerce import publish_page as publish
-    return publish(cfg, payload)
+    try:
+        return publish(cfg, payload)
+    except (urllib.error.URLError, OSError) as e:        # republier le même contenu au même endroit est sans danger
+        if isinstance(e, urllib.error.HTTPError) and e.code < 500:
+            raise
+        raise Uncertain(f"GitHub injoignable pendant la publication ({e})") from e
 
 
 EXECUTORS = {"send_email": send_email, "stripe_payment_link": create_payment_link, "publish_page": publish_page}
@@ -105,6 +150,169 @@ def apply_edits(action: str, payload: dict, edits: dict | None, cfg=None) -> lis
     return changed
 
 
+def _message_id(approval_id: int, key: str) -> str:
+    sender = os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USER") or ""
+    domain = sender.rsplit("@", 1)[-1].strip(" >") if "@" in sender else "ai-studio.local"
+    return f"<studio-{approval_id}-{key[:16]}@{domain}>"
+
+
+def _after_success(cfg, db, action: str, payload: dict) -> None:
+    """Suites locales d'une opération réussie (prospect, boîte mail, commande, offre)."""
+    if action == "send_email" and payload.get("prospect"):
+        from . import prospects
+        prospects.on_sent(cfg, db, payload["prospect"], payload.get("template", ""))
+    if action == "send_email" and payload.get("in_reply_to"):
+        db.run("UPDATE inbox SET status='replied' WHERE id=?", (payload["in_reply_to"],))
+    if action == "send_email" and payload.get("order"):
+        from .commerce import mark_delivered
+        mark_delivered(db, payload["order"], f"Livrable envoyé : {payload.get('attachment')}")
+    if action == "stripe_payment_link" and payload.get("offer_id") and payload.get("_result"):
+        db.run("UPDATE offers SET payment_link_id=?, payment_link_url=? WHERE id=?",
+               (payload["_result"]["id"], payload["_result"]["url"], payload["offer_id"]))
+
+
+def _mark_executed(cfg, db, approval_id: int, action: str, payload: dict, res: str) -> None:
+    # Le succès est enregistré EN PREMIER : si une suite locale échoue ensuite, l'opération n'est pas refaite.
+    db.set_approval(approval_id, status="executed", decided_at=iso(), result=res,
+                    payload=json.dumps(payload, ensure_ascii=False))
+    try:
+        _after_success(cfg, db, action, payload)
+    except Exception as e:
+        db.log("systeme", "erreur", f"Demande #{approval_id} exécutée, mais sa suite locale a échoué : {e}")
+
+
+def _notify_uncertain(cfg, db, approval_id: int, action: str, why: str) -> None:
+    from . import notify
+    db.log("systeme", "incertain", f"Demande #{approval_id} ({action}) : issue incertaine — {why}")
+    notify.send(cfg, db, f"Demande #{approval_id} : issue incertaine",
+                "Coupure pendant l'exécution. Rien ne sera relancé sans vérification : voir le tableau de bord.")
+
+
+def execute(cfg, db, approval_id: int, action: str, payload: dict) -> tuple[str, str]:
+    """Exécute une opération externe validée (audit FIN-03). Renvoie (statut, texte) : executed, error ou uncertain.
+
+    La clé d'exécution et le Message-ID sont enregistrés AVANT l'appel externe : après une coupure, on sait quoi
+    vérifier (email dans « Messages envoyés ») ou on relance sans doublon (Stripe et GitHub, même clé)."""
+    row = db.approval(approval_id)
+    key = row["exec_key"] or uuid.uuid4().hex
+    if action == "send_email" and not payload.get("message_id"):
+        payload["message_id"] = _message_id(approval_id, key)
+    db.set_approval(approval_id, status="processing", exec_key=key, started_at=iso(),
+                    payload=json.dumps(payload, ensure_ascii=False))
+    run = dict(payload, _exec_key=key)
+    try:
+        res = EXECUTORS[action](cfg, run)
+    except Uncertain as e:
+        db.set_approval(approval_id, status="uncertain", result=str(e))
+        _notify_uncertain(cfg, db, approval_id, action, str(e))
+        return "uncertain", str(e)
+    except Exception as e:                       # échec certain : rien n'a été fait
+        db.set_approval(approval_id, status="error", decided_at=iso(), result=str(e))
+        if action == "send_email" and payload.get("prospect"):
+            from . import prospects
+            prospects.on_not_sent(db, payload["prospect"])
+        return "error", str(e)
+    if run.get("_result"):
+        payload["_result"] = run["_result"]
+    _mark_executed(cfg, db, approval_id, action, payload, res)
+    return "executed", res
+
+
+def sent_copy_exists(message_id: str, connect=None) -> bool | None:
+    """Cherche l'email dans le dossier « Messages envoyés » (IMAP, dossier marqué \\Sent). None si impossible."""
+    import imaplib
+    import re as _re
+    from .commerce import imap_settings
+    host, user, pwd = imap_settings()
+    if not connect and not (host and user and pwd):
+        return None
+    try:
+        M = connect() if connect else imaplib.IMAP4_SSL(host, 993, timeout=30)
+        if not connect:
+            M.login(user, pwd)
+        try:
+            typ, boxes = M.list()
+            sent = None
+            for b in boxes or []:
+                line = b.decode("utf-8", "replace") if isinstance(b, bytes) else str(b)
+                if "\\Sent" in line:
+                    m = _re.search(r'"([^"]+)"\s*$', line) or _re.search(r"(\S+)\s*$", line)
+                    sent = m.group(1) if m else None
+                    break
+            if not sent:
+                return None
+            M.select(f'"{sent}"', readonly=True)
+            typ, data = M.search(None, "HEADER", "Message-ID", message_id)
+            return bool(data and data[0] and data[0].split())
+        finally:
+            try:
+                M.logout()
+            except Exception:
+                pass
+    except Exception:
+        return None
+
+
+def reconcile(cfg, db, sent_lookup=sent_copy_exists) -> dict:
+    """À chaque cycle : exécutions interrompues → incertaines ; incertaines → résolues si possible, sans doublon."""
+    from datetime import timedelta
+    from .db import now
+    out = {"stuck": 0, "resolved": 0, "waiting": 0}
+    limit = iso(now() - timedelta(minutes=STUCK_MINUTES))
+    for a in db.q("SELECT * FROM approvals WHERE status='processing' AND (started_at IS NULL OR started_at < ?)", (limit,)):
+        db.set_approval(a["id"], status="uncertain", result="Exécution interrompue (programme arrêté pendant l'opération).")
+        _notify_uncertain(cfg, db, a["id"], a["action"], "exécution interrompue")
+        out["stuck"] += 1
+    for a in db.q("SELECT * FROM approvals WHERE status='uncertain' ORDER BY id"):
+        payload = json.loads(a["payload"])
+        tries = int(a["exec_attempts"] or 0)
+        if a["action"] in SAFE_RETRY and tries < MAX_RECONCILE and not missing_setup(a["action"]):
+            db.set_approval(a["id"], exec_attempts=tries + 1)
+            status, res = execute(cfg, db, a["id"], a["action"], payload)          # même clé : pas de doublon
+            if status != "uncertain":
+                out["resolved"] += 1
+                db.log("systeme", "decision", f"Demande #{a['id']} incertaine réconciliée : {status} — {res}", a["task_id"])
+                _follow_up(db, a, payload, f"Demande #{a['id']} : {'exécutée' if status == 'executed' else 'échec'} — {res}")
+            continue
+        if a["action"] == "send_email" and payload.get("message_id"):
+            found = sent_lookup(payload["message_id"])
+            if found:
+                _mark_executed(cfg, db, a["id"], a["action"], payload, "Email envoyé (retrouvé dans les messages envoyés)")
+                db.log("systeme", "decision", f"Demande #{a['id']} : email retrouvé dans les messages envoyés, marqué envoyé", a["task_id"])
+                out["resolved"] += 1
+                if not payload.get("order"):
+                    _follow_up(db, a, payload, f"Ton email #{a['id']} est bien parti (vérifié après une coupure).")
+                continue
+        out["waiting"] += 1                       # le propriétaire tranche dans le tableau de bord
+    return out
+
+
+def _follow_up(db, a, payload, text: str) -> None:
+    summary = payload.get("subject") or payload.get("product_name") or payload.get("title") or a["action"]
+    db.add_task(f"Suite à la demande #{a['id']} : {summary}"[:120], a["agent"],
+                f"{text}\nContexte initial : {a['reason']}\nPoursuis le travail en conséquence, puis termine la tâche.",
+                priority=2, parent_id=a["task_id"], created_by="systeme")
+
+
+def resolve_uncertain(cfg, db, approval_id: int, done: bool) -> str:
+    """Le propriétaire a vérifié : l'opération a bien eu lieu (done) ou non (la demande revient à valider)."""
+    a = db.approval(approval_id)
+    if not a or a["status"] != "uncertain":
+        return "Cette demande n'est pas dans l'état incertain."
+    payload = json.loads(a["payload"])
+    if done:
+        _mark_executed(cfg, db, approval_id, a["action"], payload, "Confirmé par le propriétaire")
+        db.log("proprietaire", "decision", f"Demande #{approval_id} incertaine : confirmée comme faite", a["task_id"])
+        if not payload.get("order"):
+            _follow_up(db, a, payload, f"Ta demande #{approval_id} a bien été exécutée (confirmé par le propriétaire).")
+        return "Marquée comme faite."
+    payload.pop("message_id", None)               # nouvel essai = nouvelle clé (l'ancienne opération n'a pas eu lieu)
+    db.set_approval(approval_id, status="pending", exec_key=None, started_at=None, exec_attempts=0, result=None,
+                    payload=json.dumps(payload, ensure_ascii=False))
+    db.log("proprietaire", "decision", f"Demande #{approval_id} incertaine : non faite, remise en validation", a["task_id"])
+    return "Remise dans les validations : tu peux la valider à nouveau."
+
+
 def decide(cfg, db, approval_id: int, approve: bool, note: str = "", edits: dict | None = None) -> str:
     a = db.approval(approval_id)
     if not a:
@@ -143,27 +351,16 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "", edits: dict
             db.set_approval(approval_id, status="pending")        # reste en attente
             raise NotReady(f"Impossible d'exécuter la demande #{approval_id} : {missing} manquant(s) dans .env. "
                            "Elle reste en attente : complète .env, redémarre le moteur, puis valide-la à nouveau.")
-        try:
-            res = EXECUTORS[a["action"]](cfg, payload)
-            db.set_approval(approval_id, status="executed", decided_at=iso(), result=res)
-            if a["action"] == "send_email" and payload.get("prospect"):
-                from . import prospects
-                prospects.on_sent(cfg, db, payload["prospect"], payload.get("template", ""))
-            if a["action"] == "send_email" and payload.get("in_reply_to"):
-                db.run("UPDATE inbox SET status='replied' WHERE id=?", (payload["in_reply_to"],))
-            if a["action"] == "send_email" and payload.get("order"):
-                from .commerce import mark_delivered
-                mark_delivered(db, payload["order"], f"Livrable envoyé : {payload.get('attachment')}")
-            if a["action"] == "stripe_payment_link" and payload.get("offer_id") and payload.get("_result"):
-                db.run("UPDATE offers SET payment_link_id=?, payment_link_url=? WHERE id=?",
-                       (payload["_result"]["id"], payload["_result"]["url"], payload["offer_id"]))
+        status, res = execute(cfg, db, approval_id, a["action"], payload)
+        if status == "uncertain":
+            outcome = (f"VALIDÉ, mais l'issue est INCERTAINE : {res}. Rien ne sera relancé automatiquement sans "
+                       "vérification ; tu seras prévenu.")
+            db.log("proprietaire", "decision", f"Demande #{approval_id} ({a['action']}) : {outcome}", a["task_id"])
+            return outcome                       # pas de tâche à l'agent : il ne doit surtout pas refaire la demande
+        if status == "executed":
             outcome = f"VALIDÉ et exécuté : {res}." + (f" (Modifié par le propriétaire : {', '.join(changed)}.)" if changed else "") + f" {note}".rstrip()
-        except Exception as e:
-            db.set_approval(approval_id, status="error", decided_at=iso(), result=str(e))
-            if a["action"] == "send_email" and payload.get("prospect"):
-                from . import prospects
-                prospects.on_not_sent(db, payload["prospect"])
-            outcome = f"VALIDÉ mais l'exécution a échoué : {e}"
+        else:
+            outcome = f"VALIDÉ mais l'exécution a échoué : {res}"
     elif a["action"] == "agent_rule":
         from .audit import apply_rule
         res = apply_rule(db, payload, approval_id)

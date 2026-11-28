@@ -241,6 +241,16 @@ _Mis à jour le 27/11/2026_
   - Les appels vers des services fixes (Stripe, GitHub, Brave, fournisseurs d'IA) restent sur `urllib` : leur adresse est écrite dans le code.
   - Les connexions épinglées ignorent un éventuel proxy système, ce qui est sans effet sur le PC du propriétaire.
   - `tests/test_net.py` : 9 tests avec un vrai serveur local et un DNS simulé ; 4 échouent sur l'ancien code (les autres vérifient des règles déjà respectées). `test_seo` autorise 127.0.0.1 pour son seul serveur de test ; `test_providers` simule `net.safe_get`. 244 tests.
+- FIN-03 corrigé (28/11) : `approvals.execute` et `approvals.reconcile`, avec un nouvel état « uncertain ». Défauts confirmés en test : une erreur dans une suite locale après un envoi réussi marquait l'email en échec, donc il risquait d'être renvoyé ; un Stripe injoignable donnait un échec sans clé d'idempotence, donc un nouvel essai risquait de créer un doublon ; une demande restait bloquée en « processing » après un arrêt du programme.
+  - Avant l'appel externe, la demande enregistre `exec_key` (uuid), `started_at` et, pour un email, un Message-ID déterministe `<studio-<id>-<clé>@<domaine>>`.
+  - SMTP : un échec avant DATA ou un refus explicite (destinataire, expéditeur, données) est une erreur certaine. Une coupure pendant l'envoi lève `Uncertain`. Une erreur au QUIT, après l'acceptation, ne compte pas.
+  - Stripe : `Idempotency-Key` = `<clé>-price` et `<clé>-link` ; 5xx, 409, 429 et réseau → `Uncertain` ; autre 4xx → erreur. GitHub : réseau ou 5xx → `Uncertain`.
+  - Le succès est enregistré EN PREMIER, puis `_after_success` (une erreur y est seulement journalisée).
+  - `reconcile` à chaque cycle (orchestrateur) : « processing » depuis plus de 10 min → uncertain. Pour Stripe et GitHub, nouvel essai avec la même clé (5 au plus). Pour un email, recherche du Message-ID dans le dossier IMAP marqué \Sent (`sent_copy_exists`, lecture seule) : retrouvé → marqué envoyé ; sinon on attend le propriétaire. **Un email n'est jamais renvoyé automatiquement.**
+  - Notification Windows quand une demande devient incertaine. Pas de tâche « Suite à la demande » tant que l'issue est inconnue (l'agent ne refait rien).
+  - Tableau de bord : encadré rouge en haut des validations avec « Il est bien parti » et « Il n'est pas parti (le remettre à valider) », route `POST /api/approvals/<id>/resolve {done}`. « Pas parti » remet la demande à valider avec une nouvelle clé.
+  - `tests/test_operations.py` : 12 tests, dont 11 échouent sur l'ancien code. `test_orders` : le faux `stripe_request` accepte la clé d'idempotence. 256 tests.
+  - Non vérifié : la recherche IMAP dans « Messages envoyés » contre le vrai Gmail (nom du dossier localisé, repéré par l'attribut \Sent).
 
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.

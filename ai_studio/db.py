@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS approvals (
     action TEXT NOT NULL,
     payload TEXT NOT NULL,
     reason TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'pending',          -- pending | approved | rejected | executed | error
+    status TEXT NOT NULL DEFAULT 'pending',          -- pending | review | processing | uncertain | approved | rejected | executed | error
     result TEXT,
     created_at TEXT NOT NULL,
     decided_at TEXT
@@ -222,6 +222,9 @@ class DB:
         ("sales", "info_received_at", "TEXT"),            # informations du client reçues : le délai promis démarre
         ("sales", "content_review", "TEXT"),              # relecture du fond par le chef de projet (avant livraison)
         ("sales", "content_review_at", "TEXT"),
+        ("approvals", "exec_key", "TEXT"),                # clé unique de l'exécution (idempotence Stripe, Message-ID de l'email)
+        ("approvals", "started_at", "TEXT"),              # début de l'exécution externe (détection d'une exécution interrompue)
+        ("approvals", "exec_attempts", "INTEGER"),        # essais de réconciliation d'une opération incertaine
         ("sales", "content_review_file", "TEXT"),         # fichier relu par le chef de projet (chemin dans l'espace de travail)
         ("sales", "content_review_sha", "TEXT"),          # son empreinte SHA-256 : la livraison doit contenir cette version exacte
         ("objectives", "owner_check", "TEXT"),            # vérification du propriétaire : ok | issue

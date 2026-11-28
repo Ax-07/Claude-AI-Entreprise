@@ -232,6 +232,11 @@ def events(cfg, db, since_id: int = 0, limit: int = 40) -> list[dict]:
 
 def approvals(cfg, db) -> list[dict]:
     out = []
+    for a in db.q("SELECT * FROM approvals WHERE status='uncertain' ORDER BY id"):  # issue inconnue : le propriétaire vérifie
+        d = _row(a)
+        d["payload"] = {k: v for k, v in json.loads(a["payload"]).items() if k != "html"}
+        d["uncertain"] = True
+        out.append(d)
     for a in db.q("SELECT * FROM approvals WHERE status='review' ORDER BY id"):     # en relecture : visibles, pas encore à décider
         d = _row(a)
         d["payload"] = {k: v for k, v in json.loads(a["payload"]).items() if k != "html"}
@@ -424,6 +429,17 @@ def decide_approval(cfg, db, approval_id: int, body: dict) -> dict:
     return {"ok": True, "message": msg}
 
 
+def resolve_approval(cfg, db, approval_id: int, body: dict) -> dict:
+    """Opération à l'issue incertaine : le propriétaire indique si elle a eu lieu (ex. email présent dans Gmail)."""
+    from .approvals import resolve_uncertain
+    if body.get("done") not in (True, False):
+        raise ApiError(400, "done doit valoir true ou false")
+    a = db.approval(approval_id)
+    if not a or a["status"] != "uncertain":
+        raise ApiError(409, "Cette demande n'est pas dans l'état incertain")
+    return {"ok": True, "message": resolve_uncertain(cfg, db, approval_id, body["done"])}
+
+
 def add_objective(cfg, db, body: dict) -> dict:
     text = str(body.get("text") or "").strip()
     if len(text) < 5:
@@ -593,6 +609,8 @@ def make_handler(cfg):
                     body = self._body()
                     if len(parts) == 2 and parts[0] == "approvals" and parts[1].isdigit():
                         return self._send(200, decide_approval(cfg, db, int(parts[1]), body))
+                    if len(parts) == 3 and parts[0] == "approvals" and parts[1].isdigit() and parts[2] == "resolve":
+                        return self._send(200, resolve_approval(cfg, db, int(parts[1]), body))
                     if parts == ["objectives"]:
                         return self._send(200, add_objective(cfg, db, body))
                     if parts == ["map"]:
