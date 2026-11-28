@@ -146,6 +146,8 @@ _Mis à jour le 27/11/2026_
 - Outil commun `search_library` (aussi dans la discussion avec le PDG) ; règle ajoutée : consulter la bibliothèque avant toute recherche web. L'outil serveur web_search d'Anthropic (utilisé seulement sans clé Brave) n'est pas mis en cache.
 - Tableau de bord : Connaissances → onglet « Recherches web » (filtre, contenu complet au clic). API GET /api/library (?q=, ?id=). 124 tests.
 
+- Bug signalé par le propriétaire (28/11) : le rafraîchissement automatique redessinait la colonne Validations et effaçait la note en cours de saisie. Correction : les cartes sont des résumés cliquables ; la décision se prend dans une fenêtre (contenu complet, avis juridique, note sur plusieurs lignes, Valider / Refuser / Aperçu) que le rafraîchissement ne touche pas ; la colonne n'est redessinée que si la liste a changé ; une réponse vide à une décision est refusée.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.
