@@ -135,6 +135,23 @@ class ProjectManagerTest(Base):
         self.db.set_task(r2, status="done", result="rien")
         esc = missions.relaunch_if_stalled(self.db, self.db.task(r2))
         self.assertEqual((self.db.task(esc)["agent"], self.db.task(esc)["priority"]), ("pdg", 1))   # arbitrage du PDG
+        self.db.set_task(esc, status="done", result="rien")
+        self.assertIsNone(missions.relaunch_mission(self.db, "objectif", oid))                    # pas de boucle infinie
+        self.assertIn("ta décision est nécessaire", self.db.one("SELECT message FROM events ORDER BY id DESC LIMIT 1")[0])
+        # le propriétaire (via le PDG) peut toujours relancer avec une consigne
+        out = __import__("ai_studio.tools", fromlist=["run_tool"]).run_tool(
+            "assign_project_manager", self.ctx("pdg"), {"kind": "objectif", "id": oid, "brief": "Rédige et soumets l'email maintenant"})
+        self.assertIn("relancé", out)
+        self.assertIn("Rédige et soumets", self.db.one("SELECT description FROM tasks ORDER BY id DESC LIMIT 1")[0])
+
+    def test_engine_relaunches_stalled_mission_without_waiting(self):
+        from ai_studio.orchestrator import Studio
+        oid = self.db.add_objective("Prospection")
+        kick = missions.assign_pm(self.db, "objectif", oid)
+        self.db.set_task(kick, status="done", result="plan")
+        self.db.run("UPDATE objectives SET last_review_at=? WHERE id=?", (iso(), oid))          # point périodique récent
+        Studio(self.cfg, self.db, None).schedule_reviews()
+        self.assertTrue(self.db.one("SELECT 1 FROM tasks WHERE agent='chef_projet' AND title LIKE 'Relance%' AND status='pending'"))
 
     def test_silent_task_is_not_a_success(self):
         from ai_studio.runner import run_task
