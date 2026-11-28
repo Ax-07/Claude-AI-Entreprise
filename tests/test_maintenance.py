@@ -19,6 +19,7 @@ class Base(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.dir, True)
         self.cfg = load_config(self.dir)
         self.cfg.data["security"]["daily_review"] = False   # revue quotidienne testée à part
+        self.cfg.data["finance"] = {"daily_review": False}
         self.cfg.ensure_dirs()
         (self.dir / ".gitignore").write_text(".env\nconfig.json\ndata/\n", encoding="utf-8")   # installation saine
         self.db = DB(self.cfg.db_path)

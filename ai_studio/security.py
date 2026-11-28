@@ -101,20 +101,10 @@ def config_audit(cfg, db) -> list[tuple[str, str]]:
 
 
 def anomalies(db) -> list[str]:
-    """Écarts par rapport à l'habitude (7 derniers jours) : dépenses, échecs, envois, emails suspects."""
+    """Signaux de SÉCURITÉ sur 24 h : envois inhabituels, emails suspects. Les dépenses relèvent de la Trésorerie
+    (finance_checks) et les tâches en échec du pilotage (PDG, chefs de projet) : chaque pôle son domaine."""
     out = []
-    today = now().strftime("%Y-%m-%d")
-    week = [(now() - timedelta(days=k)).strftime("%Y-%m-%d") for k in range(1, 8)]
-    spent_today = db.one("SELECT COALESCE(SUM(usd),0) FROM costs WHERE day=?", (today,))[0]
-    avg = db.one(f"SELECT COALESCE(SUM(usd),0) FROM costs WHERE day IN ({','.join('?'*7)})", week)[0] / 7
-    if spent_today > 0.2 and spent_today > 3 * max(avg, 0.01):
-        out.append(f"Dépense du jour {spent_today:.3f} $, plus de 3 fois la moyenne ({avg:.3f} $/jour).")
-    for r in db.q("SELECT agent, SUM(usd) s FROM costs WHERE day=? GROUP BY agent HAVING s > 0.15", (today,)):
-        out.append(f"L'agent {r['agent']} a dépensé {r['s']:.3f} $ aujourd'hui.")
     since = iso(now() - timedelta(hours=24))
-    failed = db.one("SELECT COUNT(*) FROM tasks WHERE status='failed' AND updated_at>=?", (since,))[0]
-    if failed >= 3:
-        out.append(f"{failed} tâches en échec sur 24 h.")
     sent = db.one("SELECT COUNT(*) FROM approvals WHERE action='send_email' AND status='executed' AND decided_at>=?", (since,))[0]
     if sent >= 15:
         out.append(f"{sent} emails envoyés sur 24 h.")

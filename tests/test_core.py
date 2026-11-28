@@ -49,6 +49,7 @@ class Base(unittest.TestCase):
         (self.dir / "config.json").write_text(json.dumps({"budget": {"monthly_usd": 1.0, "daily_usd": 0.5, "per_task_usd": 0.05}}))
         self.cfg = load_config(self.dir)
         self.cfg.data["security"]["daily_review"] = False   # revue quotidienne testée à part
+        self.cfg.data["finance"] = {"daily_review": False}
         self.db = DB(self.cfg.db_path)
         self.guard = BudgetGuard(self.cfg, self.db)
 

@@ -74,6 +74,7 @@ DEFAULTS: dict = {
     # Relecture juridique avant ta décision (l'avis s'affiche sur la carte de validation, sans la bloquer).
     # Emails de prospection : désactivé par défaut (coût), à activer quand la prospection démarre.
     "security": {"daily_review": True},
+    "finance": {"daily_review": True},                  # contrôle quotidien des dépenses par la Trésorerie
     "missions": {"max_usd_per_mission": 3.0},           # plafond de dépense d'une mission pilotée par un chef de projet
     "legal_review": {"enabled": True, "actions": ["publish_page", "stripe_payment_link"], "prospection_emails": False},
     # Suivi des commandes : relance du PDG si plus personne ne travaille sur une commande non livrée.

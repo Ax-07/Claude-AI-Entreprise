@@ -38,10 +38,20 @@ class Studio:
         if self.cfg.get("security", "daily_review", default=True) and self.db.kv_get("security_review_day") != today:
             self.db.kv_set("security_review_day", today)
             self.db.add_task("Revue de sécurité quotidienne", "securite",
-                             "Lance security_audit, puis analyse les constats et les anomalies. Pour chaque point critique "
-                             "ou anomalie réelle : security_alert avec une consigne claire pour le propriétaire (quoi faire, "
-                             "où, en combien de minutes). Ne signale pas ce qui est déjà connu et sans changement depuis hier "
+                             "Lance security_audit, puis analyse les constats et les signaux de sécurité. Incident critique : "
+                             "security_alert niveau critique avec une consigne claire pour le propriétaire (quoi faire, où, en "
+                             "combien de minutes) ; point d'attention : security_alert niveau attention (transmis au PDG). Les "
+                             "dépenses ne sont pas ton domaine. Ne signale pas ce qui est déjà connu et sans changement depuis hier "
                              "(recall). Termine par un résumé court ; mémorise (remember) seulement les nouveaux constats.",
+                             priority=3, created_by="systeme")
+            created += 1
+        if self.cfg.get("finance", "daily_review", default=True) and self.db.kv_get("finance_review_day") != today:
+            self.db.kv_set("finance_review_day", today)
+            self.db.add_task("Contrôle quotidien des dépenses", "finance",
+                             "Lance spending_check. Pour chaque anomalie, cherche d'abord une cause interne (tâches et missions "
+                             "en cours, list_tasks). Si une dérive reste inexpliquée, signale-la au PDG avec les faits "
+                             "(delegate_task) : il décidera de la suite. Ne contacte pas le propriétaire. Termine par un résumé "
+                             "en 3 lignes ; mémorise (remember) seulement un constat nouveau.",
                              priority=3, created_by="systeme")
             created += 1
         every = timedelta(minutes=int(self.cfg["runtime"]["ceo_review_minutes"]))
