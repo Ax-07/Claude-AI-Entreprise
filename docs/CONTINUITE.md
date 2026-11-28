@@ -256,6 +256,15 @@ _Mis à jour le 27/11/2026_
   - **Vérifié sur un vrai Windows : conversion PDF par Edge** (`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`, test `test_real_pdf_conversion_when_browser_available` réussi).
   - 6/6 combinaisons au vert, 256 tests chacune.
 - **Fin de la phase 1 de l'audit externe (28/11)** : les 6 anomalies P0 et la CI (QA-01) sont traitées (PR #74 à #79, empilées). Prochaine étape : la phase 2 (FIN-01 budget réservé, SEC-04 jeton du tableau de bord, SEC-07 PDF isolé, OPS-02 curseur IMAP, OPS-01 restauration complète avec `pieces_validees`, SEC-03 cloisonnement, IA-02 états `partial` et `verified`, relecture juridique bloquante). Recommandé au propriétaire : protéger `main` en exigeant le contrôle « Tests ».
+- Phase 2, FIN-01 corrigé (28/11) : `BudgetGuard.reserve`, `settle` et `release`, nouvelle table `budget_reservations`. Défaut confirmé : avec l'ancien contrôle (vérification avant l'appel, enregistrement après), une boucle d'appels gourmands dépensait 0,6848 $ pour un plafond de 0,65 $, et davantage avec des appels concurrents.
+  - Avant chaque appel, le coût maximal est réservé : entrée estimée (`estimate_input_tokens`, 1 token pour 3 caractères + 200, au prix plein), sortie au maximum autorisé, et `max_uses` des recherches web.
+  - La réservation se fait dans une transaction `BEGIN IMMEDIATE`, qui compte les réservations des autres connexions (discussion avec le PDG et moteur).
+  - S'il reste trop peu, la longueur de réponse est réduite pour tenir dans le budget (`MIN_OUTPUT_TOKENS` = 1 024 au minimum), sinon `BudgetExceeded` est levé avant tout appel payant.
+  - Une réservation est remplacée par le coût réel (`settle`), libérée si l'appel échoue (`release`), et ignorée puis supprimée au bout de 15 min (programme arrêté).
+  - Les plafonds du jour et du mois sont stricts. Le plafond par tâche reste souple (résultat partiel), comme avant.
+  - Limite : le plafond est strict tant que l'entrée réelle ne dépasse pas l'estimation, qui est prudente.
+  - Le runner et la discussion passent par `reserve` ; `check` (début de cycle) compte aussi les réservations.
+  - `tests/test_budget.py` : 9 tests, dont le scénario de l'audit et 6 fils d'exécution en parallèle sur des connexions distinctes. 265 tests.
 
 ## Non vérifié
 - Contre les vrais services (seulement avec des simulations) : la synchronisation Stripe et les clés d'idempotence, la recherche dans « Messages envoyés » (IMAP \Sent), le client réseau sur de vrais sites.

@@ -99,9 +99,13 @@ def send(cfg, db, text: str, thread: int | None = None) -> dict:
     try:
         llm = (LLM_FACTORY or make_llm)(cfg)
         for step in range(MAX_STEPS):
-            guard.check(None)
-            resp = llm.complete(model, system, messages, tools, int(cfg["runtime"]["max_output_tokens"]))
-            cost += guard.record("pdg", None, model, resp.get("usage", {}))
+            rid, max_out = guard.reserve("pdg", None, model, system, messages, tools, int(cfg["runtime"]["max_output_tokens"]))
+            try:
+                resp = llm.complete(model, system, messages, tools, max_out)
+            except BaseException:
+                guard.release(rid)
+                raise
+            cost += guard.settle(rid, "pdg", None, model, resp.get("usage", {}))
             content = resp.get("content", [])
             messages.append({"role": "assistant", "content": content})
             texts = [b.get("text", "") for b in content if b.get("type") == "text" and b.get("text")]

@@ -127,10 +127,16 @@ def run_task(cfg, db, llm, guard, task) -> str:
                     messages[-1]["content"].append(note)
                 else:
                     messages.append({"role": "user", "content": [note]})
-            guard.check(task["id"])
             compact_history(messages, int(rt.get("keep_full_tool_results", 2)), int(rt.get("old_tool_result_chars", 600)))
-            resp = llm.complete(model, system, _clean_for_api(messages), _tools_for(cfg, role, guard), int(rt["max_output_tokens"]))
-            guard.record(role.name, task["id"], model, resp.get("usage", {}))
+            msgs, tools = _clean_for_api(messages), _tools_for(cfg, role, guard)
+            # coût maximal réservé AVANT l'appel (plafonds stricts, appels concurrents compris) — audit FIN-01
+            rid, max_out = guard.reserve(role.name, task["id"], model, system, msgs, tools, int(rt["max_output_tokens"]))
+            try:
+                resp = llm.complete(model, system, msgs, tools, max_out)
+            except BaseException:
+                guard.release(rid)
+                raise
+            guard.settle(rid, role.name, task["id"], model, resp.get("usage", {}))
             content = resp.get("content", [])
             messages.append({"role": "assistant", "content": content})
             texts = [b.get("text", "") for b in content if b.get("type") == "text"]

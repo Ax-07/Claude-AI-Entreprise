@@ -59,6 +59,14 @@ CREATE TABLE IF NOT EXISTS costs (
     web_searches INTEGER NOT NULL DEFAULT 0,
     usd REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS budget_reservations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent TEXT NOT NULL,
+    task_id INTEGER,
+    model TEXT,
+    usd REAL NOT NULL,                               -- coût maximal possible de l'appel en cours
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS approvals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     agent TEXT NOT NULL,
