@@ -272,6 +272,15 @@ _Mis à jour le 27/11/2026_
   - POST : il faut en plus `X-AI-Studio`, un `Origin` égal à l'hôte s'il est présent, et un `Sec-Fetch-Site` same-origin ou none, contre le CSRF. En-tête `Referrer-Policy: no-referrer`.
   - Nouvelle commande `python -m ai_studio lien`, qui affiche le lien d'accès (à utiliser si le cookie a été effacé). Les notifications ouvrent l'adresse sans clé, ce qui suffit puisque le cookie est conservé.
   - `tests/test_server.py` (AccessTest) : 5 tests, dont 4 échouent sur l'ancien serveur. Les fonctions d'appel des tests du serveur envoient désormais le cookie. 270 tests.
+- Phase 2, SEC-07 corrigé (28/11) : conversion PDF isolée (`pdf.sanitize_html`, `CSP_META`, `ISOLATION_FLAGS`). Défaut confirmé avec le vrai Chrome : dans un rapport piégé, un script s'exécutait, et **un fichier local du PC (iframe file://) était imprimé dans le PDF livré au client**.
+  - `sanitize_html` (HTMLParser) retire script, iframe, frame, object, embed, base, template, les attributs `on…`, `srcdoc` et les `meta http-equiv` (refresh, CSP concurrente), les `link` autres que des feuilles de style internes, et dans le CSS les `@import`, `url()` externes et `expression`.
+  - `safe_url` n'accepte que les chemins relatifs qui restent dans le dossier du livrable (« .. », « / », « \\ », lecteur Windows et encodage %2e refusés), les images en data: et les ancres. Un `<a href>` peut aussi pointer vers http(s), mailto ou tel, car il est cliquable dans le PDF sans être chargé.
+  - CSP injectée tout en haut de `<head>` : `default-src 'none'`, `script-src 'none'`, `frame-src 'none'`, `connect-src 'none'`. Vérifié avec le vrai Chrome : elle bloque à elle seule un script non nettoyé.
+  - Navigateur : `--host-resolver-rules=MAP * ~NOTFOUND` (aucun réseau) et services annexes coupés. `--blink-settings=scriptEnabled=false` a été essayé puis écarté, car il empêche Chrome sans fenêtre de produire le PDF.
+  - `--no-sandbox` n'est plus ajouté en silence en root : il faut `delivery.pdf_no_sandbox` ou `PDF_NO_SANDBOX=1`, sinon `PdfError`. Sans effet sur le PC Windows du propriétaire.
+  - CI Linux : `poppler-utils` (pdftotext) pour le test de bout en bout.
+  - `tests/test_pdf_isolation.py` : 8 tests. Le test réel échoue sur l'ancien code (PIRATE et secret imprimés).
+  - `test_server` : la classe de base `ServerBase` évite que `MaquetteTest` et `AccessTest` rejouent les tests de `ServerTest`. Le nombre de tests baisse sans perte. 265 tests.
 
 ## Non vérifié
 - Contre les vrais services (seulement avec des simulations) : la synchronisation Stripe et les clés d'idempotence, la recherche dans « Messages envoyés » (IMAP \Sent), le client réseau sur de vrais sites.

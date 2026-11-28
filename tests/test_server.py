@@ -14,7 +14,8 @@ from ai_studio.db import DB
 from ai_studio.server import make_server
 
 
-class ServerTest(unittest.TestCase):
+class ServerBase(unittest.TestCase):
+    """Serveur réel et fonctions d'appel (sans test : les classes de tests en héritent sans dupliquer)."""
     def setUp(self):
         env = unittest.mock.patch.dict(os.environ, {}, clear=False)
         env.start(); self.addCleanup(env.stop)
@@ -51,6 +52,9 @@ class ServerTest(unittest.TestCase):
 
     def post(self, path, body):
         return self.req("POST", path, body, {"X-AI-Studio": "1"})
+
+
+class ServerTest(ServerBase):
 
     def test_agent_rules_list_and_remove(self):
         rid = self.db.run("INSERT INTO agent_rules(agent, rule, created_at) VALUES ('ventes', 'Consulte list_prospects avant tout email.', '2026-11-28T10:00:00+00:00')")
@@ -208,7 +212,7 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(st, 200); self.assertIn("four à bois", body)
 
 
-class MaquetteTest(ServerTest):
+class MaquetteTest(ServerBase):
     def test_map_assets_served_compressed(self):
         import gzip as gz
         c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
@@ -322,7 +326,7 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class AccessTest(ServerTest):
+class AccessTest(ServerBase):
     """Accès protégé par clé secrète et cookie de session (audit SEC-04)."""
 
     def test_local_program_without_key_cannot_read_or_act(self):
