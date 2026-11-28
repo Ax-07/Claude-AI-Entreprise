@@ -46,12 +46,18 @@ class IntakeTest(Base):
         self.assertIn("1 à 3 concurrents connus (facultatif) :\n----------", p["body"])
         self.assertIn("Le délai de livraison (3 jours) démarre à la réception de ces informations.", p["body"])
         self.assertIn("pas encore reçues", commerce.delivery_brief(self.db, n))
-        # la réponse du client fait démarrer le délai
+        # la réponse du client ne démarre PAS le délai à elle seule : l'agent vérifie que tout est fourni (audit OPS-02)
         os.environ.update(SMTP_HOST="smtp.gmail.com", SMTP_USER="studio@gmail.com", SMTP_PASSWORD="x")
         imap = FakeIMAP({1: mail("Old <old@x.fr>", "Ancien", "vieux", "<1@x>")})
         commerce.sync_inbox(self.cfg, self.db, connect=lambda: imap)
         imap.msgs[2] = mail("Marie <marie@cafe-lumiere.fr>", "Re: Votre commande", "Café Lumière, 3 rue X, Lyon ; site cafe-lumiere.fr", "<2@x>")
         commerce.sync_inbox(self.cfg, self.db, connect=lambda: imap)
+        s = commerce.get_order(self.db, n)
+        self.assertEqual((s["stage"], s["due_at"], s["info_received_at"]), ("attente_client", None, None))
+        t = self.db.one("SELECT * FROM tasks WHERE title LIKE 'Répondre à Marie%'")
+        self.assertIn(f"set_order_status({n}, 'a_livrer'", t["description"])
+        self.assertIn("Nom et adresse de l'établissement", t["description"])          # liste de ce qui est attendu
+        run_tool("set_order_status", self.ctx("support"), {"order": n, "status": "a_livrer", "note": "toutes les informations reçues"})
         s = commerce.get_order(self.db, n)
         self.assertEqual(s["stage"], "a_livrer"); self.assertIsNotNone(s["info_received_at"]); self.assertIsNotNone(s["due_at"])
 

@@ -710,7 +710,7 @@ async function openSales(){
       h("td",{class:{livree:"st-done",a_livrer:"st-running",attente_client:"st-pending"}[s.stage]||"muted"}, ({a_livrer:"À livrer",attente_client:"Attente client",livree:"Livrée",historique:"Historique"})[s.stage]||"—", s.due_at && s.stage!=="livree" ? h("div",{class:"small muted"}, "avant le " + new Date(s.due_at).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"})) : null))))) : h("div",{class:"empty"},"Aucune vente pour l’instant. Elles apparaîtront ici dans les 10 minutes qui suivent un paiement Stripe.")));
 }
 async function openInbox(){
-  const list = await api("GET","/api/inbox"), LBL = {new:"Nouveau",queued:"Confié à un agent",ignored:"Ignoré",replied:"Répondu"};
+  const list = await api("GET","/api/inbox"), LBL = {new:"En attente",received:"Reçu, en cours de traitement",waiting:"En attente (plafond du jour)",queued:"Confié à un agent",ignored:"Ignoré",replied:"Répondu",bounce:"Non distribué"};
   modal("Emails reçus", h("div",{}, list.length ? list.map(m => h("details",{class:"box",style:{marginBottom:"8px"}},
     h("summary",{style:{cursor:"pointer",display:"flex",gap:"10px",flexWrap:"wrap",justifyContent:"space-between"}}, h("span",{}, h("b",{}, m.from_name || m.from_addr), " — ", m.subject), h("span",{class:"small muted"}, `${LBL[m.status]||m.status}${m.reason?" ("+m.reason+")":""} · ${ago(m.received_at)}`)),
     h("div",{class:"small muted",style:{margin:"6px 0"}}, m.from_addr, m.task_id ? h("button",{class:"link",style:{marginLeft:"10px"},onclick:()=>openTask(m.task_id)}, `tâche #${m.task_id} →`) : null),

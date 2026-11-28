@@ -281,6 +281,13 @@ _Mis à jour le 27/11/2026_
   - CI Linux : `poppler-utils` (pdftotext) pour le test de bout en bout.
   - `tests/test_pdf_isolation.py` : 8 tests. Le test réel échoue sur l'ancien code (PIRATE et secret imprimés).
   - `test_server` : la classe de base `ServerBase` évite que `MaquetteTest` et `AccessTest` rejouent les tests de `ServerTest`. Le nombre de tests baisse sans perte. 265 tests.
+- Phase 2, OPS-02 corrigé (28/11) : `commerce._sync_inbox` en deux temps. Défauts confirmés : (1) le curseur IMAP avançait avant le traitement, donc après une coupure le message suivant était perdu ; (2) **nouveau** : les messages bloqués par le plafond du jour restaient « new » pour toujours, alors que la notification disait qu'ils attendaient ; (3) une réponse du client démarrait le délai de livraison même si les informations étaient incomplètes.
+  - `_store_message` : le message est analysé (non-distribution → `inbox.bounce_info`, motif d'exclusion → `reason`) et enregistré à l'état « received » dans la MÊME transaction que `inbox_last_uid`.
+  - `process_inbox` : traite les messages « received », « waiting » (plafond) et « new » (anciens messages bloqués). Plafond atteint → « waiting », repris les jours suivants.
+  - `_queue_reply_task` est reprenable : la tâche existante est réutilisée. `handle_bounce` ne vise que les emails « executed », donc pas de doublon.
+  - Réponse d'un client dont la commande attend des informations : la commande reste en « attente_client », la relance est remise à zéro, et la tâche liste les informations attendues et demande `set_order_status(n, 'a_livrer')` seulement si tout est fourni. **Le délai démarre à ce moment-là.**
+  - Tableau de bord : libellés « Reçu, en cours de traitement », « En attente (plafond du jour) », « Non distribué ».
+  - `tests/test_inbox_recovery.py` : 5 tests, dont 4 échouent sur l'ancien code. Tests adaptés au nouveau comportement : `test_daily_cap` (reprise le lendemain), `test_intake` et `test_orders` (délai démarré par `set_order_status`). `test_quality` saute la conversion réelle en root sans `PDF_NO_SANDBOX=1`. 270 tests.
 
 ## Non vérifié
 - Contre les vrais services (seulement avec des simulations) : la synchronisation Stripe et les clés d'idempotence, la recherche dans « Messages envoyés » (IMAP \Sent), le client réseau sur de vrais sites.

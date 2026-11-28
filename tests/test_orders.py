@@ -175,7 +175,7 @@ class OrdersTest(Base):
         self.db.kv_set("inbox_last_uid", "0"); self.db.kv_set("inbox_uidvalidity", "7")
         commerce.sync_inbox(self.cfg, self.db, connect=lambda: FakeIMAP({1: mail("Marie <marie@cafe.fr>", "Re: infos", "Voici l'URL", "<m@x>")}))
         s = commerce.get_order(self.db, n)
-        self.assertEqual((s["stage"], s["nudges"]), ("a_livrer", 0))
+        self.assertEqual((s["stage"], s["nudges"]), ("attente_client", 0))       # relancée, délai pas encore démarré
         t = self.db.one("SELECT * FROM tasks WHERE title LIKE 'Répondre à Marie%'")
         self.assertEqual((t["order_ref"], t["priority"]), (n, 1))
 

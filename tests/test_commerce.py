@@ -152,7 +152,7 @@ class InboxTest(Base):
             6: mail("Inconnu <marie@cafe.fr>", "Question", "<p>Bonjour,<br>quel <b>prix</b> ?</p>", "<6@x>"),
         })
         r = commerce.sync_inbox(self.cfg, self.db, connect=lambda: imap)
-        self.assertEqual(r, {"new": 5, "queued": 2, "ignored": 3})
+        self.assertEqual(r, {"new": 5, "queued": 2, "ignored": 3, "waiting": 0})
         t = self.db.one("SELECT * FROM tasks WHERE title LIKE 'Répondre à Paul%'")
         self.assertEqual(t["agent"], "ventes")                  # on lui avait écrit : c'est un prospect
         self.assertIn(commerce.UNTRUSTED_START, t["description"])
@@ -169,8 +169,13 @@ class InboxTest(Base):
         imap.msgs.update({2: mail("a@x.fr", "1", "a", "<a@x>"), 3: mail("b@x.fr", "2", "b", "<b@x>")})
         r = commerce.sync_inbox(self.cfg, self.db, connect=lambda: imap)
         self.assertEqual(r["queued"], 1)
-        self.assertEqual(self.db.one("SELECT COUNT(*) FROM inbox WHERE status='new'")[0], 1)
+        self.assertEqual(self.db.one("SELECT COUNT(*) FROM inbox WHERE status='waiting'")[0], 1)
         self.assertTrue(any("Beaucoup d'emails" in x for x in self.toasts))
+        # le lendemain, le message en attente est repris (avant cette correction, il restait « new » pour toujours)
+        self.db.run("UPDATE inbox SET recorded_at='2000-01-01T00:00:00+00:00'")
+        r = commerce.sync_inbox(self.cfg, self.db, connect=lambda: imap)
+        self.assertEqual((r["queued"], r["new"]), (1, 0))
+        self.assertEqual(self.db.one("SELECT COUNT(*) FROM inbox WHERE status='queued'")[0], 2)
 
     def test_reply_threads_and_attachment(self):
         iid = self.db.run("INSERT INTO inbox(uid, message_id, from_addr, subject, body, status, recorded_at) VALUES (1,'<q@x>','marie@cafe.fr','Question','?','queued','t')")

@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS inbox (
     subject TEXT,
     received_at TEXT,
     body TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'new',              -- new | queued | ignored | replied
+    status TEXT NOT NULL DEFAULT 'new',              -- received | waiting | queued | ignored | bounce | replied (new : ancien)
     reason TEXT,
     task_id INTEGER,
     recorded_at TEXT NOT NULL
@@ -230,6 +230,7 @@ class DB:
         ("sales", "info_received_at", "TEXT"),            # informations du client reçues : le délai promis démarre
         ("sales", "content_review", "TEXT"),              # relecture du fond par le chef de projet (avant livraison)
         ("sales", "content_review_at", "TEXT"),
+        ("inbox", "bounce_info", "TEXT"),                 # non-distribution détectée à la réception (adresses, motif)
         ("approvals", "exec_key", "TEXT"),                # clé unique de l'exécution (idempotence Stripe, Message-ID de l'email)
         ("approvals", "started_at", "TEXT"),              # début de l'exécution externe (détection d'une exécution interrompue)
         ("approvals", "exec_attempts", "INTEGER"),        # essais de réconciliation d'une opération incertaine

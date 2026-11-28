@@ -115,6 +115,8 @@ class QualityTest(Base):
         from ai_studio import pdf
         if not pdf.find_browser(self.cfg):
             self.skipTest("ni Edge ni Chrome sur cette machine")
+        if hasattr(os, "geteuid") and os.geteuid() == 0 and os.environ.get("PDF_NO_SANDBOX") != "1":
+            self.skipTest("lancé en root sans PDF_NO_SANDBOX=1 (bac à sable du navigateur)")
         n, args = self._report_order()
         src = self.cfg.workspace / args["attachment"]
         out = pdf.html_to_pdf(self.cfg, src, src.with_suffix(".pdf"))
