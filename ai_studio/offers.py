@@ -11,9 +11,10 @@ import json
 
 from .db import iso
 
-FIELDS = ("price_eur", "summary", "deliverable", "delay_hours", "required_info", "producer", "activity")
+FIELDS = ("price_eur", "summary", "deliverable", "delay_hours", "required_info", "producer", "activity", "next_offer")
 LABELS = {"price_eur": "Prix", "summary": "Résumé", "deliverable": "Livrable", "delay_hours": "Délai",
-          "required_info": "Infos à demander au client", "producer": "Producteur", "activity": "Activité"}
+          "required_info": "Infos à demander au client", "producer": "Producteur", "activity": "Activité",
+          "next_offer": "Offre suivante proposée après livraison"}
 
 
 def margin(cfg, db, price_eur: float, offer_id: int | None = None) -> dict:
@@ -56,7 +57,7 @@ def submit(cfg, db, agent: str, task_id, values: dict, name: str) -> str:
     old = db.one("SELECT * FROM offers WHERE lower(name)=lower(?)", (name.strip(),))
     t = iso()
     if old and old["status"] == "active":
-        changes = {k: v for k, v in values.items() if str(old[k]) != str(v)}
+        changes = {k: v for k, v in values.items() if str(old[k] or "") != str(v or "")}
         if not changes:
             return f"Offre « {old['name']} » : aucune différence avec la version active, rien à valider."
         db.run("UPDATE offers SET pending=?, updated_at=? WHERE id=?", (json.dumps(changes, ensure_ascii=False), t, old["id"]))

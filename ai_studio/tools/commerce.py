@@ -91,10 +91,11 @@ def propose_page(ctx: ToolContext, file: str, page_path: str, title: str, reason
        "delay_hours": {"type": "integer", "description": "délai de livraison promis après paiement, en heures"},
        "required_info": {"type": "string", "description": "informations à obtenir du client pour livrer (vide si aucune)"},
        "producer": {"type": "string", "description": "agent qui produit le livrable : atelier (par défaut : rapports, audits, contenus) ou developpement (sites web, applications)"},
-       "activity": {"type": "string", "description": "activité de l'offre (services, video, ecommerce) ; par défaut celle de ta tâche"}},
+       "activity": {"type": "string", "description": "activité de l'offre (services, video, ecommerce) ; par défaut celle de ta tâche"},
+       "next_offer": {"type": "string", "description": "nom d'une offre du catalogue à proposer ensuite au client satisfait (facultatif)"}},
       ["name", "price_eur", "summary", "deliverable", "delay_hours"])
 def save_offer(ctx: ToolContext, name: str, price_eur: float, summary: str, deliverable: str, delay_hours: int,
-               producer: str = "atelier", required_info: str = "", activity: str = "") -> str:
+               producer: str = "atelier", required_info: str = "", activity: str = "", next_offer: str = "") -> str:
     from ..activities import exists
     from ..db import iso
     activity = activity.strip() or (ctx.task["activity"] if ctx.task is not None and ctx.task["activity"] else "services")
@@ -107,8 +108,19 @@ def save_offer(ctx: ToolContext, name: str, price_eur: float, summary: str, deli
         return "Prix (1 à 5000 €) ou délai (1 h à 60 jours) hors limites."
     from ..offers import submit
     values = {"price_eur": round(float(price_eur), 2), "summary": summary[:1000], "deliverable": deliverable[:1000],
-              "delay_hours": int(delay_hours), "required_info": required_info[:600], "producer": producer, "activity": activity}
+              "delay_hours": int(delay_hours), "required_info": required_info[:600], "producer": producer, "activity": activity,
+              "next_offer": next_offer.strip()[:120] or None}
     return submit(ctx.cfg, ctx.db, ctx.agent, ctx.task["id"] if ctx.task is not None else None, values, name)
+
+
+@tool("record_feedback",
+      "Enregistre le retour d'un client sur une commande livrée (ce qu'il a dit, satisfait ou non). Un client insatisfait "
+      "est signalé immédiatement au propriétaire et ne reçoit plus de proposition commerciale.",
+      {"order": {"type": "integer"}, "feedback": {"type": "string", "description": "ce que le client a dit, résumé fidèlement"},
+       "satisfied": {"type": "string", "enum": ["oui", "non", "inconnu"]}}, ["order", "feedback", "satisfied"])
+def record_feedback(ctx: ToolContext, order: int, feedback: str, satisfied: str) -> str:
+    from ..aftercare import record
+    return record(ctx.cfg, ctx.db, int(order), feedback, {"oui": True, "non": False}.get(satisfied.strip().lower()))
 
 
 # ============================================================================ Prospects

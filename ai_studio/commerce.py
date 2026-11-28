@@ -169,14 +169,14 @@ def import_offers(db, path) -> list[str]:
         if not exists(db, activity):
             raise ValueError(f"{name} : activité inconnue ({activity})")
         vals = (price, o.get("summary", "")[:1000], o.get("deliverable", "")[:1000], delay, o.get("required_info", "")[:600],
-                o.get("producer", "atelier"), activity, iso())
+                o.get("producer", "atelier"), activity, o.get("next_offer") or None, iso())
         old = db.one("SELECT id FROM offers WHERE lower(name)=lower(?)", (name,))
         if old:
             db.run("UPDATE offers SET price_eur=?, summary=?, deliverable=?, delay_hours=?, required_info=?, producer=?, activity=?, "
-                   "updated_at=?, status='active' WHERE id=?", (*vals, old["id"]))
+                   "next_offer=?, updated_at=?, status='active', pending=NULL WHERE id=?", (*vals, old["id"]))
         else:
-            db.run("INSERT INTO offers(name, price_eur, summary, deliverable, delay_hours, required_info, producer, activity, updated_at, "
-                   "created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (name, *vals, "proprietaire", iso()))
+            db.run("INSERT INTO offers(name, price_eur, summary, deliverable, delay_hours, required_info, producer, activity, next_offer, "
+                   "updated_at, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (name, *vals, "proprietaire", iso()))
         db.log("proprietaire", "offre", f"Offre {'mise à jour' if old else 'créée'} depuis le catalogue : {name}")
         done.append(name)
     return done
@@ -562,6 +562,8 @@ def _sync_inbox(cfg, db, connect=None) -> dict:
                 db.log("securite", "email", f"Email #{iid} de {addr} suspect : {', '.join(alerts)}")
             order = db.one("SELECT rowid AS n FROM sales WHERE lower(customer_email)=lower(?) AND stage IN ('a_livrer','attente_client') "
                            "ORDER BY created_at DESC LIMIT 1", (addr,))
+            delivered = db.one("SELECT rowid AS n, product FROM sales WHERE lower(customer_email)=lower(?) AND stage='livree' "
+                               "ORDER BY delivered_at DESC LIMIT 1", (addr,))
             if order:
                 db.run("UPDATE sales SET stage='a_livrer', nudges=0 WHERE rowid=?", (order["n"],))
             tid = db.add_task(
@@ -576,6 +578,9 @@ def _sync_inbox(cfg, db, connect=None) -> dict:
                 "- Vérifie la mémoire (recall) pour connaître l'offre, les prix et l'historique avec ce contact.\n"
                 "- Si le message n'appelle pas de réponse (spam, publicité, simple remerciement), termine la tâche en le disant.\n"
                 "- Si une décision du propriétaire est nécessaire (remboursement, devis particulier…), utilise request_owner_decision."
+                + (f"\n- Ce client a reçu la commande n°{delivered['n']} ({delivered['product'] or 'commande'}) : si c'est un "
+                   "avis ou un retour, enregistre-le avec record_feedback (satisfait oui/non) avant de répondre."
+                   if delivered and not order else "")
                 + ("\n- C'est un PROSPECT qui répond à notre prospection (list_prospects) : réponds dans le fil (in_reply_to), "
                    "avec le modèle reponse_interesse s'il est intéressé, puis mets à jour son statut avec set_prospect_status "
                    "(interesse, refus…)." if pst else "")

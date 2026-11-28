@@ -371,7 +371,7 @@ function approvalLines(a){ const pl = a.payload, lines = [];
   if (a.action==="send_email") lines.push(`À : ${pl.to}`, `Objet : ${pl.subject}`, ...(pl.in_reply_to ? [`En réponse à l'email reçu #${pl.in_reply_to}`] : []), ...(pl.attachment ? [`Pièce jointe : ${pl.attachment}`] : []), "", pl.body);
   else if (a.action==="publish_page") lines.push(`Adresse : ${pl.url}`, `Titre : ${pl.title}`, `Fichier : ${pl.file} (${Math.round((pl.size||0)/1024)} Ko)`);
   else if (a.action==="stripe_payment_link") lines.push(`Produit : ${pl.product_name}`, `Montant : ${pl.amount_eur} €` + (pl.recurring ? ` / ${pl.recurring==="month"?"mois":"an"}` : ""));
-  else if (a.action==="offer") { const L = {price_eur:"Prix", delay_hours:"Délai", summary:"Résumé", deliverable:"Livrable", required_info:"Infos à demander au client", producer:"Producteur", activity:"Activité"};
+  else if (a.action==="offer") { const L = {price_eur:"Prix", delay_hours:"Délai", summary:"Résumé", deliverable:"Livrable", required_info:"Infos à demander au client", producer:"Producteur", activity:"Activité", next_offer:"Offre suivante (après livraison)"};
     lines.push(`Offre : ${pl.name}` + (pl.kind==="update" ? " (modification d'une offre en vente)" : " (nouvelle offre)"), "");
     for (const [k,v] of Object.entries(pl.changes||{})) lines.push(`${L[k]||k} : ` + (k==="price_eur" ? `${v} €` : k==="delay_hours" ? `${v} h` : v));
     lines.push("", "Marge (contrôle Finance) : " + (pl.margin_text||"")); }
@@ -581,6 +581,8 @@ async function openMission(kind, id){
     m.kind==="objectif" ? h("div",{class:"pre"}, m.text) : null,
     h("span",{class:"small",style:{color:m.pm?"#A5B4FC":"#8590B8"}}, m.pm ? "Pilotée par un chef de projet : il est réveillé à la fin de chaque étape et clôture la mission." : "Pilotée directement par le PDG."),
     m.pm_summary ? h("div",{}, h("span",{class:"lab"},"Bilan du chef de projet"), h("div",{class:"pre"}, m.pm_summary)) : null,
+    m.feedback ? h("div",{}, h("span",{class:"lab",style:{color:m.satisfied===0?"#FCA5A5":m.satisfied===1?"#6EE7B7":undefined}}, "Avis du client" + (m.satisfied===0 ? " — insatisfait" : m.satisfied===1 ? " — satisfait" : "")), h("div",{class:"pre"}, m.feedback))
+      : m.aftercare_at ? h("span",{class:"small muted"}, "Suivi après livraison lancé " + ago(m.aftercare_at) + " (remerciement, demande d’avis).") : null,
     m.issues.length ? h("div",{style:{fontSize:"13px",padding:"8px 10px",borderRadius:"10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.4)",color:"#FCA5A5"}}, "Anomalies détectées : " + m.issues.join(" · ")) : null,
     m.waiting.length ? h("div",{style:{fontSize:"13px",padding:"8px 10px",borderRadius:"10px",background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.4)",color:"#FCD34D"}}, `Elle attend ta décision : validation(s) #${m.waiting.join(", #")} (colonne Validations).`) : null,
     h("span",{class:"lab"},"Tâches (clique pour le détail et le résultat complet)"),

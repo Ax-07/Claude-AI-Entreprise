@@ -91,8 +91,10 @@ class Studio:
         try:
             from . import prospects
             prospects.due_followups(self.cfg, self.db)   # relance unique à J+7, puis « sans suite » (sans coût d'API)
+            from . import aftercare
+            aftercare.due(self.cfg, self.db)             # suivi après livraison (remerciement, avis, offre suivante)
         except Exception as e:
-            self.db.log("systeme", "prospect", f"Suivi des prospects impossible : {e}")
+            self.db.log("systeme", "prospect", f"Suivi des prospects ou des clients impossible : {e}")
         try:
             security.check(self.cfg, self.db)       # alertes de configuration critiques (sans coût d'API)
         except Exception as e:

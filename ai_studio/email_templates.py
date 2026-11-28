@@ -12,7 +12,7 @@ from pathlib import Path
 
 PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
 TODO_RE = re.compile(r"(?i)\[[^\]]{1,40}\]|\bX{3,}\b|à compléter|à remplir|lorem ipsum|\{|\}")
-AUTO = {"offre", "prix", "delai", "infos_requises", "lien_paiement"}
+AUTO = {"offre", "prix", "delai", "infos_requises", "lien_paiement", "lien_avis", "suite"}
 
 
 def _path(cfg) -> Path | None:
@@ -61,6 +61,25 @@ def offer_values(db, name: str) -> dict:
             "lien_paiement": f"\n\nVous pouvez régler en ligne ici : {o['payment_link_url']}" if o["payment_link_url"] else ""}
 
 
+def order_values(cfg, db, n: int) -> dict:
+    s = db.one("SELECT rowid AS n, * FROM sales WHERE rowid=?", (n,))
+    if not s:
+        raise ValueError(f"Commande n°{n} introuvable (list_orders)")
+    o = db.one("SELECT * FROM offers WHERE id=?", (s["offer_id"],)) if s["offer_id"] else None
+    name = o["name"] if o else (s["product"] or "commande")
+    out = {"offre": name, "lien_avis": "", "suite": ""}
+    url = (cfg.get("aftercare", "review_url", default="") or "").strip()
+    if url:
+        out["lien_avis"] = f"\n\nSi vous le souhaitez, vous pouvez aussi laisser un avis ici : {url}"
+    nxt = db.one("SELECT * FROM offers WHERE lower(name)=lower(?) AND status='active'", (o["next_offer"],)) if o and o["next_offer"] else None
+    bought = nxt and db.one("SELECT 1 FROM sales WHERE lower(customer_email)=lower(?) AND offer_id=?", (s["customer_email"] or "", nxt["id"]))
+    if nxt and not bought and s["satisfied"] != 0:
+        v = offer_values(db, nxt["name"])
+        out["suite"] = (f"\n\nPour aller plus loin, nous réalisons aussi un {v['offre']} : {nxt['summary'][:200].rstrip('.')}. "
+                        f"Livré sous {v['delai']}, pour {v['prix']}. Il suffit de répondre à cet email si cela vous intéresse.")
+    return out
+
+
 def render(cfg, db, tid: str, fields: dict | None) -> tuple[str, str, dict]:
     """→ (objet, texte, modèle). ValueError avec la liste précise de ce qui ne va pas."""
     t = get(cfg, tid)
@@ -86,6 +105,14 @@ def render(cfg, db, tid: str, fields: dict | None) -> tuple[str, str, dict]:
     if values.get("salutation"):
         values["salutation"] = " " + values["salutation"]
     offer = t.get("offer")
+    if offer == "{commande}":                        # modèle lié à une commande : offre livrée et offre suivante
+        try:
+            values.update(order_values(cfg, db, int(values.get("commande") or 0)))
+        except (ValueError, TypeError) as e:
+            errors.append(str(e) if isinstance(e, ValueError) and "Commande" in str(e) else "« commande » doit être un numéro de commande")
+        offer = None
+    if values.get("remarque"):
+        values["remarque"] = values["remarque"].rstrip() + "\n\n"
     if offer:
         name = values.get("offre", "") if offer == "{offre}" else offer
         try:

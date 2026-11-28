@@ -7,9 +7,20 @@
   "subject": "{site} : une piste pour votre visibilité locale",
   "body": "Bonjour{salutation},\n\nEn consultant {site}, j'ai remarqué {accroche}\n\nNous proposons un {offre} : une analyse de votre site, de vos informations publiques et de trois concurrents proches, avec un plan de 10 actions priorisées et des textes prêts à copier. Le rapport est livré sous {delai}, pour {prix}.\n\nCela vous intéresserait-il ? Une simple réponse à cet email suffit pour en parler.\n\nBien cordialement,",
   "fields": {
-   "site": {"desc": "nom de domaine du prospect, ex. ax-07.fr", "max": 60},
-   "salutation": {"desc": "« Monsieur Dupont », « Madame Martin », ou vide si le nom n'est pas connu (un espace est ajouté automatiquement)", "optional": true, "max": 60},
-   "accroche": {"desc": "UNE observation vérifiable et factuelle sur le site (ce qui est visible publiquement), qui termine la phrase « j'ai remarqué… » et finit par un point. Pas de diagnostic inventé, pas de chiffre non vérifié.", "min": 30, "max": 350}
+   "site": {
+    "desc": "nom de domaine du prospect, ex. ax-07.fr",
+    "max": 60
+   },
+   "salutation": {
+    "desc": "« Monsieur Dupont », « Madame Martin », ou vide si le nom n'est pas connu (un espace est ajouté automatiquement)",
+    "optional": true,
+    "max": 60
+   },
+   "accroche": {
+    "desc": "UNE observation vérifiable et factuelle sur le site (ce qui est visible publiquement), qui termine la phrase « j'ai remarqué… » et finit par un point. Pas de diagnostic inventé, pas de chiffre non vérifié.",
+    "min": 30,
+    "max": 350
+   }
   }
  },
  {
@@ -20,9 +31,20 @@
   "subject": "Un site professionnel pour {entreprise}",
   "body": "Bonjour{salutation},\n\n{accroche}\n\nNous réalisons des sites vitrines de 1 à 5 pages, rapides, adaptés au mobile et sans abonnement, livrés prêts à mettre en ligne sous {delai}, pour {prix}.\n\nCela vous intéresserait-il ? Une simple réponse à cet email suffit pour en parler.\n\nBien cordialement,",
   "fields": {
-   "entreprise": {"desc": "nom de l'entreprise du prospect", "max": 80},
-   "salutation": {"desc": "« Monsieur Dupont », « Madame Martin », ou vide", "optional": true, "max": 60},
-   "accroche": {"desc": "1 à 2 phrases factuelles : ce que vous avez constaté (pas de site trouvé, site non adapté au mobile…) et pourquoi c'est utile pour son activité. Vérifiable, sans exagération.", "min": 30, "max": 400}
+   "entreprise": {
+    "desc": "nom de l'entreprise du prospect",
+    "max": 80
+   },
+   "salutation": {
+    "desc": "« Monsieur Dupont », « Madame Martin », ou vide",
+    "optional": true,
+    "max": 60
+   },
+   "accroche": {
+    "desc": "1 à 2 phrases factuelles : ce que vous avez constaté (pas de site trouvé, site non adapté au mobile…) et pourquoi c'est utile pour son activité. Vérifiable, sans exagération.",
+    "min": 30,
+    "max": 400
+   }
   }
  },
  {
@@ -32,11 +54,28 @@
   "subject": "Re : {objet_initial}",
   "body": "Bonjour{salutation},\n\nJe me permets de revenir vers vous au sujet de mon message du {date_initiale} concernant {sujet}.\n\n{rappel}\n\nSi ce n'est pas le bon moment, aucun souci : il vous suffit de me le dire.\n\nBien cordialement,",
   "fields": {
-   "objet_initial": {"desc": "objet exact du premier email", "max": 120},
-   "date_initiale": {"desc": "date du premier email, ex. 28 novembre", "max": 30},
-   "sujet": {"desc": "ce qui était proposé, ex. un diagnostic de votre visibilité locale", "max": 120},
-   "salutation": {"desc": "« Monsieur Dupont » ou vide", "optional": true, "max": 60},
-   "rappel": {"desc": "une phrase qui rappelle l'intérêt pour le prospect (sans pression ni fausse urgence)", "min": 20, "max": 300}
+   "objet_initial": {
+    "desc": "objet exact du premier email",
+    "max": 120
+   },
+   "date_initiale": {
+    "desc": "date du premier email, ex. 28 novembre",
+    "max": 30
+   },
+   "sujet": {
+    "desc": "ce qui était proposé, ex. un diagnostic de votre visibilité locale",
+    "max": 120
+   },
+   "salutation": {
+    "desc": "« Monsieur Dupont » ou vide",
+    "optional": true,
+    "max": 60
+   },
+   "rappel": {
+    "desc": "une phrase qui rappelle l'intérêt pour le prospect (sans pression ni fausse urgence)",
+    "min": 20,
+    "max": 300
+   }
   }
  },
  {
@@ -47,10 +86,48 @@
   "subject": "Re : {objet}",
   "body": "Bonjour{salutation},\n\nMerci pour votre réponse.\n\n{reponse}\n\nPour réaliser le {offre}, j'aurais besoin des éléments suivants : {infos_requises}\n\nLe tarif est de {prix}, avec une livraison sous {delai} après le paiement.{lien_paiement}\n\nBien cordialement,",
   "fields": {
-   "objet": {"desc": "objet de l'email reçu (sans « Re : »)", "max": 120},
-   "offre": {"desc": "nom exact de l'offre du catalogue (list_offers)", "max": 80},
-   "salutation": {"desc": "« Monsieur Dupont » ou vide", "optional": true, "max": 60},
-   "reponse": {"desc": "réponse précise à ce que le prospect a demandé (2 à 5 phrases)", "min": 20, "max": 800}
+   "objet": {
+    "desc": "objet de l'email reçu (sans « Re : »)",
+    "max": 120
+   },
+   "offre": {
+    "desc": "nom exact de l'offre du catalogue (list_offers)",
+    "max": 80
+   },
+   "salutation": {
+    "desc": "« Monsieur Dupont » ou vide",
+    "optional": true,
+    "max": 60
+   },
+   "reponse": {
+    "desc": "réponse précise à ce que le prospect a demandé (2 à 5 phrases)",
+    "min": 20,
+    "max": 800
+   }
+  }
+ },
+ {
+  "id": "suivi_livraison",
+  "name": "Suivi après livraison (remerciement, avis, offre suivante)",
+  "usage": "Quelques jours après la livraison d'une commande : remercier, demander un avis, proposer l'offre suivante si elle existe. Déclenché automatiquement par le moteur.",
+  "offer": "{commande}",
+  "subject": "Votre {offre} : tout vous convient ?",
+  "body": "Bonjour{salutation},\n\nIl y a quelques jours, nous vous avons livré votre {offre}. Merci pour votre confiance !\n\n{remarque}Avez-vous une question, ou un point qui mériterait d'être précisé ? Une simple réponse à cet email suffit. Et votre avis, même en une ligne, nous aide beaucoup à nous améliorer.{lien_avis}{suite}\n\nBien cordialement,",
+  "fields": {
+   "commande": {
+    "desc": "numéro de la commande livrée",
+    "max": 10
+   },
+   "salutation": {
+    "desc": "« Monsieur Dupont », « Madame Martin », ou vide",
+    "optional": true,
+    "max": 60
+   },
+   "remarque": {
+    "desc": "une phrase personnalisée sur ce qui a été livré, par exemple la première action recommandée dans le rapport (facultatif, factuel)",
+    "optional": true,
+    "max": 300
+   }
   }
  }
 ]
