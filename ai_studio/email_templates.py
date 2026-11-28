@@ -61,6 +61,16 @@ def offer_values(db, name: str) -> dict:
             "lien_paiement": f"\n\nVous pouvez régler en ligne ici : {o['payment_link_url']}" if o["payment_link_url"] else ""}
 
 
+def answer_form(infos: str) -> str:
+    """Formulaire à copier-coller par le client dans sa réponse : une ligne par information à fournir."""
+    items = [x.strip(" .") for x in re.split(r"\s*[;\n]\s*|\s*,\s*(?=[A-ZÉÈÀ0-9])", infos or "") if x.strip(" .")]
+    if not items:
+        return ""
+    lines = [f"{it[0].upper()}{it[1:]} :" for it in items]
+    return ("\n\nPour vous simplifier la tâche, copiez ce modèle dans votre réponse et complétez chaque ligne "
+            "(laissez vide ce qui ne vous concerne pas) :\n\n----------\n" + "\n".join(lines) + "\n----------")
+
+
 def order_values(cfg, db, n: int) -> dict:
     s = db.one("SELECT rowid AS n, * FROM sales WHERE rowid=?", (n,))
     if not s:
@@ -124,16 +134,18 @@ def render(cfg, db, tid: str, fields: dict | None) -> tuple[str, str, dict]:
     if "infos_manquantes" in spec and not errors:        # ne redemander que ce qui manque vraiment
         miss = values.get("infos_manquantes", "").strip()
         asking = t["id"] != "reponse_interesse"          # une demande d'informations demande tout si rien n'est précisé
-        if asking and (not miss or miss.lower().rstrip(".") in ("toutes", "tout", "toutes les informations")):
-            values["besoin"] = f"Pour la réaliser, nous avons besoin des éléments suivants : {values.get('infos_requises', '')}"
+        everything = miss.lower().rstrip(".") in ("toutes", "tout", "toutes les informations")
+        full = values.get("infos_requises", "")
+        if asking and (not miss or everything):
+            values["besoin"] = f"Pour la réaliser, nous avons besoin des éléments suivants.{answer_form(full)}"
         elif asking:
-            values["besoin"] = f"Pour la réaliser, il nous manque seulement : {miss.rstrip('.')}."
+            values["besoin"] = f"Pour la réaliser, il nous manque seulement quelques éléments.{answer_form(miss)}"
         elif not miss:
             values["besoin"] = "Nous avons bien toutes les informations nécessaires : la réalisation démarre dès votre paiement."
-        elif miss.lower().rstrip(".") in ("toutes", "tout", "toutes les informations"):
-            values["besoin"] = f"Pour réaliser le {values.get('offre', 'travail')}, j'aurais besoin des éléments suivants : {values.get('infos_requises', '')}"
+        elif everything:
+            values["besoin"] = f"Pour réaliser le {values.get('offre', 'travail')}, j'aurais besoin des éléments suivants.{answer_form(full)}"
         else:
-            values["besoin"] = f"Pour compléter, il nous manque seulement : {miss.rstrip('.')}."
+            values["besoin"] = f"Pour compléter, il nous manque seulement quelques éléments.{answer_form(miss)}"
     if errors:
         raise ValueError("Email non conforme au modèle « " + t["id"] + " » : " + " ; ".join(errors))
     fill = lambda s: PLACEHOLDER_RE.sub(lambda m: values.get(m.group(1), m.group(0)), s)
