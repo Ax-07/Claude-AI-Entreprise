@@ -143,7 +143,8 @@ def open_order(cfg, db, s: dict) -> int:
         due = iso(datetime.fromisoformat(s["created_at"]) + timedelta(hours=int(offer["delay_hours"])))
     db.run("UPDATE sales SET stage='a_livrer', offer_id=?, due_at=? WHERE id=?", (offer["id"] if offer else None, due, s["id"]))
     n = order_number(db, s["id"])
-    tid = db.add_task(f"Commande n°{n} : livrer {s['product'] or 'la commande'} ({s['customer_email'] or 'client'})"[:120], "pdg",
+    db.run("UPDATE sales SET project_manager='chef_projet' WHERE id=?", (s["id"],))     # chaque commande a son chef de projet
+    tid = db.add_task(f"Commande n°{n} : livrer {s['product'] or 'la commande'} ({s['customer_email'] or 'client'})"[:120], "chef_projet",
                       delivery_brief(db, n), priority=1, created_by="systeme", order_ref=n)
     db.run("UPDATE sales SET task_id=? WHERE id=?", (tid, s["id"]))
     return n
@@ -317,10 +318,10 @@ def follow_orders(cfg, db) -> dict:
             continue
         why = ("Le client n'a pas répondu depuis longtemps : relance-le poliment ou livre avec les informations disponibles."
                if s["stage"] == "attente_client" else "Plus aucune tâche n'est en cours sur cette commande alors qu'elle n'est pas livrée.")
-        tid = db.add_task(f"Commande n°{n} : relance {s['nudges'] + 1} — livraison non terminée"[:120], "pdg",
+        tid = db.add_task(f"Commande n°{n} : relance {s['nudges'] + 1} — livraison non terminée"[:120], s["project_manager"] or "pdg",
                           delivery_brief(db, n, f"RELANCE AUTOMATIQUE : {why}\n\n"), priority=1, created_by="systeme", order_ref=n)
         db.run("UPDATE sales SET nudges=nudges+1, last_nudge_at=? WHERE rowid=?", (iso(), n))
-        db.log("systeme", "commande", f"Commande n°{n} non livrée et sans travail en cours → relance du PDG (tâche #{tid})", tid)
+        db.log("systeme", "commande", f"Commande n°{n} non livrée et sans travail en cours → relance (tâche #{tid})", tid)
         out["nudged"].append(n)
     return out
 

@@ -16,7 +16,7 @@ from .tools import REGISTRY, ToolContext, run_tool
 LLM_FACTORY = None          # remplacé par un faux modèle dans les tests
 HISTORY = 16                # messages repris comme contexte (les plus récents)
 MAX_STEPS = 6
-TOOLS = ["create_objective", "delegate_task", "company_stats", "budget_status", "list_tasks", "get_task_result",
+TOOLS = ["create_objective", "assign_project_manager", "mission_status", "delegate_task", "company_stats", "budget_status", "list_tasks", "get_task_result",
          "list_orders", "list_offers", "list_sales", "recall", "search_library"]
 
 CHAT_RULES = """

@@ -97,6 +97,7 @@ INFO = {  # nom, couleur, agent, rôle affiché, description, échelle du bâtim
  "finance": ("Trésorerie", "#F472B6", "finance", "Finances", "Revenus, coûts d’API et rentabilité de chaque activité.", .56),
  "security": ("Cybersécurité", "#F87171", "securite", "Protection", "Configuration, anomalies et emails piégés : veille défensive quotidienne.", .56),
 }
+EXTRA_AGENTS = {"hq": ["chef_projet"]}   # agents sans bâtiment propre : les chefs de projet logent au Command HQ
 KIND = {"hq": "globe", "data": "city", "marketing": "target", "sales": "bars", "support": "headset", "research": "chart",
         "atelier": "gear", "dev": "code", "video": "play", "ecommerce": "cart", "rh": "people", "infra": "cloud", "auto": "flow", "legal": "scale", "finance": "coin", "security": "shield"}
 VARS = {p[0]: p[4] for p in POLES}
@@ -314,6 +315,7 @@ for pid, (x, y, d) in B.items():
     objs.append((y + foot * .9, '<g class="bots">%s</g>' % bots))
 # personnages des agents sur la place : visibles quand l'agent est au repos (géré par le tableau de bord)
 idle = [(pid, INFO[pid]) for pid in INFO if INFO[pid][2]]
+idle += [(pid, ("Chef de projet", "#A5B4FC", a)) for pid, ags in EXTRA_AGENTS.items() for a in ags]
 for k, (pid, inf) in enumerate(idle):
     a = 2 * math.pi * k / len(idle) - math.pi / 4
     u, v = pcu + 25 * math.cos(a), pcv + 25 * math.sin(a)
@@ -346,7 +348,7 @@ SVG_OUT = SVG.replace('<svg viewBox="0 0 1000 620" width="100%" style="display: 
                       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="100%" style="display:block" aria-hidden="true">', 1)
 assert "{{" not in SVG_OUT, "trou de gabarit restant"
 (OUT / "carte.svg").write_text(SVG_OUT, encoding="utf-8")
-meta = {"default_variants": DEFAULT, "agent_of_pole": AGENT, "agents_of_pole": {p_: ([INFO[p_][2]] if INFO[p_][2] else []) for p_ in B},
+meta = {"default_variants": DEFAULT, "agent_of_pole": AGENT, "agents_of_pole": {p_: ([INFO[p_][2]] if INFO[p_][2] else []) + EXTRA_AGENTS.get(p_, []) for p_ in B},
         "quarters": quarters_js, "divisions": [], "poles": poles_js}
 (OUT / "carte.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
 print("carte.svg :", len(SVG_OUT) // 1024, "Ko")

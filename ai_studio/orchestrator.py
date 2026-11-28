@@ -46,14 +46,20 @@ class Studio:
             created += 1
         every = timedelta(minutes=int(self.cfg["runtime"]["ceo_review_minutes"]))
         for o in self.db.active_objectives():
-            busy = self.db.one("SELECT COUNT(*) FROM tasks WHERE agent='pdg' AND objective_id=? AND status IN ('pending','running')", (o["id"],))[0]
+            who = o["project_manager"] or "pdg"
+            busy = self.db.one("SELECT COUNT(*) FROM tasks WHERE agent=? AND objective_id=? AND status IN ('pending','running')", (who, o["id"]))[0]
             if busy:
                 continue
             last = datetime.fromisoformat(o["last_review_at"]) if o["last_review_at"] else None
             if last and now() - last < every:
                 continue
-            self.db.add_task(f"Revue de l'objectif #{o['id']}", "pdg", REVIEW_TEMPLATE.format(oid=o["id"], text=o["text"]),
-                             priority=2, objective_id=o["id"], created_by="systeme")
+            if o["project_manager"]:      # mission pilotée : point périodique du chef de projet (si rien ne l'a réveillé)
+                self.db.add_task(f"Point de mission #{o['id']}", who, "Point périodique : lance mission_status, fais avancer ce "
+                                 "qui est bloqué ou à l'arrêt, ou clôture si la mission est réellement terminée.",
+                                 priority=2, objective_id=o["id"], created_by="systeme")
+            else:
+                self.db.add_task(f"Revue de l'objectif #{o['id']}", "pdg", REVIEW_TEMPLATE.format(oid=o["id"], text=o["text"]),
+                                 priority=2, objective_id=o["id"], created_by="systeme")
             self.db.run("UPDATE objectives SET last_review_at=? WHERE id=?", (iso(), o["id"]))
             created += 1
         return created

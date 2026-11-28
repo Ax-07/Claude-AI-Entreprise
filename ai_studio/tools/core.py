@@ -52,6 +52,50 @@ def delegate_task(ctx: ToolContext, agent: str, title: str, description: str, pr
     return f"Tâche #{tid} créée pour {agent}."
 
 
+@tool("assign_project_manager",
+      "Confie une mission (objectif ou commande) à un chef de projet qui la pilotera jusqu'au bout : planification, "
+      "délégation, suivi de chaque étape, contrôle et clôture. Pour toute mission de plusieurs étapes ou agents.",
+      {"kind": {"type": "string", "enum": ["objectif", "commande"]}, "id": {"type": "integer", "description": "n° de l'objectif ou de la commande"},
+       "brief": {"type": "string", "description": "consignes de lancement : priorités, contraintes, livrable attendu"}}, ["kind", "id"])
+def assign_project_manager(ctx: ToolContext, kind: str, id: int, brief: str = "") -> str:
+    from ..missions import assign_pm, has_pm, detail
+    try:
+        detail(ctx.db, kind, int(id))
+    except KeyError:
+        return "Mission introuvable."
+    if has_pm(ctx.db, kind, int(id)):
+        return "Cette mission a déjà un chef de projet."
+    tid = assign_pm(ctx.db, kind, int(id), brief, ctx.agent)
+    return f"Chef de projet nommé (tâche de lancement #{tid}). Il te remontera ce qui dépasse sa mission."
+
+
+@tool("mission_status", "Dossier complet d'une mission : demande, consignes du propriétaire, anomalies, tâches et résultats. "
+      "Sans paramètre : la mission de ta tâche en cours.",
+      {"kind": {"type": "string", "enum": ["objectif", "commande"]}, "id": {"type": "integer"}})
+def mission_status(ctx: ToolContext, kind: str = "", id: int = 0) -> str:
+    from ..missions import dossier, mission_of
+    m = (kind, int(id)) if kind and id else mission_of(ctx.task)
+    if not m:
+        return "Aucune mission rattachée à cette tâche : précise kind et id."
+    try:
+        return dossier(ctx.db, *m)[:9000]
+    except KeyError:
+        return "Mission introuvable."
+
+
+@tool("close_mission", "Clôture la mission de ta tâche quand le résultat répond vraiment à la demande, avec un bilan pour "
+      "le propriétaire (ce qui a été produit, où le trouver, ce qui reste éventuellement). Il vérifiera ensuite.",
+      {"summary": {"type": "string"}}, ["summary"])
+def close_mission(ctx: ToolContext, summary: str) -> str:
+    from ..missions import close, mission_of
+    m = mission_of(ctx.task)
+    if not m:
+        return "Aucune mission rattachée à cette tâche."
+    if len(summary.strip()) < 30:
+        return "Bilan trop court : dis ce qui a été produit et où le trouver."
+    return close(ctx.db, m[0], m[1], summary.strip(), ctx.agent)
+
+
 @tool("create_objective",
       "Enregistre un nouvel objectif de l'entreprise (mission de fond que le PDG découpera en tâches au prochain cycle). "
       "À n'utiliser que sur demande du propriétaire.",

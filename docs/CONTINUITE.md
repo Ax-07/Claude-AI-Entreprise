@@ -170,6 +170,14 @@ _Mis à jour le 27/11/2026_
 - Aperçu du livrable dans la fenêtre de validation : GET /api/approvals/ID/livrable[/chemin] (page HTML, document, ou fichiers d'une archive de site avec navigation entre pages), isolé (CSP sandbox, aucun script). 139 tests.
 - Limites restantes : pas de génération d'images ni de PDF (rapports HTML imprimables) ; pas de rendu visuel automatique (le propriétaire juge via l'aperçu).
 
+## Chefs de projet (28/11/2026)
+- Décision du propriétaire : un chef de projet par mission (le PDG reste l'arbitre ; l'auditeur RH viendra ensuite et évaluera aussi les chefs de projet).
+- Rôle unique `chef_projet` (Direction, logé au Command HQ, modèle par défaut, 14 étapes, 0,25 $/tâche), instancié par mission : chaque tâche porte sa mission (objective_id / order_ref) et commence par `mission_status` (dossier complet). Outils : mission_status, close_mission, delegate_task, list_orders, list_offers, check_deliverable, set_order_status. PDG : `assign_project_manager` (aussi dans la discussion), consigne de confier les missions de plusieurs étapes/agents.
+- Réveil événementiel : à la fin (ou à l'échec définitif) d'une tâche d'une mission pilotée, `missions.wake_pm` crée UNE tâche de suivi (les fins suivantes s'y ajoutent tant qu'elle attend). Revue périodique : « Point de mission » du chef de projet au lieu de la revue PDG. Clôture (`close_mission`) refusée s'il reste des tâches ouvertes ou une validation en attente ; une commande se clôt par sa livraison ; bilan stocké (`objectives.pm_summary`) et affiché au propriétaire, la mission passe « À vérifier ».
+- Commandes : chaque nouvelle commande a son chef de projet (tâche de livraison et relances vers lui) ; les commandes ouvertes existantes en reçoivent un à la migration.
+- Plafond par mission pilotée : `missions.max_usd_per_mission` (3 $ par défaut) ; au-delà, les tâches de la mission sont suspendues (« blocked ») avec le motif.
+- Carte : `EXTRA_AGENTS` (hq → chef_projet), personnage sur la place. Tableau des missions : badge « chef de projet », bilan de clôture. 142 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

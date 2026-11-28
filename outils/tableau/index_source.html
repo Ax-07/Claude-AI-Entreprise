@@ -172,7 +172,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:rgba(255,255,255,.03)}
 "use strict";
 const ICONS = __ICONS__;
 const $ = s => document.querySelector(s);
-const C = {pdg:"#818CF8",recherche:"#34D399",marketing:"#60A5FA",ventes:"#A78BFA",support:"#FBBF24",data:"#F1F5F9",finance:"#F472B6",atelier:"#FB923C",developpement:"#22D3EE",juridique:"#CBD5E1",securite:"#F87171",proprietaire:"#FDE68A",systeme:"#94A3B8"};
+const C = {pdg:"#818CF8",recherche:"#34D399",marketing:"#60A5FA",ventes:"#A78BFA",support:"#FBBF24",data:"#F1F5F9",finance:"#F472B6",atelier:"#FB923C",developpement:"#22D3EE",chef_projet:"#A5B4FC",juridique:"#CBD5E1",securite:"#F87171",proprietaire:"#FDE68A",systeme:"#94A3B8"};
 const STATUS = {pending:"En attente",running:"En cours",done:"Terminée",failed:"En échec",blocked:"Bloquée"};
 const STATE = {running:["En cours","#34D399"],waiting:["En attente","#FBBF24"],idle:["Disponible","#9AA4C7"]};
 const LEVELS = ["Start-up naissante","Entreprise émergente","Entreprise structurée","Entreprise en croissance","Groupe établi","Empire autonome"];
@@ -517,7 +517,8 @@ async function openMissions(filter){
     h("div",{class:"small muted",style:{marginBottom:"10px"}},"« À vérifier » : missions déclarées terminées par les agents, ou dont toutes les tâches sont finies sans rien en attente. Ouvre-les pour confirmer, les renvoyer au PDG, ou les archiver (doublon, essai, abandon)."),
     h("div",{style:{overflowX:"auto"}}, h("table",{}, h("thead",{}, h("tr",{}, ["Mission","État (agents)","Avancement","Anomalies","Ta vérification","Activité"].map(x=>h("th",{},x)))),
       h("tbody",{}, shown.length ? shown.map(m => h("tr",{class:"click",onclick:()=>openMission(m.kind, m.id)},
-        h("td",{style:{maxWidth:"340px"}}, h("b",{}, m.kind==="objectif" ? `#${m.id} ` : ""), m.title, m.test ? h("span",{class:"pill",style:{marginLeft:"6px"}},"essai") : null),
+        h("td",{style:{maxWidth:"340px"}}, h("b",{}, m.kind==="objectif" ? `#${m.id} ` : ""), m.title, m.test ? h("span",{class:"pill",style:{marginLeft:"6px"}},"essai") : null,
+          m.pm ? h("span",{class:"pill",title:"Pilotée par un chef de projet",style:{marginLeft:"6px",color:"#A5B4FC"}},"chef de projet") : null),
         h("td",{style:{whiteSpace:"nowrap",color:m.declared_done?"#6EE7B7":"#C7CEF0"}}, m.state),
         h("td",{}, progressBar(m)),
         h("td",{style:{fontSize:"12px"}}, m.issues.length ? h("span",{style:{color:"#FCA5A5"}}, m.issues.join(" · ")) : null,
@@ -542,6 +543,8 @@ async function openMission(kind, id){
     h("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap",alignItems:"center"}}, h("span",{class:"pill"}, m.state), progressBar(m),
       m.owner_check ? h("span",{style:{color:MCHECK[m.owner_check][1],fontSize:"13px"}}, MCHECK[m.owner_check][0] + (m.checked_at ? " · " + ago(m.checked_at) : "")) : null),
     m.kind==="objectif" ? h("div",{class:"pre"}, m.text) : null,
+    h("span",{class:"small",style:{color:m.pm?"#A5B4FC":"#8590B8"}}, m.pm ? "Pilotée par un chef de projet : il est réveillé à la fin de chaque étape et clôture la mission." : "Pilotée directement par le PDG."),
+    m.pm_summary ? h("div",{}, h("span",{class:"lab"},"Bilan du chef de projet"), h("div",{class:"pre"}, m.pm_summary)) : null,
     m.issues.length ? h("div",{style:{fontSize:"13px",padding:"8px 10px",borderRadius:"10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.4)",color:"#FCA5A5"}}, "Anomalies détectées : " + m.issues.join(" · ")) : null,
     m.waiting.length ? h("div",{style:{fontSize:"13px",padding:"8px 10px",borderRadius:"10px",background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.4)",color:"#FCD34D"}}, `Elle attend ta décision : validation(s) #${m.waiting.join(", #")} (colonne Validations).`) : null,
     h("span",{class:"lab"},"Tâches (clique pour le détail et le résultat complet)"),

@@ -95,6 +95,13 @@ def run_task(cfg, db, llm, guard, task) -> str:
         db.set_task(task["id"], status="failed", result=f"Agent inconnu : {task['agent']}")
         return "failed"
     rt = cfg["runtime"]
+    from .missions import over_cap, wake_pm
+    cap = over_cap(cfg, db, task)
+    if cap:
+        db.set_task(task["id"], status="blocked", result=f"En attente : {cap}. Le propriétaire peut relever "
+                    "missions.max_usd_per_mission dans config.json puis relancer la tâche.")
+        db.log(role.name, "budget", f"Tâche #{task['id']} suspendue : {cap}", task["id"])
+        return "blocked"
     model = _model_for(cfg, role)
     db.set_task(task["id"], status="running", attempts=task["attempts"] + 1)
     db.log(role.name, "start", f"Début : {task['title']}", task["id"])
@@ -156,10 +163,13 @@ def run_task(cfg, db, llm, guard, task) -> str:
         status = "failed" if task["attempts"] + 1 >= int(rt["max_attempts"]) else "pending"
         db.set_task(task["id"], status=status, cost_usd=cost, result=f"Erreur API : {e}")
         db.log(role.name, "error", f"Tâche #{task['id']} : {e}", task["id"])
+        if status == "failed":
+            wake_pm(db, task)
         return status
 
     cost = db.task_cost(task["id"])
     result = ctx.result or last_text or "(terminé sans résultat explicite)"
     db.set_task(task["id"], status="done", result=result, cost_usd=cost)
     db.log(role.name, "done", f"Terminé : {task['title']} ({cost:.4f} $)", task["id"])
+    wake_pm(db, task)                      # mission pilotée : le chef de projet relit l'étape et enchaîne
     return "done"
