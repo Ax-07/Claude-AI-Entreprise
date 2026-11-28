@@ -82,8 +82,10 @@ def propose_page(ctx: ToolContext, file: str, page_path: str, title: str, reason
 
 # ============================================================================ Catalogue d'offres et commandes
 @tool("save_offer",
-      "Crée ou met à jour une fiche d'offre du catalogue (par son nom). C'est la référence pour vendre (lien de paiement, "
-      "page) et pour livrer : ce que reçoit le client, le délai promis, ce qu'il faut lui demander, l'agent qui produit.",
+      "Propose une nouvelle offre ou une modification d'offre (par son nom). La marge est calculée automatiquement "
+      "(Stripe, cotisations, coût d'API) et l'offre est soumise à la validation du propriétaire : un brouillon ne peut "
+      "être ni vendu ni livré avant. C'est la référence pour vendre et livrer : ce que reçoit le client, le délai promis, "
+      "ce qu'il faut lui demander, l'agent qui produit.",
       {"name": {"type": "string"}, "price_eur": {"type": "number"}, "summary": {"type": "string"},
        "deliverable": {"type": "string", "description": "ce que reçoit concrètement le client (format, contenu)"},
        "delay_hours": {"type": "integer", "description": "délai de livraison promis après paiement, en heures"},
@@ -103,17 +105,10 @@ def save_offer(ctx: ToolContext, name: str, price_eur: float, summary: str, deli
         return f"Agent inconnu pour la production. Choix : {', '.join(ctx.agent_names)}"
     if not 1 <= float(price_eur) <= 5000 or not 1 <= int(delay_hours) <= 24 * 60:
         return "Prix (1 à 5000 €) ou délai (1 h à 60 jours) hors limites."
-    old = ctx.db.one("SELECT id FROM offers WHERE lower(name)=lower(?)", (name.strip(),))
-    vals = (float(price_eur), summary[:1000], deliverable[:1000], int(delay_hours), required_info[:600], producer, iso())
-    if old:
-        ctx.db.run("UPDATE offers SET price_eur=?, summary=?, deliverable=?, delay_hours=?, required_info=?, producer=?, "
-                   "updated_at=?, status='active', activity=? WHERE id=?", (*vals, activity, old["id"]))
-        ctx.db.log(ctx.agent, "offre", f"Offre mise à jour : {name}")
-        return f"Offre « {name} » mise à jour (#{old['id']})."
-    oid = ctx.db.run("INSERT INTO offers(name, price_eur, summary, deliverable, delay_hours, required_info, producer, updated_at, "
-                     "created_by, created_at, activity) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (name.strip()[:120], *vals, ctx.agent, iso(), activity))
-    ctx.db.log(ctx.agent, "offre", f"Nouvelle offre au catalogue : {name}")
-    return f"Offre « {name} » ajoutée au catalogue (#{oid}). Pour la vendre : propose_payment_link avec offer=\"{name}\"."
+    from ..offers import submit
+    values = {"price_eur": round(float(price_eur), 2), "summary": summary[:1000], "deliverable": deliverable[:1000],
+              "delay_hours": int(delay_hours), "required_info": required_info[:600], "producer": producer, "activity": activity}
+    return submit(ctx.cfg, ctx.db, ctx.agent, ctx.task["id"] if ctx.task is not None else None, values, name)
 
 
 # ============================================================================ Prospects
@@ -185,9 +180,15 @@ def set_prospect_status(ctx: ToolContext, email: str, status: str, note: str = "
 def list_offers(ctx: ToolContext) -> str:
     from ..commerce import offer_sheet
     rows = ctx.db.q("SELECT * FROM offers WHERE status='active' ORDER BY id")
-    if not rows:
-        return "Catalogue vide. Crée une fiche avec save_offer avant de vendre."
-    return "\n\n".join(f"#{o['id']} " + offer_sheet(o) + f"\n- Lien de paiement : {o['payment_link_url'] or 'aucun'}" for o in rows)
+    drafts = ctx.db.q("SELECT * FROM offers WHERE status='draft' ORDER BY id")
+    if not rows and not drafts:
+        return "Catalogue vide. Propose une offre avec save_offer (elle sera validée par le propriétaire)."
+    out = "\n\n".join(f"#{o['id']} " + offer_sheet(o) + f"\n- Lien de paiement : {o['payment_link_url'] or 'aucun'}"
+                       + ("\n- Modification proposée en attente de validation (la version ci-dessus reste en vigueur)" if o["pending"] else "")
+                       for o in rows) or "Aucune offre validée pour l'instant."
+    if drafts:
+        out += "\n\nEN ATTENTE DE VALIDATION (ne pas vendre ni proposer) : " + ", ".join(f"#{o['id']} {o['name']} ({o['price_eur']:.0f} €)" for o in drafts)
+    return out
 
 
 @tool("list_orders", "Commandes payées et leur état de livraison (à livrer, en attente du client, livrée).",

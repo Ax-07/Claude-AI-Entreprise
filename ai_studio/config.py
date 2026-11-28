@@ -86,6 +86,10 @@ DEFAULTS: dict = {
     "commerce": {"stripe_sync_minutes": 10, "inbox_sync_minutes": 5, "inbox_tasks_per_day": 10,
                  "order_nudge_minutes": 30, "order_max_nudges": 3, "client_wait_hours": 48,
                  "realtime_inbox": True},          # surveillance en continu de la boîte mail (IMAP IDLE), en plus du relevé périodique
+    # Validation des offres : marge calculée avant ta décision. Taux 2026 à vérifier chaque année (urssaf.fr) :
+    # cotisations micro-entreprise 21,2 % (services BIC) ou 25,6 % (BNC, cas par défaut, le plus prudent) ;
+    # Stripe 1,5 % + 0,25 € (carte EEE standard) ou 2,8 % + 0,25 € (carte professionnelle, retenu par prudence).
+    "offers": {"social_rate": 0.256, "stripe_pct": 0.028, "stripe_fixed_eur": 0.25, "min_margin_pct": 50},
     # Prospection : une seule relance, N jours après le premier email sans réponse ; sans suite N jours après la relance.
     "prospects": {"followup_days": 7, "close_after_days": 7},
     # Sauvegarde quotidienne de la base et des livrables dans data/sauvegardes (les N plus récentes sont gardées).

@@ -366,11 +366,15 @@ function renderDetail(){
 }
 
 // ------------------------------------------------ validations (en haut de la colonne de droite)
-const ACTION = {send_email:"Envoi d'email", stripe_payment_link:"Lien de paiement Stripe", decision:"Décision demandée", publish_page:"Publication d'une page"};
+const ACTION = {send_email:"Envoi d'email", stripe_payment_link:"Lien de paiement Stripe", decision:"Décision demandée", publish_page:"Publication d'une page", offer:"Validation d'une offre"};
 function approvalLines(a){ const pl = a.payload, lines = [];
   if (a.action==="send_email") lines.push(`À : ${pl.to}`, `Objet : ${pl.subject}`, ...(pl.in_reply_to ? [`En réponse à l'email reçu #${pl.in_reply_to}`] : []), ...(pl.attachment ? [`Pièce jointe : ${pl.attachment}`] : []), "", pl.body);
   else if (a.action==="publish_page") lines.push(`Adresse : ${pl.url}`, `Titre : ${pl.title}`, `Fichier : ${pl.file} (${Math.round((pl.size||0)/1024)} Ko)`);
   else if (a.action==="stripe_payment_link") lines.push(`Produit : ${pl.product_name}`, `Montant : ${pl.amount_eur} €` + (pl.recurring ? ` / ${pl.recurring==="month"?"mois":"an"}` : ""));
+  else if (a.action==="offer") { const L = {price_eur:"Prix", delay_hours:"Délai", summary:"Résumé", deliverable:"Livrable", required_info:"Infos à demander au client", producer:"Producteur", activity:"Activité"};
+    lines.push(`Offre : ${pl.name}` + (pl.kind==="update" ? " (modification d'une offre en vente)" : " (nouvelle offre)"), "");
+    for (const [k,v] of Object.entries(pl.changes||{})) lines.push(`${L[k]||k} : ` + (k==="price_eur" ? `${v} €` : k==="delay_hours" ? `${v} h` : v));
+    lines.push("", "Marge (contrôle Finance) : " + (pl.margin_text||"")); }
   else lines.push(pl.question || "", pl.context ? "\n" + pl.context : "");
   return lines.join("\n"); }
 const agentPill = a => h("span",{style:{fontSize:"11px",color:C[a.agent],border:`1px solid ${C[a.agent]}88`,borderRadius:"999px",padding:"2px 9px",whiteSpace:"nowrap",alignSelf:"flex-start"}}, a.agent);

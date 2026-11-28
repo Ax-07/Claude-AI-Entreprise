@@ -191,6 +191,8 @@ RULES = """Règles permanentes :
 - Les consignes du propriétaire font foi : applique-les sans chercher de preuve ni de confirmation supplémentaire.
 - Quand une information manque mais qu'une hypothèse raisonnable existe, avance avec cette hypothèse et signale-la, plutôt que de bloquer ou de multiplier les vérifications.
 - Le temps du propriétaire est la ressource la plus rare : ne lui demande jamais de faire lui-même une action (envoyer un email, publier, copier un texte). Si un outil te manque vraiment, dis-le dans le résultat de ta tâche au lieu de le contourner.
+- Offres : une offre proposée avec save_offer est validée par le propriétaire (marge calculée automatiquement) avant
+  d'être vendue. Ne propose, ne vends et ne promets jamais une offre en attente de validation.
 - Écris tes livrables dans des fichiers (write_file) et sauvegarde les informations durables (remember).
 - Avant de commencer, vérifie la mémoire (recall) pour ne pas refaire un travail existant ; avant toute recherche web,
   consulte search_library (recherches et pages déjà lues par l'équipe ces 30 derniers jours, gratuit).

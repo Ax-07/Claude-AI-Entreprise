@@ -2,6 +2,7 @@ import json
 """Catalogue d'offres et suivi des commandes jusqu'à la livraison (Stripe et SMTP simulés)."""
 import os
 import sqlite3
+import json
 import unittest
 import unittest.mock
 from datetime import timedelta
@@ -23,11 +24,15 @@ class OrdersTest(Base):
         tid = self.db.add_task("t", agent)
         return ToolContext(self.cfg, self.db, agent, self.db.task(tid), list(ROLES))
 
-    def offer(self, **kw):
+    def offer(self, approve=True, **kw):
         args = {"name": "Diagnostic SEO local", "price_eur": 250, "summary": "Audit de la page d'accueil",
                 "deliverable": "Rapport PDF priorisé", "delay_hours": 48, "required_info": "URL du site, ville",
                 "producer": "recherche", **kw}
-        return run_tool("save_offer", self.ctx("pdg"), args)
+        out = run_tool("save_offer", self.ctx("pdg"), args)
+        if approve and "soumise" in out:                  # le propriétaire valide (circuit de validation testé à part)
+            aid = self.db.one("SELECT id FROM approvals WHERE action='offer' AND status='pending' ORDER BY id DESC")[0]
+            approvals.decide(self.cfg, self.db, aid, True)
+        return out
 
     def sell(self, sid="cs_1", product="Diagnostic SEO local", link="plink_x", email="client@exemple.fr", live=True):
         s = session(sid, int(now().timestamp()), product=product, email=email, live=live)
@@ -36,8 +41,23 @@ class OrdersTest(Base):
         return commerce.order_number(self.db, sid)
 
     def test_offer_catalog_and_payment_link(self):
-        self.assertIn("ajoutée au catalogue", self.offer())
-        self.assertIn("mise à jour", self.offer(price_eur=290))
+        out = self.offer(approve=False)
+        self.assertIn("soumise à la validation", out); self.assertIn("marge", out)
+        self.assertIn("en attente de validation", run_tool("propose_payment_link", self.ctx("ventes"), {"offer": "diagnostic seo local", "reason": "vendre"}))
+        self.assertIn("EN ATTENTE DE VALIDATION", run_tool("list_offers", self.ctx("support"), {}))
+        a = self.db.pending_approvals()[0]
+        self.assertEqual(a["action"], "offer")
+        p = json.loads(a["payload"])
+        self.assertEqual((p["kind"], p["margin"]["price"], p["margin"]["ok"]), ("new", 250.0, True))
+        approvals.decide(self.cfg, self.db, a["id"], True)
+        self.assertEqual(self.db.one("SELECT status FROM offers")[0], "active")
+        # modification d'une offre active : en attente, la version actuelle reste en vente
+        self.assertIn("version actuelle reste en vente", self.offer(approve=False, price_eur=290))
+        self.assertEqual(self.db.one("SELECT price_eur FROM offers")[0], 250)
+        self.assertIn("Modification proposée", run_tool("list_offers", self.ctx("support"), {}))
+        self.assertIn("aucune différence", self.offer(approve=False))
+        approvals.decide(self.cfg, self.db, self.db.pending_approvals()[0]["id"], True)
+        self.assertEqual(self.db.one("SELECT price_eur, pending FROM offers")[:], (290, None))
         self.assertIn("Agent inconnu", self.offer(producer="stagiaire"))
         out = run_tool("propose_payment_link", self.ctx("ventes"), {"offer": "diagnostic seo local", "reason": "vendre"})
         self.assertIn("créé automatiquement", out)
@@ -48,6 +68,33 @@ class OrdersTest(Base):
         o = self.db.one("SELECT * FROM offers")
         self.assertEqual((o["price_eur"], o["payment_link_id"]), (290, "plink_9"))
         self.assertIn("buy.stripe.com/test_9", run_tool("list_offers", self.ctx("support"), {}))
+
+    def test_offer_refused_low_margin_and_resubmitted(self):
+        out = self.offer(approve=False, price_eur=9)
+        self.assertIn("sous le seuil", out)
+        a = self.db.pending_approvals()[0]
+        approvals.decide(self.cfg, self.db, a["id"], False, "Trop bas")
+        self.assertEqual(self.db.one("SELECT status FROM offers")[0], "archived")
+        self.assertIn("agent", self.db.one("SELECT title FROM tasks ORDER BY id DESC LIMIT 1")[0] + " agent")
+        self.offer(approve=False, price_eur=120)                     # nouvelle proposition : de nouveau en brouillon
+        self.assertEqual(self.db.one("SELECT status, price_eur FROM offers")[:], ("draft", 120))
+        self.offer(approve=False, price_eur=130)                     # remplace la demande précédente
+        self.assertEqual(len([x for x in self.db.pending_approvals() if x["action"] == "offer"]), 1)
+
+    def test_margin_uses_real_delivery_costs(self):
+        from ai_studio.offers import margin
+        self.offer()
+        oid = self.db.one("SELECT id FROM offers")[0]
+        m = margin(self.cfg, self.db, 250, oid)
+        self.assertIn("pire cas", m["api_basis"])
+        self.assertAlmostEqual(m["stripe"], round(250 * 0.028 + 0.25, 2)); self.assertAlmostEqual(m["social"], 64.0)
+        self.db.run("UPDATE offers SET payment_link_id='plink_x'")
+        n = self.sell()
+        t = self.db.one("SELECT id FROM tasks WHERE order_ref=?", (n,))[0]
+        self.db.add_cost("atelier", t, "m", 1000, 1000, 0, 0.5)
+        self.db.run("UPDATE sales SET stage='livree' WHERE rowid=?", (n,))
+        m = margin(self.cfg, self.db, 250, oid)
+        self.assertIn("moyenne réelle de 1", m["api_basis"]); self.assertAlmostEqual(m["api"], round(0.5 * 0.92, 2))
 
     def test_sale_matched_to_offer_gets_deadline_and_clear_brief(self):
         self.offer()
