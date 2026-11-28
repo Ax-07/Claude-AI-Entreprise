@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-def fresh_start(cfg, db, agent_memory: bool = False) -> dict:
+def fresh_start(cfg, db, agent_memory: bool = False, all_prospects: bool = False) -> dict:
     from .backup import make_backup
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     saved = make_backup(cfg, db, f"{stamp}_avant-remise-a-zero")
@@ -22,12 +22,25 @@ def fresh_start(cfg, db, agent_memory: bool = False) -> dict:
     out["tasks"], out["objectives"], out["approvals"] = counts("tasks"), counts("objectives"), counts("approvals")
     out["test_orders"] = counts("sales", "livemode=0")
     out["agent_memories"] = counts("memory", "agent!='proprietaire'") if agent_memory else 0
+    # prospects : ceux du mode test (tes propres adresses) sont effacés pour pouvoir refaire les essais ; les autres sont
+    # gardés (historique de prospection) sauf --prospects ; les oppositions « STOP » sont TOUJOURS gardées.
+    from .config import test_recipients
+    test_addrs = [e.lower() for e in (test_recipients(cfg) or [])]
+    if all_prospects:
+        where_p = "status!='stop'"
+    elif test_addrs:
+        where_p = f"status!='stop' AND email IN ({','.join(repr(e) for e in test_addrs)})"
+    else:
+        where_p = "0"
+    out["prospects"] = counts("prospects", where_p)
     with db.conn:
         for t in ("tasks", "objectives", "approvals", "events", "chat", "chat_threads"):
             db.conn.execute(f"DELETE FROM {t}")
         db.conn.execute("DELETE FROM sales WHERE livemode=0")              # essais : aucune valeur comptable
         db.conn.execute("UPDATE inbox SET task_id=NULL")
-        db.conn.execute("DELETE FROM kv WHERE k LIKE 'order_%' OR k IN ('security_review_day')")
+        db.conn.execute(f"DELETE FROM prospects WHERE {where_p}")
+        db.conn.execute("DELETE FROM kv WHERE k LIKE 'order_%' OR k LIKE 'mission_stuck_%' OR k LIKE 'legal_round_task_%' "
+                        "OR k IN ('security_review_day')")
         # numérotation repartant de 1 pour les missions, validations et discussions (pas pour les tâches : les coûts
         # historiques y sont rattachés par numéro)
         db.conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('objectives','approvals','events','chat','chat_threads')")
