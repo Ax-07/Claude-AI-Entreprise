@@ -273,6 +273,49 @@ class AgentGuidanceTest(Base):
         cmd_mode_test(self.cfg, self.db, types.SimpleNamespace(etat="off", emails=[]))
         self.assertFalse(_j.loads((self.dir / "config.json").read_text())["company"]["test_mode"]["enabled"])
 
+    def test_email_templates(self):
+        import json as _j
+        from pathlib import Path
+        from ai_studio import commerce
+        from ai_studio.agents import ROLES
+        commerce.import_offers(self.db, Path(__file__).resolve().parents[1] / "catalogue" / "offres.json")
+        self.assertIn("email_templates", ROLES["ventes"].all_tools())
+        listing = run_tool("email_templates", self.ctx(), {})
+        self.assertIn("prospection_seo", listing)
+        self.assertIn("Diagnostic SEO local (89 €, 3 jours)", listing)
+        # champ manquant, crochets, champ inconnu : refus précis, rien n'est soumis
+        out = run_tool("send_email", self.ctx(), {"to": "a@b.fr", "reason": "prospection", "template": "prospection_seo",
+                                                  "fields": {"site": "[site]", "ville": "Paris"}})
+        self.assertIn("Refusé", out)
+        self.assertIn("« accroche » manquant", out)
+        self.assertIn("texte à compléter", out)
+        self.assertIn("inconnu", out)
+        self.assertFalse(self.db.pending_approvals())
+        out = run_tool("send_email", self.ctx(), {"to": "a@b.fr", "reason": "prospection", "template": "prospection_seo",
+                                                  "fields": {"site": "ax-07.fr", "salutation": "Monsieur Affringue",
+                                                             "accroche": "que la page d'accueil ne mentionne ni votre ville ni la zone que vous desservez."}})
+        self.assertIn("en attente de validation", out)
+        a = self.db.pending_approvals()[0]
+        p = _j.loads(a["payload"])
+        self.assertEqual(p["subject"], "ax-07.fr : une piste pour votre visibilité locale")
+        self.assertTrue(p["body"].startswith("Bonjour Monsieur Affringue,"))
+        self.assertIn("livré sous 3 jours, pour 89 €", p["body"])
+        self.assertIn("STOP", p["body"])                                   # opposition toujours ajoutée
+        self.assertNotIn("{", p["body"])
+        self.assertEqual(p["template"], "prospection_seo")
+        self.assertTrue(a["reason"].startswith("[Modèle : Prospection — Diagnostic SEO local]"))
+        # sans salutation, offre choisie par l'agent, lien de paiement repris du catalogue
+        self.db.run("UPDATE offers SET payment_link_url='https://buy.stripe.com/x' WHERE name='Site vitrine'")
+        run_tool("send_email", self.ctx(), {"to": "c@d.fr", "reason": "réponse", "template": "reponse_interesse", "in_reply_to": 0,
+                                            "fields": {"objet": "Votre proposition", "offre": "site vitrine",
+                                                       "reponse": "Oui, le site inclut une page contact et les mentions légales."}})
+        b = _j.loads(self.db.pending_approvals()[-1]["payload"])["body"]
+        self.assertTrue(b.startswith("Bonjour,"))
+        self.assertIn("390 €", b); self.assertIn("5 jours", b); self.assertIn("https://buy.stripe.com/x", b)
+        self.assertIn("Refusé", run_tool("send_email", self.ctx(), {"to": "c@d.fr", "reason": "r", "template": "reponse_interesse",
+                                         "fields": {"objet": "o", "offre": "Offre inconnue", "reponse": "Une réponse suffisamment longue."}}))
+        self.assertIn("Donne subject et body", run_tool("send_email", self.ctx(), {"to": "c@d.fr", "reason": "r"}))
+
     def test_approval_waits_for_setup_then_runs(self):
         from ai_studio.approvals import NotReady, decide
         run_tool("send_email", self.ctx(), {"to": "a@b.fr", "subject": "s", "body": "b", "reason": "r"})
