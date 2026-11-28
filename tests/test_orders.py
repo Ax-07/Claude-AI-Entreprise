@@ -62,7 +62,7 @@ class OrdersTest(Base):
         self.assertIn("créé automatiquement", out)
         aid = self.db.pending_approvals()[0]["id"]
         calls = iter([{"id": "price_1"}, {"id": "plink_9", "url": "https://buy.stripe.com/test_9"}])
-        with unittest.mock.patch.object(approvals, "stripe_request", lambda *a: next(calls)):
+        with unittest.mock.patch.object(approvals, "stripe_request", lambda *a, **k: next(calls)):
             approvals.decide(self.cfg, self.db, aid, True)
         o = self.db.one("SELECT * FROM offers")
         self.assertEqual((o["price_eur"], o["payment_link_id"]), (290, "plink_9"))
@@ -175,7 +175,7 @@ class OrdersTest(Base):
         self.db.kv_set("inbox_last_uid", "0"); self.db.kv_set("inbox_uidvalidity", "7")
         commerce.sync_inbox(self.cfg, self.db, connect=lambda: FakeIMAP({1: mail("Marie <marie@cafe.fr>", "Re: infos", "Voici l'URL", "<m@x>")}))
         s = commerce.get_order(self.db, n)
-        self.assertEqual((s["stage"], s["nudges"]), ("a_livrer", 0))
+        self.assertEqual((s["stage"], s["nudges"]), ("attente_client", 0))       # relancée, délai pas encore démarré
         t = self.db.one("SELECT * FROM tasks WHERE title LIKE 'Répondre à Marie%'")
         self.assertEqual((t["order_ref"], t["priority"]), (n, 1))
 

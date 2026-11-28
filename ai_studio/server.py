@@ -128,10 +128,18 @@ def deliverable_preview(cfg, db, approval_id: int, sub: str = "") -> tuple[bytes
     att = json.loads(a["payload"]).get("attachment") if a and a["action"] == "send_email" else None
     if not att:
         raise ApiError(404, "Aucun livrable à prévisualiser")
-    base = cfg.workspace.resolve()
-    p = (base / att).resolve()
-    if base not in p.parents or not p.is_file():
-        raise ApiError(404, "Livrable introuvable")
+    payload = json.loads(a["payload"])
+    if payload.get("attachment_sha256"):
+        from .outgoing import OutgoingError, frozen_path
+        try:
+            p = frozen_path(cfg, payload)                 # exactement le fichier qui partira si tu valides
+        except OutgoingError as e:
+            raise ApiError(409, str(e))
+    else:
+        base = cfg.workspace.resolve()
+        p = (base / att).resolve()
+        if base not in p.parents or not p.is_file():
+            raise ApiError(404, "Livrable introuvable")
     if p.suffix.lower() == ".zip":
         sub = str(PurePosixPath("/" + (sub or "index.html"))).lstrip("/") or "index.html"
         if sub.endswith("/"):
@@ -224,6 +232,11 @@ def events(cfg, db, since_id: int = 0, limit: int = 40) -> list[dict]:
 
 def approvals(cfg, db) -> list[dict]:
     out = []
+    for a in db.q("SELECT * FROM approvals WHERE status='uncertain' ORDER BY id"):  # issue inconnue : le propriétaire vérifie
+        d = _row(a)
+        d["payload"] = {k: v for k, v in json.loads(a["payload"]).items() if k != "html"}
+        d["uncertain"] = True
+        out.append(d)
     for a in db.q("SELECT * FROM approvals WHERE status='review' ORDER BY id"):     # en relecture : visibles, pas encore à décider
         d = _row(a)
         d["payload"] = {k: v for k, v in json.loads(a["payload"]).items() if k != "html"}
@@ -416,6 +429,17 @@ def decide_approval(cfg, db, approval_id: int, body: dict) -> dict:
     return {"ok": True, "message": msg}
 
 
+def resolve_approval(cfg, db, approval_id: int, body: dict) -> dict:
+    """Opération à l'issue incertaine : le propriétaire indique si elle a eu lieu (ex. email présent dans Gmail)."""
+    from .approvals import resolve_uncertain
+    if body.get("done") not in (True, False):
+        raise ApiError(400, "done doit valoir true ou false")
+    a = db.approval(approval_id)
+    if not a or a["status"] != "uncertain":
+        raise ApiError(409, "Cette demande n'est pas dans l'état incertain")
+    return {"ok": True, "message": resolve_uncertain(cfg, db, approval_id, body["done"])}
+
+
 def add_objective(cfg, db, body: dict) -> dict:
     text = str(body.get("text") or "").strip()
     if len(text) < 5:
@@ -479,6 +503,7 @@ def make_handler(cfg):
             self.send_header("Cache-Control", "no-cache" if etag else "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
             self.send_header("Content-Security-Policy",
                              "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                              "font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
@@ -522,10 +547,34 @@ def make_handler(cfg):
             url = urlparse(self.path)
             path, qs = url.path.rstrip("/") or "/", parse_qs(url.query)
             q = lambda k, d="": (qs.get(k) or [d])[0]
-            if method == "GET" and (path == "/" or not path.startswith("/api")):
+            from . import auth
+            session_ok = auth.valid(cfg, auth.cookie_value(self.headers))
+            if method == "GET" and path == "/" and "cle" in qs:          # lien d'accès : cookie posé, clé retirée de l'adresse
+                if not auth.valid(cfg, q("cle")):
+                    return self._send(403, auth.LOGIN_PAGE.encode(), "text/html; charset=utf-8")
+                self.send_response(303)
+                self.send_header("Location", "/")
+                self.send_header("Set-Cookie", auth.set_cookie_header(cfg))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            if method == "GET" and path == "/" and not session_ok:
+                return self._send(401, auth.LOGIN_PAGE.encode(), "text/html; charset=utf-8")
+            if method == "GET" and not path.startswith("/api"):
                 return self._static(path)
-            if method == "POST" and self.headers.get("X-AI-Studio") != "1":
-                return self._send(403, {"error": "En-tête X-AI-Studio manquant"})
+            if not session_ok:                                            # audit SEC-04 : clé secrète obligatoire
+                return self._send(401, {"error": "Session absente ou expirée : rouvre le tableau de bord avec ton lien "
+                                                 "d'accès (commande : python -m ai_studio lien)."})
+            if method == "POST":
+                origin = self.headers.get("Origin")
+                if self.headers.get("X-AI-Studio") != "1":
+                    return self._send(403, {"error": "En-tête X-AI-Studio manquant"})
+                if origin is not None and origin != f"http://{self.headers.get('Host')}":
+                    return self._send(403, {"error": "Origine refusée"})
+                if (self.headers.get("Sec-Fetch-Site") or "same-origin") not in ("same-origin", "none"):
+                    return self._send(403, {"error": "Requête d'un autre site refusée"})
             db = self._db()
             try:
                 parts = path.split("/")[2:]          # /api/<a>/<b>
@@ -585,6 +634,8 @@ def make_handler(cfg):
                     body = self._body()
                     if len(parts) == 2 and parts[0] == "approvals" and parts[1].isdigit():
                         return self._send(200, decide_approval(cfg, db, int(parts[1]), body))
+                    if len(parts) == 3 and parts[0] == "approvals" and parts[1].isdigit() and parts[2] == "resolve":
+                        return self._send(200, resolve_approval(cfg, db, int(parts[1]), body))
                     if parts == ["objectives"]:
                         return self._send(200, add_objective(cfg, db, body))
                     if parts == ["map"]:

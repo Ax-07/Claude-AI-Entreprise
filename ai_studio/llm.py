@@ -247,27 +247,109 @@ def compute_cost(prices: dict, model: str, usage: dict) -> tuple[float, int, int
     return round(usd, 6), total_in, out, searches
 
 
+CHARS_PER_TOKEN = 3.0          # estimation prudente (le français compte plutôt 3,5 à 4 caractères par token)
+MIN_OUTPUT_TOKENS = 1024       # en dessous, la réponse serait inutilisable : l'appel est refusé
+RESERVATION_TTL_MIN = 15       # réservation d'un appel interrompu (programme arrêté) : ignorée après ce délai
+
+
+def estimate_input_tokens(system, messages, tools) -> int:
+    import json
+    raw = json.dumps([system, messages, tools or []], ensure_ascii=False, default=str)
+    return int(len(raw) / CHARS_PER_TOKEN) + 200
+
+
 class BudgetGuard:
-    """Vérifie les plafonds AVANT chaque appel et enregistre la dépense APRÈS."""
+    """Plafonds de dépense (audit FIN-01).
+
+    Avant chaque appel, le coût MAXIMAL possible (entrée estimée prudemment, sortie au maximum autorisé, recherches
+    web) est RÉSERVÉ dans une transaction SQLite exclusive, en tenant compte des réservations en cours des autres
+    appels (discussion avec le PDG et moteur en parallèle). Après la réponse, la réservation est remplacée par le coût
+    réel. Les plafonds du jour et du mois sont donc stricts ; s'il reste trop peu pour la réponse maximale, la longueur
+    de réponse autorisée est réduite pour tenir dans le budget. Le plafond par tâche reste « souple » : la tâche
+    s'arrête avec un résultat partiel dès qu'il est atteint."""
 
     def __init__(self, cfg, db):
         self.cfg, self.db = cfg, db
 
+    def _held(self, where: str = "", params: tuple = ()) -> float:
+        from .db import iso, now
+        from datetime import timedelta
+        limit = iso(now() - timedelta(minutes=RESERVATION_TTL_MIN))
+        return float(self.db.one(f"SELECT COALESCE(SUM(usd),0) FROM budget_reservations WHERE created_at >= ? {where}",
+                                 (limit, *params))[0])
+
+    def _task_cap(self, task_id) -> float:
+        cap = self.cfg["budget"]["per_task_usd"]
+        row = self.db.one("SELECT agent FROM tasks WHERE id=?", (task_id,))
+        if row:
+            from .agents import ROLES
+            role = ROLES.get(row[0])
+            cap = (role.task_budget_usd if role and role.task_budget_usd else cap)
+        return cap
+
     def check(self, task_id: int | None = None) -> None:
         b = self.cfg["budget"]
-        if self.db.spent("month") >= b["monthly_usd"]:
+        held = self._held()
+        if self.db.spent("month") + held >= b["monthly_usd"]:
             raise BudgetExceeded(f"Budget mensuel atteint ({b['monthly_usd']} $)")
-        if self.db.spent("day") >= b["daily_usd"]:
+        if self.db.spent("day") + held >= b["daily_usd"]:
             raise BudgetExceeded(f"Budget du jour atteint ({b['daily_usd']} $)")
         if task_id is not None:
-            cap = b["per_task_usd"]
-            row = self.db.one("SELECT agent FROM tasks WHERE id=?", (task_id,))
-            if row:
-                from .agents import ROLES
-                role = ROLES.get(row[0])
-                cap = (role.task_budget_usd if role and role.task_budget_usd else cap)
-            if self.db.task_cost(task_id) >= cap:
+            cap = self._task_cap(task_id)
+            if self.db.task_cost(task_id) + self._held("AND task_id=?", (task_id,)) >= cap:
                 raise BudgetExceeded(f"Plafond par tâche atteint ({cap} $)")
+
+    def reserve(self, agent: str, task_id, model: str, system, messages, tools, max_tokens: int) -> tuple[int, int]:
+        """Réserve le coût maximal du prochain appel. Renvoie (id de réservation, max_tokens autorisé).
+        Lève BudgetExceeded si le budget ne permet même pas une réponse courte."""
+        from .db import iso, now
+        from datetime import timedelta
+        b, prices = self.cfg["budget"], self.cfg["prices"]
+        in_tokens = estimate_input_tokens(system, messages, tools)
+        searches = sum(int(t.get("max_uses", 0) or 0) for t in (tools or []) if isinstance(t, dict) and t.get("type", "").startswith("web_search"))
+        fixed, *_ = compute_cost(prices, model, {"input_tokens": in_tokens, "output_tokens": 0,
+                                                 "server_tool_use": {"web_search_requests": searches}})
+        full, *_ = compute_cost(prices, model, {"input_tokens": in_tokens, "output_tokens": max_tokens,
+                                                "server_tool_use": {"web_search_requests": searches}})
+        per_out = (full - fixed) / max(1, max_tokens)
+        conn = self.db.conn
+        conn.commit()
+        conn.execute("BEGIN IMMEDIATE")           # une seule réservation à la fois, toutes connexions confondues
+        try:
+            conn.execute("DELETE FROM budget_reservations WHERE created_at < ?",
+                         (iso(now() - timedelta(minutes=RESERVATION_TTL_MIN)),))
+            held = self._held()
+            day_left = b["daily_usd"] - self.db.spent("day") - held
+            month_left = b["monthly_usd"] - self.db.spent("month") - held
+            left = min(day_left, month_left)
+            if task_id is not None:
+                cap = self._task_cap(task_id)
+                if self.db.task_cost(task_id) + self._held("AND task_id=?", (task_id,)) >= cap:
+                    raise BudgetExceeded(f"Plafond par tâche atteint ({cap} $)")
+            allowed = max_tokens
+            if full > left:
+                allowed = int((left - fixed) / per_out) if per_out > 0 else 0
+                if allowed < MIN_OUTPUT_TOKENS:
+                    raise BudgetExceeded(f"Budget mensuel atteint ({b['monthly_usd']} $)" if month_left < day_left
+                                         else f"Budget du jour atteint ({b['daily_usd']} $)")
+            usd = round(fixed + per_out * allowed, 6)
+            cur = conn.execute("INSERT INTO budget_reservations(agent, task_id, model, usd, created_at) VALUES (?,?,?,?,?)",
+                               (agent, task_id, model, usd, iso()))
+            conn.commit()
+            return cur.lastrowid, allowed
+        except BaseException:
+            conn.rollback()
+            raise
+
+    def release(self, rid: int | None) -> None:
+        if rid:
+            self.db.run("DELETE FROM budget_reservations WHERE id=?", (rid,))
+
+    def settle(self, rid: int | None, agent: str, task_id, model: str, usage: dict) -> float:
+        """Remplace la réservation par le coût réel (dans la même écriture)."""
+        if rid:
+            self.db.conn.execute("DELETE FROM budget_reservations WHERE id=?", (rid,))
+        return self.record(agent, task_id, model, usage)
 
     def searches_left(self) -> int:
         return max(0, int(self.cfg["budget"]["web_searches_per_day"]) - self.db.searches_today())

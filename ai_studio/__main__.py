@@ -96,11 +96,12 @@ def _start_dashboard(cfg, port: int, open_browser: bool):
         return
     url = f"http://127.0.0.1:{port}"
     from .db import DB
+    from .auth import login_url
     DB(cfg.db_path).kv_set("dashboard_url", url)   # utilisé par les notifications pour ouvrir la bonne page
-    _out(f"Tableau de bord : {url}")
+    _out(f"Tableau de bord : {url}  (lien d'accès personnel : python -m ai_studio lien)")
     if open_browser:
         import webbrowser
-        webbrowser.open(url)
+        webbrowser.open(login_url(cfg, url))      # la clé pose le cookie de session puis disparaît de l'adresse
 
 
 def cmd_serveur(cfg, db, a):
@@ -403,6 +404,12 @@ def cmd_retenir(cfg, db, a):
     _out(f"Consigne #{mid} mémorisée : les agents la verront en premier quand ils chercheront « {a.sujet} ».")
 
 
+def cmd_lien(cfg, db, a):
+    from .auth import login_url
+    base = db.kv_get("dashboard_url") or "http://127.0.0.1:8765"
+    _out("Lien d'accès personnel au tableau de bord (ne le partage pas) :\n" + login_url(cfg, base))
+
+
 def cmd_notifier_test(cfg, db, a):
     from . import notify
     if notify.runner is None:
@@ -447,13 +454,28 @@ def cmd_sauvegardes(cfg, db, a):
     if not lst:
         _out("Aucune sauvegarde pour l'instant (la première est faite au premier cycle du moteur).")
     for b in lst:
-        _out(f"{b['name']:<20} {b['size'] / 1024:>8.0f} Ko   {b['path']}")
+        _out(f"{b['name']:<20} {b['size'] / 1024:>8.0f} Ko   {'complète' if b['complete'] else 'ancienne (base seule)':<22} {b['path']}")
+    ext = cfg.get("backup", "external_dir", default="")
+    _out(f"Copie externe : {ext}" if ext else "Copie externe : non configurée (backup.external_dir dans config.json, "
+         "par exemple un dossier OneDrive ou une clé USB).")
+
+
+def cmd_verifier_sauvegarde(cfg, db, a):
+    from .backup import list_backups, verify
+    names = [a.nom] if a.nom else [b["name"] for b in list_backups(cfg)]
+    if not names:
+        _out("Aucune sauvegarde.")
+    for n in names:
+        problems = verify(cfg, n)
+        _out(f"{n} : " + ("OK (empreintes, base et archives vérifiées)" if not problems else "PROBLÈME — " + " ; ".join(problems)))
 
 
 def cmd_restaurer(cfg, db, a):
     from .backup import restore
     db.conn.close()
-    _out(f"Base restaurée depuis la sauvegarde {a.nom} ({restore(cfg, a.nom)}). L'ancienne base est conservée à côté.")
+    r = restore(cfg, a.nom, force=a.forcer)
+    _out(f"Sauvegarde {a.nom} restaurée et vérifiée : base, livrables et pièces validées.\n"
+         f"L'état précédent est conservé dans {r['previous']}. Tu peux redémarrer le moteur.")
 
 
 def startup_file() -> Path:
@@ -513,8 +535,9 @@ def main(argv=None):
     s = sub.add_parser("memoire"); s.add_argument("recherche", nargs="?", default=""); s.add_argument("-n", type=int, default=30)
     s = sub.add_parser("oublier"); s.add_argument("ids", type=int, nargs="+")
     s = sub.add_parser("retenir"); s.add_argument("sujet"); s.add_argument("texte")
-    sub.add_parser("notifier-test"); sub.add_parser("sauvegarder"); sub.add_parser("sauvegardes")
-    s = sub.add_parser("restaurer"); s.add_argument("nom")
+    sub.add_parser("notifier-test"); sub.add_parser("sauvegarder"); sub.add_parser("sauvegardes"); sub.add_parser("lien")
+    s = sub.add_parser("restaurer"); s.add_argument("nom"); s.add_argument("--forcer", action="store_true", help="même si le moteur semble tourner")
+    s = sub.add_parser("verifier-sauvegarde"); s.add_argument("nom", nargs="?")
     s = sub.add_parser("demarrage-auto"); s.add_argument("--retirer", action="store_true")
     a = p.parse_args(argv)
 
@@ -527,7 +550,7 @@ def main(argv=None):
                 "offres": cmd_offres, "client": cmd_client, "repartir-propre": cmd_repartir_propre, "importer-offres": cmd_importer_offres, "commande-test": cmd_commande_test, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne, "mode-test": cmd_mode_test, "bilan": cmd_bilan, "supprimer-mission": cmd_supprimer_mission,
                 "memoire": cmd_memoire, "oublier": cmd_oublier, "retenir": cmd_retenir,
                 "sauvegarder": cmd_sauvegarder, "sauvegardes": cmd_sauvegardes, "restaurer": cmd_restaurer,
-                "demarrage-auto": cmd_demarrage_auto,
+                "demarrage-auto": cmd_demarrage_auto, "lien": cmd_lien, "verifier-sauvegarde": cmd_verifier_sauvegarde,
                 "valider": lambda c, d, x: cmd_decide(c, d, x, True), "refuser": lambda c, d, x: cmd_decide(c, d, x, False)}
     try:
         handlers[a.cmd](cfg, db, a)

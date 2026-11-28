@@ -91,7 +91,7 @@ class StripeTest(Base):
                     "has_more": False}
         r = commerce.sync_stripe(self.cfg, self.db, req)
         self.assertEqual(r["new"], 1)
-        self.assertEqual(calls[0]["created[gt]"], old)
+        self.assertLessEqual(calls[0]["created[gte]"], old)          # fenêtre qui recouvre le passage précédent (sessions encore ouvertes)
         self.assertEqual(calls[0]["expand[]"], "data.line_items")
         t = self.db.one("SELECT * FROM tasks WHERE agent='chef_projet'")    # chaque commande a son chef de projet
         self.assertEqual(t["priority"], 1)
@@ -152,7 +152,7 @@ class InboxTest(Base):
             6: mail("Inconnu <marie@cafe.fr>", "Question", "<p>Bonjour,<br>quel <b>prix</b> ?</p>", "<6@x>"),
         })
         r = commerce.sync_inbox(self.cfg, self.db, connect=lambda: imap)
-        self.assertEqual(r, {"new": 5, "queued": 2, "ignored": 3})
+        self.assertEqual(r, {"new": 5, "queued": 2, "ignored": 3, "waiting": 0})
         t = self.db.one("SELECT * FROM tasks WHERE title LIKE 'Répondre à Paul%'")
         self.assertEqual(t["agent"], "ventes")                  # on lui avait écrit : c'est un prospect
         self.assertIn(commerce.UNTRUSTED_START, t["description"])
@@ -169,8 +169,13 @@ class InboxTest(Base):
         imap.msgs.update({2: mail("a@x.fr", "1", "a", "<a@x>"), 3: mail("b@x.fr", "2", "b", "<b@x>")})
         r = commerce.sync_inbox(self.cfg, self.db, connect=lambda: imap)
         self.assertEqual(r["queued"], 1)
-        self.assertEqual(self.db.one("SELECT COUNT(*) FROM inbox WHERE status='new'")[0], 1)
+        self.assertEqual(self.db.one("SELECT COUNT(*) FROM inbox WHERE status='waiting'")[0], 1)
         self.assertTrue(any("Beaucoup d'emails" in x for x in self.toasts))
+        # le lendemain, le message en attente est repris (avant cette correction, il restait « new » pour toujours)
+        self.db.run("UPDATE inbox SET recorded_at='2000-01-01T00:00:00+00:00'")
+        r = commerce.sync_inbox(self.cfg, self.db, connect=lambda: imap)
+        self.assertEqual((r["queued"], r["new"]), (1, 0))
+        self.assertEqual(self.db.one("SELECT COUNT(*) FROM inbox WHERE status='queued'")[0], 2)
 
     def test_reply_threads_and_attachment(self):
         iid = self.db.run("INSERT INTO inbox(uid, message_id, from_addr, subject, body, status, recorded_at) VALUES (1,'<q@x>','marie@cafe.fr','Question','?','queued','t')")
@@ -418,12 +423,13 @@ class ServerCommerceTest(Base):
         os.environ.update(GITHUB_PAGES_REPO="Ax-07/ai-studio-site", GITHUB_TOKEN="t")
         self.db.add_approval("marketing", None, "publish_page", {"path": "o.html", "url": "u", "title": "T", "file": "f", "html": "<h1>Bonjour</h1>"}, "r")
         self.db.run("INSERT INTO sales(id, created_at, amount, currency, livemode, recorded_at) VALUES ('s', '2026-11-27T10:00:00+00:00', 49, 'EUR', 1, 'x')")
+        from ai_studio.auth import COOKIE, get_key
         srv = make_server(self.cfg, 0); port = srv.server_address[1]
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         self.addCleanup(srv.server_close); self.addCleanup(srv.shutdown)
         def get(path):
             c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-            c.request("GET", path, headers={"Host": f"127.0.0.1:{port}"})
+            c.request("GET", path, headers={"Host": f"127.0.0.1:{port}", "Cookie": f"{COOKIE}={get_key(self.cfg)}"})
             r = c.getresponse(); body = r.read(); c.close()
             return r, body
         r, body = get("/api/approvals")
@@ -438,7 +444,8 @@ class ServerCommerceTest(Base):
         self.db.add_approval("ventes", None, "send_email", {"to": "a@b.fr", "subject": "s", "body": "b"}, "r")
         c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
         c.request("POST", "/api/approvals/2", body=json.dumps({"decision": "approve"}),
-                  headers={"Host": f"127.0.0.1:{port}", "X-AI-Studio": "1", "Content-Type": "application/json"})
+                  headers={"Host": f"127.0.0.1:{port}", "X-AI-Studio": "1", "Content-Type": "application/json",
+                           "Cookie": f"{COOKIE}={get_key(self.cfg)}"})
         r = c.getresponse(); err = json.loads(r.read()); c.close()
         self.assertEqual(r.status, 409)
         self.assertIn("SMTP_HOST", err["error"])
