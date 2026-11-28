@@ -95,6 +95,8 @@ class Studio:
             aftercare.due(self.cfg, self.db)             # suivi après livraison (remerciement, avis, offre suivante)
             from . import reports
             reports.run_monthly(self.cfg, self.db)       # le 1er du mois : bilan chiffré du mois écoulé + analyse Finance
+            from . import audit
+            audit.run_weekly(self.cfg, self.db)          # le lundi : dossier d'audit des agents + revue de l'auditeur RH
         except Exception as e:
             self.db.log("systeme", "prospect", f"Suivi des prospects ou des clients impossible : {e}")
         try:

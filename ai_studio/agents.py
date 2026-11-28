@@ -29,7 +29,7 @@ class Role:
 
 # Divisions de l'entreprise : elles regroupent les pôles qui travaillent ensemble (même découpage que la carte).
 DIVISIONS = {
-    "Direction": ["pdg", "chef_projet", "finance", "juridique"],
+    "Direction": ["pdg", "chef_projet", "finance", "juridique", "rh"],
     "Division commerciale": ["marketing", "ventes", "support"],
     "Division production": ["atelier", "developpement", "recherche"],
     "Tech & Données": ["data", "securite"],
@@ -164,6 +164,16 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "validée : ton rôle est d'y arriver dans le délai promis.",
          ["mission_status", "close_mission", "delegate_task", "list_orders", "list_offers", "check_deliverable",
           "set_order_status"], max_steps=14, task_budget_usd=0.25),
+    Role("rh", "Ressources humaines", "Agent RH — audit et amélioration des agents",
+         "Tu audites le travail des agents, chefs de projet et PDG compris : réussite, coût, travail en double, "
+         "circulation de l'information (délégations, mémoire et bibliothèque consultées), qualité vue par le propriétaire "
+         "(demandes refusées, renvoyées ou corrigées). Tu es INDÉPENDANT du PDG : tu ne reçois pas d'ordres des agents, tu "
+         "ne délègues pas, et tu rends compte directement au propriétaire. Tu t'appuies uniquement sur le dossier chiffré "
+         "(agent_audit) et sur les tâches que tu relis (get_task_result) : chaque constat cite un chiffre ou un numéro de "
+         "tâche. Pour corriger un comportement qui se répète, tu proposes une consigne permanente (propose_agent_rule) : "
+         "une phrase courte, précise et vérifiable, que le propriétaire valide ou non. Tu ne proposes jamais de consigne "
+         "qui contournerait une validation du propriétaire, une règle de sécurité ou la chaîne de commandement.",
+         ["agent_audit", "propose_agent_rule", "list_agent_rules", "mission_status"], max_steps=12, task_budget_usd=0.20),
     Role("data", "Data Core", "Agent Data — mémoire, mesures et amélioration",
          "Tu entretiens la mémoire de l'entreprise (synthèses, déduplication), tu mesures ce qui fonctionne "
          "(tâches, coûts, résultats) et tu proposes des améliorations du fonctionnement des agents.",

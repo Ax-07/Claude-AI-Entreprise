@@ -172,7 +172,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:rgba(255,255,255,.03)}
 "use strict";
 const ICONS = {"I_BOT": "<rect x=\"5\" y=\"8\" width=\"14\" height=\"11\" rx=\"3\"/><path d=\"M12 4v4M9 13h.01M15 13h.01M9 16.5h6\"/>", "I_STAR": "<path d=\"M12 3l2.6 5.6 6 .6-4.5 4 1.3 6L12 16.3 6.6 19.2l1.3-6-4.5-4 6-.6z\"/>", "I_TARGET": "<circle cx=\"12\" cy=\"12\" r=\"8\"/><circle cx=\"12\" cy=\"12\" r=\"4\"/><circle cx=\"12\" cy=\"12\" r=\"1\"/>", "I_COIN": "<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M14.5 9.3c-.6-.8-1.5-1.1-2.5-1.1-1.5 0-2.6.8-2.6 2s1.2 1.6 2.6 1.9 2.7.7 2.7 2-1.2 2-2.7 2c-1.1 0-2.1-.4-2.7-1.2M12 6.5v1.7M12 15.8v1.7\"/>", "I_CHIP": "<rect x=\"6\" y=\"6\" width=\"12\" height=\"12\" rx=\"2\"/><path d=\"M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4\"/>", "I_BELL": "<path d=\"M6 16V11a6 6 0 0112 0v5l1.5 2h-15zM10 20.5a2 2 0 004 0\"/>", "I_TROPHY": "<path d=\"M8 4h8v5a4 4 0 01-8 0zM8 6H5a3 3 0 003 4M16 6h3a3 3 0 01-3 4M12 13v4M8.5 20h7\"/>", "I_SHIELD": "<path d=\"M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z\"/><path d=\"M9 12l2 2 4-4\"/>", "I_CAL": "<rect x=\"4\" y=\"5\" width=\"16\" height=\"15\" rx=\"2\"/><path d=\"M4 10h16M9 3v4M15 3v4\"/>", "I_GRID": "<rect x=\"4\" y=\"4\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"13\" y=\"4\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"4\" y=\"13\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"13\" y=\"13\" width=\"7\" height=\"7\" rx=\"1.5\"/>", "I_PLUS": "<path d=\"M12 5v14M5 12h14\"/>", "I_HOME": "<path d=\"M4 11l8-7 8 7v9h-5v-6h-6v6H4z\"/>", "I_USERS": "<circle cx=\"9\" cy=\"8\" r=\"3.5\"/><path d=\"M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M16 4.8a3.3 3.3 0 010 6.4M18 14.4c2 .7 3.5 2.6 3.5 5.6\"/>", "I_FLAG": "<path d=\"M5 21V4M5 4h11l-2 4 2 4H5\"/>", "I_CHART": "<path d=\"M4 20V10M10 20V4M16 20v-7M22 20H2\"/>", "I_BOOK": "<path d=\"M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2zM4 19V5M8 7h7\"/>", "I_PLUG": "<path d=\"M9 3v5M15 3v5M7 8h10v3a5 5 0 01-10 0zM12 16v5\"/>", "I_GEAR": "<circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1\"/>", "I_HEX": "<path d=\"M12 2.5l8.5 4.9v9.2L12 21.5l-8.5-4.9V7.4z\"/>", "I_TREND": "<path d=\"M3 17l6-6 4 4 8-8M15 7h6v6\"/>", "I_CHECK": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M8 12.5l2.7 2.7L16 10\"/>", "I_BOLT": "<path d=\"M13 2L4 14h7l-1 8 9-12h-7z\"/>"};
 const $ = s => document.querySelector(s);
-const C = {pdg:"#818CF8",recherche:"#34D399",marketing:"#60A5FA",ventes:"#A78BFA",support:"#FBBF24",data:"#F1F5F9",finance:"#F472B6",atelier:"#FB923C",developpement:"#22D3EE",chef_projet:"#A5B4FC",juridique:"#CBD5E1",securite:"#F87171",proprietaire:"#FDE68A",systeme:"#94A3B8"};
+const C = {pdg:"#818CF8",recherche:"#34D399",marketing:"#60A5FA",ventes:"#A78BFA",support:"#FBBF24",data:"#F1F5F9",finance:"#F472B6",atelier:"#FB923C",developpement:"#22D3EE",chef_projet:"#A5B4FC",juridique:"#CBD5E1",securite:"#F87171",rh:"#E879F9",proprietaire:"#FDE68A",systeme:"#94A3B8"};
 const STATUS = {pending:"En attente",running:"En cours",done:"Terminée",failed:"En échec",blocked:"Bloquée"};
 const STATE = {running:["En cours","#34D399"],waiting:["En attente","#FBBF24"],idle:["Disponible","#9AA4C7"]};
 const LEVELS = ["Start-up naissante","Entreprise émergente","Entreprise structurée","Entreprise en croissance","Groupe établi","Empire autonome"];
@@ -366,11 +366,14 @@ function renderDetail(){
 }
 
 // ------------------------------------------------ validations (en haut de la colonne de droite)
-const ACTION = {send_email:"Envoi d'email", stripe_payment_link:"Lien de paiement Stripe", decision:"Décision demandée", publish_page:"Publication d'une page", offer:"Validation d'une offre"};
+const ACTION = {send_email:"Envoi d'email", stripe_payment_link:"Lien de paiement Stripe", decision:"Décision demandée", publish_page:"Publication d'une page", offer:"Validation d'une offre", agent_rule:"Consigne permanente d'un agent"};
 function approvalLines(a){ const pl = a.payload, lines = [];
   if (a.action==="send_email") lines.push(`À : ${pl.to}`, `Objet : ${pl.subject}`, ...(pl.in_reply_to ? [`En réponse à l'email reçu #${pl.in_reply_to}`] : []), ...(pl.attachment ? [`Pièce jointe : ${pl.attachment}`] : []), "", pl.body);
   else if (a.action==="publish_page") lines.push(`Adresse : ${pl.url}`, `Titre : ${pl.title}`, `Fichier : ${pl.file} (${Math.round((pl.size||0)/1024)} Ko)`);
   else if (a.action==="stripe_payment_link") lines.push(`Produit : ${pl.product_name}`, `Montant : ${pl.amount_eur} €` + (pl.recurring ? ` / ${pl.recurring==="month"?"mois":"an"}` : ""));
+  else if (a.action==="agent_rule") lines.push(`Agent : ${pl.agent}`, "", `Consigne proposée : ${pl.rule}`, "", `Preuve : ${pl.evidence}`,
+    ...(pl.current && pl.current.length ? ["", "Consignes déjà en vigueur pour cet agent :", ...pl.current.map(r => "- " + r)] : []),
+    "", "Si tu valides, elle s'appliquera à toutes ses tâches (tu pourras la retirer dans Paramètres).");
   else if (a.action==="offer") { const L = {price_eur:"Prix", delay_hours:"Délai", summary:"Résumé", deliverable:"Livrable", required_info:"Infos à demander au client", producer:"Producteur", activity:"Activité", next_offer:"Offre suivante (après livraison)"};
     lines.push(`Offre : ${pl.name}` + (pl.kind==="update" ? " (modification d'une offre en vente)" : " (nouvelle offre)"), "");
     for (const [k,v] of Object.entries(pl.changes||{})) lines.push(`${L[k]||k} : ` + (k==="price_eur" ? `${v} €` : k==="delay_hours" ? `${v} h` : v));
@@ -672,10 +675,17 @@ async function openIntegrations(){
   modal("Intégrations", h("div",{}, list.map(i => h("div",{class:"feedrow"}, h("span",{style:{width:"10px",height:"10px",borderRadius:"50%",background:i.ok?"#34D399":"#F87171",boxShadow:`0 0 8px ${i.ok?"#34D399":"#F87171"}`}}), h("span",{style:{flex:"1"}}, h("b",{}, i.name), h("span",{class:"small muted"}, " · " + i.detail)), h("span",{class:"small",style:{color:i.ok?"#6EE7B7":"#FCA5A5"}}, i.ok?"Connecté":"Non configuré"))),
     h("p",{class:"small muted"},"Les clés se règlent dans le fichier .env du projet (elles ne quittent jamais ton PC). Redémarre le moteur après une modification.")));
 }
-function openSettings(){
+async function openSettings(){
   const b = ST.budget || {};
+  let rules = []; try { rules = await api("GET","/api/agent-rules"); } catch(e){}
+  const rm = async r => { try { const x = await api("POST",`/api/agent-rules/${r.id}/remove`,{}); toast(x.message, true); openSettings(); } catch(e){ toast(e.message,false); } };
   modal("Paramètres", h("div",{style:{display:"flex",flexDirection:"column",gap:"8px"}}, h("div",{}, h("b",{},"Fournisseur : "), `${ST.provider} (${Object.values(ST.models||{}).join(" / ")})`), h("div",{}, h("b",{},"Plafonds : "), `${money(b.day_limit)} par jour, ${money(b.month_limit)} par mois, ${b.searches_limit} recherches web par jour`),
-    h("p",{class:"small muted"},"Ces réglages se modifient dans config.json, puis on redémarre le moteur. Les modifier depuis cette page viendra dans une prochaine version.")));
+    h("p",{class:"small muted"},"Ces réglages se modifient dans config.json, puis on redémarre le moteur. Les modifier depuis cette page viendra dans une prochaine version."),
+    h("span",{class:"lab",style:{marginTop:"10px"}},"Consignes permanentes des agents (proposées par l’auditeur RH, validées par toi)"),
+    rules.length ? h("table",{}, h("tbody",{}, rules.map(r => h("tr",{title:r.reason||""}, h("td",{}, h("span",{class:"pill",style:{color:C[r.agent]}}, r.agent)),
+      h("td",{style:{fontSize:"13px"}}, r.rule), h("td",{class:"muted small",style:{whiteSpace:"nowrap"}}, ago(r.created_at)),
+      h("td",{}, h("button",{class:"btn",onclick:()=>rm(r)},"Retirer"))))))
+      : h("span",{class:"small muted"},"Aucune pour l’instant. L’auditeur RH en propose quand un comportement se répète ; elles arrivent dans tes validations.")));
 }
 async function openSales(){
   const list = await api("GET","/api/sales");

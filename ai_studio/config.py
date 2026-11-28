@@ -95,6 +95,8 @@ DEFAULTS: dict = {
     "aftercare": {"enabled": True, "days": 3, "review_url": ""},
     # Bilan mensuel par offre, le 1er du mois (fichier rapports/bilan-AAAA-MM.md + analyse de Finance).
     "reports": {"monthly": True},
+    # Audit RH des agents : chaque lundi, dossier chiffré de la semaine (rapports/) et revue par l'auditeur RH.
+    "audit": {"weekly": True, "max_rules_per_agent": 8},
     # Prospection : une seule relance, N jours après le premier email sans réponse ; sans suite N jours après la relance.
     "prospects": {"followup_days": 7, "close_after_days": 7},
     # Sauvegarde quotidienne de la base et des livrables dans data/sauvegardes (les N plus récentes sont gardées).

@@ -49,6 +49,15 @@ class ServerTest(unittest.TestCase):
     def post(self, path, body):
         return self.req("POST", path, body, {"X-AI-Studio": "1"})
 
+    def test_agent_rules_list_and_remove(self):
+        rid = self.db.run("INSERT INTO agent_rules(agent, rule, created_at) VALUES ('ventes', 'Consulte list_prospects avant tout email.', '2026-11-28T10:00:00+00:00')")
+        st, rules, _ = self.req("GET", "/api/agent-rules")
+        self.assertEqual((st, rules[0]["agent"]), (200, "ventes"))
+        st, r, _ = self.post(f"/api/agent-rules/{rid}/remove", {})
+        self.assertEqual((st, r["ok"]), (200, True))
+        self.assertEqual(self.req("GET", "/api/agent-rules")[1], [])
+        self.assertEqual(self.post(f"/api/agent-rules/{rid}/remove", {})[0], 404)
+
     def test_library(self):
         self.db.cache_put("search", "FR|boulangeries lyon", "recherche", None, "1. Boulangeries à Lyon https://exemple.fr")
         self.db.cache_put("page", "https://martin.fr/", "atelier", None, "Pain au levain")
@@ -83,7 +92,7 @@ class ServerTest(unittest.TestCase):
         self.assertFalse(s["engine"]["running"])
         st, ag, _ = self.req("GET", "/api/agents")
         by = {a["name"]: a for a in ag}
-        self.assertEqual(len(ag), 12)
+        self.assertEqual(len(ag), 13)
         self.assertEqual(by["atelier"]["division"], "Division production")
         self.assertEqual(by["data"]["division"], "Tech & Données")
         self.assertEqual(by["securite"]["division"], "Tech & Données")
@@ -234,7 +243,7 @@ class MaquetteTest(ServerTest):
         # chaque pôle occupe un coin de 4 emplacements
         slots = {k: len(q[k]["poles"]) + q[k]["free"] for k in ("direction", "commercial", "production", "tech")}
         planned = {p["id"] for p in meta["poles"] if p["planned"]}
-        self.assertEqual(planned, {"video", "ecommerce", "rh", "infra", "auto"})               # bâtiments des divisions en préparation
+        self.assertEqual(planned, {"video", "ecommerce", "infra", "auto"})               # bâtiments des divisions en préparation (RH : auditeur)
         self.assertEqual((meta["agents_of_pole"]["video"], "video" in meta["agent_of_pole"]), ([], False))
         self.assertEqual(set(slots.values()), {4})
 

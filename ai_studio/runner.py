@@ -112,7 +112,8 @@ def run_task(cfg, db, llm, guard, task) -> str:
     db.log(role.name, "start", f"Début : {task['title']}", task["id"])
 
     ctx = ToolContext(cfg, db, role.name, task, list(ROLES.keys()))
-    system = [{"type": "text", "text": system_prompt(role, cfg), "cache_control": {"type": "ephemeral"}}]
+    from .audit import rules_text
+    system = [{"type": "text", "text": system_prompt(role, cfg) + rules_text(db, role.name), "cache_control": {"type": "ephemeral"}}]
     messages: list[dict] = [{"role": "user", "content": _briefing(db, task, cfg)}]
     last_text = ""
     max_steps = int(role.max_steps or rt["max_steps_per_task"])

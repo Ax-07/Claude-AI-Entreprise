@@ -155,6 +155,11 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "", edits: dict
                 from . import prospects
                 prospects.on_not_sent(db, payload["prospect"])
             outcome = f"VALIDÉ mais l'exécution a échoué : {e}"
+    elif a["action"] == "agent_rule":
+        from .audit import apply_rule
+        res = apply_rule(db, payload, approval_id)
+        db.set_approval(approval_id, status="approved", decided_at=iso(), result=res)
+        outcome = f"VALIDÉ : {res}. {note}".strip()
     elif a["action"] == "offer":
         from .offers import decide as decide_offer
         res = decide_offer(db, payload, True)

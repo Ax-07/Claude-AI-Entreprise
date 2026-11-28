@@ -91,7 +91,8 @@ def send(cfg, db, text: str, thread: int | None = None) -> dict:
     guard = BudgetGuard(cfg, db)
     model = models_for(cfg)["strong"]
     ctx = ToolContext(cfg, db, "pdg", None, list(ROLES))
-    system = [{"type": "text", "text": system_prompt(role, cfg) + "\n" + CHAT_RULES, "cache_control": {"type": "ephemeral"}}]
+    from .audit import rules_text
+    system = [{"type": "text", "text": system_prompt(role, cfg) + rules_text(db, "pdg") + "\n" + CHAT_RULES, "cache_control": {"type": "ephemeral"}}]
     tools = [REGISTRY[n].spec() for n in TOOLS if n in REGISTRY and REGISTRY[n].available()]
     messages, answer, cost, actions = _messages(db, thread), "", 0.0, []
     try:
