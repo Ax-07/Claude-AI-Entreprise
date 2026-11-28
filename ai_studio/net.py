@@ -30,14 +30,20 @@ class NetError(Exception):
 
 def ip_allowed(ip: str) -> bool:
     """Vrai seulement pour une adresse publique routable sur Internet."""
+    return _allowed(ip)
+
+
+def _allowed(ip: str) -> bool:
     try:
         a = ipaddress.ip_address(ip.split("%", 1)[0])
     except ValueError:
         return False
     if isinstance(a, ipaddress.IPv6Address):
         mapped = a.ipv4_mapped or a.sixtofour or (a.teredo[1] if a.teredo else None)
-        if mapped is not None and not ip_allowed(str(mapped)):
+        if mapped is not None and not _allowed(str(mapped)):    # IPv4 encapsulée : jugée sur sa vraie adresse
             return False
+        if a in ipaddress.ip_network("2002::/16") or a in ipaddress.ip_network("2001::/32"):
+            return False                                           # 6to4 / Teredo : jamais nécessaire pour un site
     return a.is_global and not a.is_multicast and not a.is_reserved
 
 
@@ -48,7 +54,7 @@ def resolve(host: str, port: int) -> list[str]:
     except (socket.gaierror, UnicodeError) as e:
         raise NetError(f"nom introuvable : {host}") from e
     ips = list(dict.fromkeys(i[4][0] for i in infos))
-    if not ips or not all(ip_allowed(ip) for ip in ips):
+    if not ips or not all(ip_allowed(ip) for ip in ips):        # (ip_allowed : remplaçable dans les tests)
         raise NetError(f"adresse non publique : {host}")
     return ips
 

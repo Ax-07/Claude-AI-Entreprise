@@ -101,11 +101,12 @@ class OutgoingTest(Base):
         a = self.db.pending_approvals()[0]
         payload = json.loads(a["payload"])
         self.assertEqual(len(payload["attachment_sha256"]), 64)
+        original = (self.cfg.workspace / rel).read_bytes()                  # octets réels (\r\n sous Windows)
         (self.cfg.workspace / rel).write_text("VERSION MODIFIÉE PAR UN AGENT", encoding="utf-8")   # après la validation demandée
         from ai_studio.server import deliverable_preview
-        self.assertEqual(deliverable_preview(self.cfg, self.db, a["id"])[0], REPORT.encode())   # l'aperçu montre la version figée
+        self.assertEqual(deliverable_preview(self.cfg, self.db, a["id"])[0], original)   # l'aperçu montre la version figée
         self.assertIn("exécuté", approvals.decide(self.cfg, self.db, a["id"], True))
-        self.assertEqual(self.attachment_of(FakeSMTP.sent[0]), REPORT.encode())                  # c'est elle qui part
+        self.assertEqual(self.attachment_of(FakeSMTP.sent[0]), original)                  # c'est elle qui part
 
     def test_tampered_frozen_copy_blocks_sending(self):
         n, rel = self.order_with_report()

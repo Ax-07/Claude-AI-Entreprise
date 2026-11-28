@@ -33,6 +33,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - name: Bac à sable de Chrome (Ubuntu 24.04)
+        if: runner.os == 'Linux'
+        # Ubuntu 24.04 restreint les espaces de noms utilisateur (AppArmor) : Chrome ne peut plus créer son bac à sable.
+        # On règle la machine de test plutôt que de désactiver le bac à sable dans le programme (audit SEC-07).
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Navigateur utilisé pour les PDF
+        run: python -c "from ai_studio import pdf; print(pdf.find_browser() or 'aucun (test de conversion réelle ignoré)')"
       - name: Compilation
         run: python -m compileall -q ai_studio tests
       - name: Tests
