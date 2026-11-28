@@ -86,7 +86,7 @@ class MissionsTest(Base):
         self.assertEqual(missions.detail(self.db, "objectif", oid)["tasks"][0]["cost_usd"], 0.15)
         c = costs(self.cfg, self.db)
         order = next(r for r in c["by_mission"] if r["kind"] == "commande")
-        self.assertEqual((order["revenue_eur"], order["margin_eur"]), (89, round(89 - 0.5 * 0.92, 2)))
+        self.assertEqual((order["revenue_eur"], order["margin_eur"]), (89, round(89 - (89 * 0.028 + 0.25) - 89 * 0.256 - 0.5 * 0.92, 2)))   # Stripe, cotisations, API
         self.assertEqual(c["outside_missions_month_usd"], 0.02)
 
     def test_stuck_and_idle_signals(self):

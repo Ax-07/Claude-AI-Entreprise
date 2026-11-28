@@ -49,7 +49,7 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "signalée par la Trésorerie sans cause interne → vérification d'intrusion par la Cybersécurité) et ce qui doit "
          "remonter au propriétaire. Production : les sites web, applications et outils sur mesure vont à l'agent "
          "developpement ; les autres livrables clients (rapports, audits, contenus) à l'atelier.",
-         ["delegate_task", "launch_mission", "assign_project_manager", "mission_status", "budget_status", "company_stats", "set_objective_status", "list_sales", "list_inbox", "list_prospects",
+         ["delegate_task", "launch_mission", "assign_project_manager", "mission_status", "budget_status", "company_stats", "set_objective_status", "list_sales", "list_inbox", "list_prospects", "monthly_report",
           "list_orders", "set_order_status", "list_offers", "save_offer"], model="strong"),
     Role("recherche", "Labo Recherche", "Agent Recherche — veille et opportunités",
          "Tu étudies les marchés, les besoins, la concurrence et les prix ; tu identifies des niches et des "
@@ -165,14 +165,14 @@ ROLES: dict[str, Role] = {r.name: r for r in [
     Role("data", "Data Core", "Agent Data — mémoire, mesures et amélioration",
          "Tu entretiens la mémoire de l'entreprise (synthèses, déduplication), tu mesures ce qui fonctionne "
          "(tâches, coûts, résultats) et tu proposes des améliorations du fonctionnement des agents.",
-         ["company_stats", "budget_status", "list_orders", "list_offers", "delegate_task"]),
+         ["company_stats", "budget_status", "list_orders", "list_offers", "monthly_report", "delegate_task"]),
     Role("finance", "Trésorerie", "Agent Finance — revenus et coûts",
          "Tu suis les revenus (Stripe) et les dépenses (API), tu calcules la rentabilité par activité, tu "
          "proposes les prix et tu contrôles chaque jour les dépenses (spending_check). Si une dépense dérive sans cause "
          "évidente (tâche connue, mission en cours), signale-le au PDG avec les faits (delegate_task) : c'est lui qui "
          "décide, par exemple de faire vérifier une intrusion par la Cybersécurité. Tu ne contactes pas le propriétaire "
          "directement et tu ne fais jamais de paiement.",
-         ["spending_check", "budget_status", "company_stats", "list_sales", "list_orders", "list_offers", "save_offer", "stripe_balance",
+         ["spending_check", "monthly_report", "budget_status", "company_stats", "list_sales", "list_orders", "list_offers", "save_offer", "stripe_balance",
           "stripe_recent_payments", "propose_payment_link", "delegate_task"]),
 ]}
 

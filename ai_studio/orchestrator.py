@@ -93,6 +93,8 @@ class Studio:
             prospects.due_followups(self.cfg, self.db)   # relance unique à J+7, puis « sans suite » (sans coût d'API)
             from . import aftercare
             aftercare.due(self.cfg, self.db)             # suivi après livraison (remerciement, avis, offre suivante)
+            from . import reports
+            reports.run_monthly(self.cfg, self.db)       # le 1er du mois : bilan chiffré du mois écoulé + analyse Finance
         except Exception as e:
             self.db.log("systeme", "prospect", f"Suivi des prospects ou des clients impossible : {e}")
         try:
