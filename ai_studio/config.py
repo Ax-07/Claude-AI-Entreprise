@@ -90,6 +90,9 @@ DEFAULTS: dict = {
     # cotisations micro-entreprise 21,2 % (services BIC) ou 25,6 % (BNC, cas par défaut, le plus prudent) ;
     # Stripe 1,5 % + 0,25 € (carte EEE standard) ou 2,8 % + 0,25 € (carte professionnelle, retenu par prudence).
     "offers": {"social_rate": 0.256, "stripe_pct": 0.028, "stripe_fixed_eur": 0.25, "min_margin_pct": 50},
+    # Après la livraison : message de suivi (remerciement, avis, offre suivante) N jours après, validé comme tout email.
+    # review_url : lien où laisser un avis (fiche Google…), facultatif.
+    "aftercare": {"enabled": True, "days": 3, "review_url": ""},
     # Prospection : une seule relance, N jours après le premier email sans réponse ; sans suite N jours après la relance.
     "prospects": {"followup_days": 7, "close_after_days": 7},
     # Sauvegarde quotidienne de la base et des livrables dans data/sauvegardes (les N plus récentes sont gardées).

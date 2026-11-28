@@ -79,8 +79,9 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "Tu prépares les réponses aux clients et prospects, tu rédiges les FAQ et les procédures, tu repères les "
          "problèmes récurrents et tu proposes des améliorations. Ton ton est poli, précis et rassurant ; tu vouvoies. "
          "Pour répondre à un prospect intéressé, utilise le modèle reponse_interesse (email_templates) et mets à jour "
-         "son statut (set_prospect_status).",
-         ["send_email", "email_templates", "list_prospects", "set_prospect_status", "deliver_order", "list_orders", "set_order_status", "list_offers", "list_inbox", "read_email",
+         "son statut (set_prospect_status). Après une livraison, tu envoies le suivi (modèle suivi_livraison) ; quand un "
+         "client donne son avis, enregistre-le (record_feedback), et s'il est mécontent, propose une solution concrète.",
+         ["send_email", "email_templates", "list_prospects", "set_prospect_status", "record_feedback", "deliver_order", "list_orders", "set_order_status", "list_offers", "list_inbox", "read_email",
           "list_sales", "delegate_task"]),
     Role("atelier", "Atelier", "Agent Atelier — production des livrables clients",
          "Tu fabriques ce que les clients ont payé, à partir de la fiche d'offre (list_offers), de la commande "

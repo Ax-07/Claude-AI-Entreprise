@@ -129,7 +129,8 @@ def missions(db) -> list[dict]:
         out.append({"kind": "commande", "id": r["n"], "title": f"Commande n°{r['n']} · {r['product'] or 'commande'}", "text": r["product"] or "",
                     "activity": "services", "state": st, "status": r["stage"], "declared_done": done, "archived": archived, "waiting": w, **s, "issues": issues,
                     "owner_check": r["owner_check"], "owner_note": r["owner_notes"], "checked_at": r["checked_at"], "created_at": r["created_at"],
-                    "test": not r["livemode"], "pm": bool(r["project_manager"]), "pm_summary": None})
+                    "test": not r["livemode"], "pm": bool(r["project_manager"]), "pm_summary": None,
+                    "feedback": r["feedback"], "satisfied": r["satisfied"], "aftercare_at": r["aftercare_at"]})
     for m in out:
         m["to_check"] = _to_check(m)
         m["cost_usd"] = round(costs.get((m["kind"], m["id"]), 0), 4)
