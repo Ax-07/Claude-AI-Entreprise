@@ -378,6 +378,23 @@ def cmd_notifier_test(cfg, db, a):
         _out("La notification n'a pas pu être affichée.\n" + (last[0] if last else ""))
 
 
+def cmd_repartir_propre(cfg, db, a):
+    if not a.confirmer:
+        _out("Remise à zéro : supprime missions, tâches, journal, validations, discussions et commandes d'essai ; déplace "
+             "les fichiers de travail dans data/archives/. Conserve configuration, offres, ventes réelles, coûts, emails, "
+             "bibliothèque de recherches et ta mémoire. Une sauvegarde complète est faite avant.\n"
+             "Arrête d'abord le moteur, puis relance avec --confirmer (ajoute --memoire-agents pour effacer aussi les "
+             "souvenirs des agents).")
+        return
+    from .reset import fresh_start
+    r = fresh_start(cfg, db, a.memoire_agents)
+    _out(f"Remise à zéro faite. Sauvegarde : {r['backup']}\n"
+         f"Supprimé : {r['tasks']} tâche(s), {r['objectives']} mission(s), {r['approvals']} validation(s), "
+         f"{r['test_orders']} commande(s) d'essai" + (f", {r['agent_memories']} souvenir(s) d'agents" if a.memoire_agents else "") +
+         (f".\nFichiers de travail déplacés dans : {r['workspace_archive']}" if r.get("workspace_archive") else ".") +
+         "\nRelance le moteur (demarrer.bat).")
+
+
 def cmd_sauvegarder(cfg, db, a):
     from .backup import make_backup
     _out(f"Sauvegarde créée : {make_backup(cfg, db, datetime.now().strftime('%Y-%m-%d_%H%M%S'))}")
@@ -442,6 +459,7 @@ def main(argv=None):
     s = sub.add_parser("relancer"); s.add_argument("id", type=int, nargs="?")
     s = sub.add_parser("archiver"); s.add_argument("id", type=int)
     sub.add_parser("offres")
+    s = sub.add_parser("repartir-propre"); s.add_argument("--confirmer", action="store_true"); s.add_argument("--memoire-agents", action="store_true")
     s = sub.add_parser("client"); s.add_argument("n", type=int); s.add_argument("email")
     s = sub.add_parser("importer-offres"); s.add_argument("fichier", nargs="?")
     s = sub.add_parser("commande-test"); s.add_argument("offre"); s.add_argument("-e", "--email", required=True); s.add_argument("-i", "--infos")
@@ -462,7 +480,7 @@ def main(argv=None):
                 "validations": cmd_validations, "taches": cmd_taches, "voir": cmd_voir, "journal": cmd_journal,
                 "couts": cmd_couts, "agents": cmd_agents, "relancer": cmd_relancer, "objectifs": cmd_objectifs, "activites": cmd_activites,
                 "archiver": cmd_archiver, "serveur": cmd_serveur, "notifier-test": cmd_notifier_test,
-                "offres": cmd_offres, "client": cmd_client, "importer-offres": cmd_importer_offres, "commande-test": cmd_commande_test, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne,
+                "offres": cmd_offres, "client": cmd_client, "repartir-propre": cmd_repartir_propre, "importer-offres": cmd_importer_offres, "commande-test": cmd_commande_test, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne,
                 "memoire": cmd_memoire, "oublier": cmd_oublier, "retenir": cmd_retenir,
                 "sauvegarder": cmd_sauvegarder, "sauvegardes": cmd_sauvegardes, "restaurer": cmd_restaurer,
                 "demarrage-auto": cmd_demarrage_auto,
