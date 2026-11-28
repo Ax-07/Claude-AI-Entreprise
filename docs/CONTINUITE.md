@@ -251,14 +251,20 @@ _Mis à jour le 27/11/2026_
   - Tableau de bord : encadré rouge en haut des validations avec « Il est bien parti » et « Il n'est pas parti (le remettre à valider) », route `POST /api/approvals/<id>/resolve {done}`. « Pas parti » remet la demande à valider avec une nouvelle clé.
   - `tests/test_operations.py` : 12 tests, dont 11 échouent sur l'ancien code. `test_orders` : le faux `stripe_request` accepte la clé d'idempotence. 256 tests.
   - Non vérifié : la recherche IMAP dans « Messages envoyés » contre le vrai Gmail (nom du dossier localisé, repéré par l'attribut \Sent).
+- QA-01, CI GitHub Actions (28/11) : `.github/workflows/tests.yml`, avec compilation et toute la suite, à chaque push sur main et à chaque PR, sous Windows et Linux, Python 3.10, 3.11 et 3.13 (6 combinaisons, sans secret).
+  - Le premier passage a tout fait échouer et a révélé : (1) sous Windows, `write_text` écrit `\r\n`, et `test_outgoing` comparait avec `\n` (défaut du test) ; (2) `net.ip_allowed` vérifiait une IPv4 encapsulée avec la règle remplaçable par les tests. La vérification passe désormais par `_allowed`, et 6to4 (2002::/16) et Teredo (2001::/32) sont refusés d'office ; (3) Chrome ne démarre pas sur Ubuntu 24.04 (bac à sable bloqué par AppArmor). On règle la machine de test (`sysctl kernel.apparmor_restrict_unprivileged_userns=0`) au lieu de désactiver le bac à sable.
+  - **Vérifié sur un vrai Windows : conversion PDF par Edge** (`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`, test `test_real_pdf_conversion_when_browser_available` réussi).
+  - 6/6 combinaisons au vert, 256 tests chacune.
+- **Fin de la phase 1 de l'audit externe (28/11)** : les 6 anomalies P0 et la CI (QA-01) sont traitées (PR #74 à #79, empilées). Prochaine étape : la phase 2 (FIN-01 budget réservé, SEC-04 jeton du tableau de bord, SEC-07 PDF isolé, OPS-02 curseur IMAP, OPS-01 restauration complète avec `pieces_validees`, SEC-03 cloisonnement, IA-02 états `partial` et `verified`, relecture juridique bloquante). Recommandé au propriétaire : protéger `main` en exigeant le contrôle « Tests ».
 
 ## Non vérifié
+- Contre les vrais services (seulement avec des simulations) : la synchronisation Stripe et les clés d'idempotence, la recherche dans « Messages envoyés » (IMAP \Sent), le client réseau sur de vrais sites.
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.
 
 ## Prochaines étapes
-0. Phase 1 de l'audit externe (voir ci-dessus) avant toute nouvelle fonctionnalité.
-1. Propriétaire (après `git pull`, `importer-offres`, redémarrage) : prospection ax-07.fr en mode test ; commande d'essai Diagnostic SEO local pour vérifier le PDF généré par Edge sous Windows.
+0. Fusionner la PR #79 (contient #74 à #78), puis la phase 2 de l'audit externe avant toute nouvelle fonctionnalité.
+1. Propriétaire (après `git pull`, `importer-offres`, redémarrage) : analyse SEO de ax-07.fr (vrai site) ; prospection ax-07.fr en mode test ; commande d'essai Diagnostic SEO local ; paiement de test via le lien Stripe (nouvelle synchronisation). Refuser et faire refaire les livraisons en attente créées avant la PR #75.
 2. Premier audit RH réel : le lundi suivant une semaine d'activité (≥ 5 tâches).
 3. Avant de vendre réellement : `mode-test off`, `company.legal` réel, `offers.social_rate` à ajuster (0,212 si BIC), factures automatiques conformes, domaine, email pro, CGV ; Gmail, dépôt public du site + jeton GitHub, clé Stripe déjà prévus.
 4. Ensuite : ordre de lancement vidéo / e-commerce ; export des sprites PNG.
