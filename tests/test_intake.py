@@ -67,5 +67,28 @@ class IntakeTest(Base):
         self.assertIsNotNone(commerce.get_order(self.db, n)["due_at"])
 
 
+    def test_reply_asks_only_what_is_missing(self):
+        from ai_studio.email_templates import render
+        f = {"objet": "Votre proposition", "offre": "Diagnostic SEO local", "reponse": "Oui, le rapport couvre aussi la zone que vous desservez."}
+        _, body, _ = render(self.cfg, self.db, "reponse_interesse", f)
+        self.assertIn("Nous avons bien toutes les informations", body)               # déjà tout donné : rien à redemander
+        self.assertNotIn("Nom et adresse", body)
+        _, body, _ = render(self.cfg, self.db, "reponse_interesse", {**f, "infos_manquantes": "toutes"})
+        self.assertIn("Nom et adresse de l'établissement", body)
+        _, body, _ = render(self.cfg, self.db, "reponse_interesse", {**f, "infos_manquantes": "la ville desservie"})
+        self.assertIn("il nous manque seulement : la ville desservie.", body); self.assertNotIn("Nom et adresse", body)
+        n = commerce.test_order(self.cfg, self.db, "Diagnostic SEO local", "marie@cafe-lumiere.fr")
+        _, body, _ = render(self.cfg, self.db, "demande_informations", {"commande": str(n), "infos_manquantes": "vos 3 services principaux",
+                                                                        "remarque": "Nous avons bien votre adresse et votre site."})
+        self.assertIn("Nous avons bien votre adresse et votre site.\n\nPour la réaliser, il nous manque seulement : vos 3 services principaux.", body)
+
+    def test_order_from_prospect_who_already_wrote(self):
+        self.db.run("INSERT INTO inbox(uid, message_id, from_addr, subject, body, status, received_at, recorded_at) "
+                    "VALUES (1,'<a@x>','marie@cafe-lumiere.fr','Re: Une piste','Café Lumière, Lyon, cafe-lumiere.fr','replied','2026-11-28T10:00:00+00:00','x')")
+        n = commerce.test_order(self.cfg, self.db, "Diagnostic SEO local", "marie@cafe-lumiere.fr")
+        t = self.db.one("SELECT description FROM tasks WHERE order_ref=? AND agent='support'", (n,))[0]
+        self.assertIn("DÉJÀ écrit", t); self.assertIn("#1 du 2026-11-28", t); self.assertIn("ne lui redemande rien", t)
+
+
 if __name__ == "__main__":
     unittest.main()

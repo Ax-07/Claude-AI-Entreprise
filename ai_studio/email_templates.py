@@ -12,7 +12,7 @@ from pathlib import Path
 
 PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
 TODO_RE = re.compile(r"(?i)\[[^\]]{1,40}\]|\bX{3,}\b|à compléter|à remplir|lorem ipsum|\{|\}")
-AUTO = {"offre", "prix", "delai", "infos_requises", "lien_paiement", "lien_avis", "suite"}
+AUTO = {"offre", "prix", "delai", "infos_requises", "lien_paiement", "lien_avis", "suite", "besoin"}
 
 
 def _path(cfg) -> Path | None:
@@ -121,6 +121,19 @@ def render(cfg, db, tid: str, fields: dict | None) -> tuple[str, str, dict]:
             values.update(offer_values(db, name) if name else {})
         except ValueError as e:
             errors.append(str(e))
+    if "infos_manquantes" in spec and not errors:        # ne redemander que ce qui manque vraiment
+        miss = values.get("infos_manquantes", "").strip()
+        asking = t["id"] != "reponse_interesse"          # une demande d'informations demande tout si rien n'est précisé
+        if asking and (not miss or miss.lower().rstrip(".") in ("toutes", "tout", "toutes les informations")):
+            values["besoin"] = f"Pour la réaliser, nous avons besoin des éléments suivants : {values.get('infos_requises', '')}"
+        elif asking:
+            values["besoin"] = f"Pour la réaliser, il nous manque seulement : {miss.rstrip('.')}."
+        elif not miss:
+            values["besoin"] = "Nous avons bien toutes les informations nécessaires : la réalisation démarre dès votre paiement."
+        elif miss.lower().rstrip(".") in ("toutes", "tout", "toutes les informations"):
+            values["besoin"] = f"Pour réaliser le {values.get('offre', 'travail')}, j'aurais besoin des éléments suivants : {values.get('infos_requises', '')}"
+        else:
+            values["besoin"] = f"Pour compléter, il nous manque seulement : {miss.rstrip('.')}."
     if errors:
         raise ValueError("Email non conforme au modèle « " + t["id"] + " » : " + " ; ".join(errors))
     fill = lambda s: PLACEHOLDER_RE.sub(lambda m: values.get(m.group(1), m.group(0)), s)
