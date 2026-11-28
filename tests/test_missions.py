@@ -110,6 +110,46 @@ class MissionsTest(Base):
         self.assertTrue(any(e["mission"] and e["mission"]["label"].startswith(f"Commande n°{n}") for e in ev))
 
 
+class DeleteMissionTest(Base):
+    def test_delete_objective_mission(self):
+        keep = self.db.add_objective("Autre mission")
+        kt = self.db.add_task("Garder", "ventes", objective_id=keep)
+        oid = self.db.add_objective("Prospection ax-07")
+        kick = missions.assign_pm(self.db, "objectif", oid)
+        step = self.db.add_task("Email", "ventes", parent_id=kick)
+        self.db.add_approval("ventes", step, "send_email", {"to": "a@b.fr", "subject": "s", "body": "b"}, "r")
+        self.db.log("ventes", "info", "trace", step)
+        self.db.run("INSERT INTO costs(ts, day, month, agent, task_id, model, usd) VALUES (?,?,?,?,?,?,?)", (iso(), "2026-11-28", "2026-11", "ventes", step, "m", 0.01))
+        self.db.set_task(step, status="running")
+        with self.assertRaises(ValueError):                                  # un agent y travaille : refus
+            missions.verify(self.cfg, self.db, "objectif", oid, "delete")
+        self.db.set_task(step, status="done")
+        msg = missions.verify(self.cfg, self.db, "objectif", oid, "delete")
+        self.assertIn("supprimée : 2 tâche(s), 1 validation(s)", msg)
+        self.assertIsNone(self.db.one("SELECT 1 FROM objectives WHERE id=?", (oid,)))
+        self.assertIsNone(self.db.one("SELECT 1 FROM tasks WHERE objective_id=?", (oid,)))
+        self.assertFalse(self.db.pending_approvals())
+        self.assertIsNone(self.db.one("SELECT 1 FROM events WHERE task_id=?", (step,)))
+        self.assertTrue(self.db.one("SELECT 1 FROM costs WHERE task_id=?", (step,)))      # budget exact
+        self.assertTrue(self.db.task(kt))                                                   # l'autre mission reste
+        self.assertTrue(any((self.cfg.data_dir / "sauvegardes").glob("*avant-suppression-objectif*"))
+                        or any(self.cfg.data_dir.rglob("*avant-suppression-objectif*")))
+        with self.assertRaises(KeyError):
+            missions.verify(self.cfg, self.db, "objectif", oid, "delete")
+
+    def test_real_order_cannot_be_deleted(self):
+        from pathlib import Path
+        from ai_studio import commerce
+        commerce.import_offers(self.db, Path(__file__).resolve().parents[1] / "catalogue" / "offres.json")
+        n = commerce.test_order(self.cfg, self.db, "Site vitrine", "proprio@studio.fr")
+        self.assertIn("supprimée", missions.verify(self.cfg, self.db, "commande", n, "delete"))
+        self.assertIsNone(commerce.get_order(self.db, n))
+        n2 = commerce.test_order(self.cfg, self.db, "Site vitrine", "proprio@studio.fr")
+        self.db.run("UPDATE sales SET livemode=1 WHERE rowid=?", (n2,))
+        with self.assertRaises(ValueError):
+            missions.verify(self.cfg, self.db, "commande", n2, "delete")
+
+
 class ProjectManagerTest(Base):
     def test_only_project_manager_distributes_work(self):
         from ai_studio.tools import run_tool
