@@ -17,7 +17,7 @@
     "max": 60
    },
    "accroche": {
-    "desc": "UNE observation vérifiable et factuelle sur le site (ce qui est visible publiquement), qui termine la phrase « j'ai remarqué… » et finit par un point. Pas de diagnostic inventé, pas de chiffre non vérifié.",
+    "desc": "UNE observation vérifiable et factuelle sur le site, de préférence un constat de seo_check (title trop long, pas de meta description, numéro non cliquable…), qui termine la phrase « j'ai remarqué… » et finit par un point. Pas de diagnostic inventé, pas de chiffre non vérifié.",
     "min": 30,
     "max": 350
    }

@@ -67,7 +67,7 @@ def _clean_for_api(messages: list) -> list:
     return out
 
 
-def _briefing(db, task) -> str:
+def _briefing(db, task, cfg=None) -> str:
     parts = [f"Tâche #{task['id']} : {task['title']}", "", task["description"] or "(pas de description)"]
     if task["parent_id"]:
         p = db.task(task["parent_id"])
@@ -82,6 +82,11 @@ def _briefing(db, task) -> str:
         o = db.one("SELECT text FROM objectives WHERE id=?", (task["objective_id"],))
         if o:
             parts += [f"Objectif de l'entreprise concerné : {o['text']}"]
+    if cfg is not None:
+        from .offers import method_for_task
+        meth = method_for_task(cfg, db, task)
+        if meth:
+            parts += ["", "MÉTHODE DE PRODUCTION DE L'OFFRE (à suivre, elle s'impose) :", meth]
     mem = db.recall(task["title"], task["agent"], limit=5)
     if mem:
         parts += ["", "Éléments de mémoire possiblement utiles :"] + [f"- [{m['topic']}] {m['content'][:300]}" for m in mem]
@@ -108,7 +113,7 @@ def run_task(cfg, db, llm, guard, task) -> str:
 
     ctx = ToolContext(cfg, db, role.name, task, list(ROLES.keys()))
     system = [{"type": "text", "text": system_prompt(role, cfg), "cache_control": {"type": "ephemeral"}}]
-    messages: list[dict] = [{"role": "user", "content": _briefing(db, task)}]
+    messages: list[dict] = [{"role": "user", "content": _briefing(db, task, cfg)}]
     last_text = ""
     max_steps = int(role.max_steps or rt["max_steps_per_task"])
 
