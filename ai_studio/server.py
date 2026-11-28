@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
 import mimetypes
 import threading
@@ -168,9 +169,19 @@ def task_detail(cfg, db, task_id: int) -> dict:
 
 
 def events(cfg, db, since_id: int = 0, limit: int = 40) -> list[dict]:
-    rows = db.q("SELECT id, ts, agent, kind, message, task_id FROM events WHERE id>? ORDER BY id DESC LIMIT ?",
-                (int(since_id), max(1, min(int(limit), 200))))
-    return [_row(r) for r in rows]
+    from .missions import labels_for_tasks
+    rows = [_row(r) for r in db.q("SELECT id, ts, agent, kind, message, task_id FROM events WHERE id>? ORDER BY id DESC LIMIT ?",
+                                  (int(since_id), max(1, min(int(limit), 200))))]
+    labels = labels_for_tasks(db, [r["task_id"] for r in rows])
+    for r in rows:
+        r["mission"] = labels.get(r["task_id"])           # « Mission #3 · … » ou « Commande n°2 · … »
+        if not r["mission"]:
+            m = re.search(r"[Cc]ommande n°(\d+)", r["message"])
+            if m:
+                o = db.one("SELECT product FROM sales WHERE rowid=?", (int(m.group(1)),))
+                if o:
+                    r["mission"] = {"kind": "commande", "id": int(m.group(1)), "label": f"Commande n°{m.group(1)} · {o['product'] or 'commande'}"}
+    return rows
 
 
 def approvals(cfg, db) -> list[dict]:
@@ -469,6 +480,15 @@ def make_handler(cfg):
                         return self._send(200, _chat_history(db, int(q("thread", "0") or 0)))
                     if parts == ["chat", "threads"]:
                         return self._send(200, _chat_threads(db))
+                    if parts == ["missions"]:
+                        from .missions import missions
+                        return self._send(200, missions(db))
+                    if len(parts) == 3 and parts[0] == "missions" and parts[1] in ("objectif", "commande") and parts[2].isdigit():
+                        from .missions import detail
+                        try:
+                            return self._send(200, detail(db, parts[1], int(parts[2])))
+                        except KeyError as e:
+                            raise ApiError(404, str(e))
                     if parts == ["library"]:
                         return self._send(200, library(db, q("q"), int(q("id", "0") or 0)))
                     if parts == ["insights"]:
@@ -489,6 +509,14 @@ def make_handler(cfg):
                         return self._send(200, set_map(cfg, db, body))
                     if parts == ["chat"]:
                         return self._send(200, _chat_send(cfg, db, body))
+                    if len(parts) == 3 and parts[0] == "missions" and parts[1] in ("objectif", "commande") and parts[2].isdigit():
+                        from .missions import verify
+                        try:
+                            return self._send(200, {"ok": True, "message": verify(cfg, db, parts[1], int(parts[2]), body.get("verdict"), str(body.get("note") or "")[:1000])})
+                        except KeyError as e:
+                            raise ApiError(404, str(e))
+                        except ValueError as e:
+                            raise ApiError(400, str(e))
                     if parts == ["chat", "threads"]:
                         from .chat import new_thread
                         return self._send(200, {"id": new_thread(db)})

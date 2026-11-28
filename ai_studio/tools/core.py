@@ -11,6 +11,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 from . import tool, ToolContext
+from ..db import iso
 
 
 # ---------------------------------------------------------------- tâche
@@ -318,7 +319,9 @@ def list_objectives(ctx: ToolContext) -> str:
 def set_objective_status(ctx: ToolContext, objective_id: int, status: str, note: str) -> str:
     if status not in ("done", "paused", "active"):
         return "Statut invalide."
-    ctx.db.run("UPDATE objectives SET status=? WHERE id=?", (status, int(objective_id)))
+    ctx.db.run("UPDATE objectives SET status=?, done_at=CASE WHEN ?='done' THEN ? ELSE done_at END, "
+               "owner_check=CASE WHEN ?='done' THEN NULL ELSE owner_check END WHERE id=?",
+               (status, status, iso(), status, int(objective_id)))
     ctx.db.log(ctx.agent, "objective", f"Objectif #{objective_id} → {status} : {note}")
     return "Objectif mis à jour."
 

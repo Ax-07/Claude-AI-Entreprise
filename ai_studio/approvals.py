@@ -146,7 +146,7 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "", edits: dict
     else:
         db.set_approval(approval_id, status="approved", decided_at=iso(), result=note or "Validé")
         outcome = f"Réponse du propriétaire : {note or 'OK, validé.'}"
-    db.log("proprietaire", "decision", f"Demande #{approval_id} ({a['action']}) : {outcome}")
+    db.log("proprietaire", "decision", f"Demande #{approval_id} ({a['action']}) : {outcome}", a["task_id"])
     # On informe l'agent demandeur via une nouvelle tâche pour qu'il poursuive le travail.
     summary = payload.get("question") or payload.get("subject") or payload.get("product_name") or payload.get("title") or a["action"]
     if a["action"] == "send_email" and payload.get("order") and approve and "exécuté" in outcome:
