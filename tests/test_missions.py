@@ -36,6 +36,23 @@ class MissionsTest(Base):
         self.assertIn("terminée", missions.verify(self.cfg, self.db, "objectif", oid, "ok"))
         self.assertEqual(self.db.one("SELECT owner_check, status FROM objectives WHERE id=?", (oid,))[:], ("ok", "done"))
 
+    def test_unclosed_waiting_and_archive(self):
+        oid = self.db.add_objective("Documents légaux")
+        tid = self.db.add_task("Rédiger les CGV", "juridique", objective_id=oid)
+        self.db.set_task(tid, status="done", result="CGV rédigées")
+        m = missions.missions(self.db)[0]
+        self.assertTrue(m["to_check"])                                      # tout est fini mais personne n'a clôturé
+        self.assertIn("plus personne n'y travaille", m["issues"][0])
+        aid = self.db.add_approval("juridique", tid, "decision", {"question": "Je publie ?"}, "r")
+        m = missions.missions(self.db)[0]
+        self.assertEqual((m["waiting"], m["to_check"], m["issues"]), ([aid], False, []))   # elle attend le propriétaire
+        dup = self.db.add_objective("Doublon")
+        pending = self.db.add_task("t", "recherche", objective_id=dup)
+        self.assertIn("archivée", missions.verify(self.cfg, self.db, "objectif", dup, "archive", "doublon"))
+        self.assertEqual(self.db.task(pending)["status"], "blocked")
+        m = next(x for x in missions.missions(self.db) if x["id"] == dup and x["kind"] == "objectif")
+        self.assertEqual((m["archived"], m["issues"], m["to_check"]), (True, [], False))
+
     def test_stuck_and_idle_signals(self):
         oid = self.db.add_objective("Mission test")
         tid = self.db.add_task("t", "recherche", objective_id=oid)

@@ -504,20 +504,22 @@ function progressBar(m){ const c = m.counts, t = Math.max(1, m.total), seg = (n,
 async function openMissions(filter){
   let list; try { list = await api("GET","/api/missions"); } catch(e){ return toast(e.message,false); }
   filter = filter || "todo";
-  const F = {todo:["À vérifier", m => m.declared_done && m.owner_check !== "ok"], open:["En cours", m => !m.declared_done && m.status !== "paused"],
-             issues:["Anomalies", m => m.issues.length], all:["Toutes", () => true]};
+  const F = {todo:["À vérifier", m => m.to_check], open:["En cours", m => !m.archived && !m.declared_done && m.status !== "paused"],
+             issues:["Anomalies", m => m.issues.length], all:["Toutes", m => !m.archived], archived:["Archivées", m => m.archived]};
   const shown = list.filter(F[filter][1]);
   const tabs = h("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap",marginBottom:"12px",alignItems:"center"}},
     Object.entries(F).map(([k,[lbl,fn]]) => h("button",{class:"btn"+(k===filter?" on":""),onclick:()=>openMissions(k)}, `${lbl} (${list.filter(fn).length})`)),
     h("span",{style:{flex:"1"}}), h("button",{class:"link",onclick:()=>openTasks()},"Toutes les tâches →"));
   modal("Missions — avancement et vérification", h("div",{}, tabs,
-    h("div",{class:"small muted",style:{marginBottom:"10px"}},"« À vérifier » : les agents considèrent ces missions terminées. Ouvre-les pour confirmer, ou renvoie-les au PDG s’il manque quelque chose."),
+    h("div",{class:"small muted",style:{marginBottom:"10px"}},"« À vérifier » : missions déclarées terminées par les agents, ou dont toutes les tâches sont finies sans rien en attente. Ouvre-les pour confirmer, les renvoyer au PDG, ou les archiver (doublon, essai, abandon)."),
     h("div",{style:{overflowX:"auto"}}, h("table",{}, h("thead",{}, h("tr",{}, ["Mission","État (agents)","Avancement","Anomalies","Ta vérification","Activité"].map(x=>h("th",{},x)))),
       h("tbody",{}, shown.length ? shown.map(m => h("tr",{class:"click",onclick:()=>openMission(m.kind, m.id)},
         h("td",{style:{maxWidth:"340px"}}, h("b",{}, m.kind==="objectif" ? `#${m.id} ` : ""), m.title, m.test ? h("span",{class:"pill",style:{marginLeft:"6px"}},"essai") : null),
         h("td",{style:{whiteSpace:"nowrap",color:m.declared_done?"#6EE7B7":"#C7CEF0"}}, m.state),
         h("td",{}, progressBar(m)),
-        h("td",{style:{color:"#FCA5A5",fontSize:"12px"}}, m.issues.length ? m.issues.join(" · ") : h("span",{class:"muted"},"—")),
+        h("td",{style:{fontSize:"12px"}}, m.issues.length ? h("span",{style:{color:"#FCA5A5"}}, m.issues.join(" · ")) : null,
+          m.waiting.length ? h("span",{style:{display:"block",color:"#FCD34D"}}, `En attente de ta validation (#${m.waiting.join(", #")})`) : null,
+          !m.issues.length && !m.waiting.length ? h("span",{class:"muted"},"—") : null),
         h("td",{style:{whiteSpace:"nowrap",color:(MCHECK[m.owner_check]||[])[1]||"#8590B8"}}, (MCHECK[m.owner_check]||["—"])[0]),
         h("td",{class:"muted",style:{whiteSpace:"nowrap"}}, m.last_activity ? ago(m.last_activity) : "—")))
         : h("tr",{}, h("td",{class:"empty",colspan:"6"}, filter==="todo" ? "Rien à vérifier pour l’instant." : "Aucune mission.")))))));
@@ -538,10 +540,13 @@ async function openMission(kind, id){
       m.owner_check ? h("span",{style:{color:MCHECK[m.owner_check][1],fontSize:"13px"}}, MCHECK[m.owner_check][0] + (m.checked_at ? " · " + ago(m.checked_at) : "")) : null),
     m.kind==="objectif" ? h("div",{class:"pre"}, m.text) : null,
     m.issues.length ? h("div",{style:{fontSize:"13px",padding:"8px 10px",borderRadius:"10px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.4)",color:"#FCA5A5"}}, "Anomalies détectées : " + m.issues.join(" · ")) : null,
+    m.waiting.length ? h("div",{style:{fontSize:"13px",padding:"8px 10px",borderRadius:"10px",background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.4)",color:"#FCD34D"}}, `Elle attend ta décision : validation(s) #${m.waiting.join(", #")} (colonne Validations).`) : null,
     h("span",{class:"lab"},"Tâches (clique pour le détail et le résultat complet)"),
     h("div",{style:{maxHeight:"40vh",overflow:"auto"}}, roots.length ? roots.map(t => row(t,0)).flat() : h("div",{class:"empty"},"Aucune tâche pour cette mission.")),
     h("span",{class:"lab"},"Ta vérification"), note,
-    h("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}}, h("button",{class:"btn ok",onclick:()=>send("ok")},"Confirmer : terminée"), h("button",{class:"btn no",onclick:()=>send("issue")},"Pas terminée : renvoyer au PDG"))));
+    m.archived ? h("span",{class:"small muted"},"Mission archivée : elle n’est plus suivie.") :
+    h("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}}, h("button",{class:"btn ok",onclick:()=>send("ok")},"Confirmer : terminée"), h("button",{class:"btn no",onclick:()=>send("issue")},"Pas terminée : renvoyer au PDG"),
+      h("button",{class:"btn",title:"Doublon, essai ou mission abandonnée : ses tâches en attente sont annulées",onclick:()=>send("archive")},"Archiver"))));
 }
 async function openTask(id){
   const t = await api("GET",`/api/tasks/${id}`);

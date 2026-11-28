@@ -161,6 +161,8 @@ _Mis à jour le 27/11/2026_
 - Les sous-tâches héritent désormais de la mission de leur parent (`add_task`). Les décisions sur validations sont journalisées avec leur tâche.
 - Tableau de bord : menu Missions → onglets À vérifier / En cours / Anomalies / Toutes, détail en arbre des tâches ; « Toutes les tâches » garde l'ancienne liste. Fil d'activité : titre « Mission #N · … » ou « Commande n°N · … » (cliquable). API /api/missions, /api/missions/{objectif|commande}/ID (GET, POST verdict). 133 tests.
 
+- Retour du propriétaire sur le premier tableau réel (28/11) : mission #6 avec 12/12 tâches réussies mais restée « En cours » ; commandes n°2 et n°3 « À livrer » avec 13/13 tâches réussies ; missions #2 à #4 en double de #1 avec d'anciens échecs. Améliorations : « À vérifier » inclut aussi les missions dont toutes les tâches sont finies sans rien en attente ; anomalie « plus personne n'y travaille » ; validations en attente rattachées à leur mission (« elle attend ta décision #N ») ; une mission en pause n'affiche plus ses tâches suspendues comme anomalie ; verdict « Archiver » (objectif `archived`, commande `historique` + owner_check `archived`, tâches en attente annulées) et onglet « Archivées ». 134 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.
