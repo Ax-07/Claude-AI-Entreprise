@@ -112,6 +112,7 @@ def run_task(cfg, db, llm, guard, task) -> str:
     db.log(role.name, "start", f"Début : {task['title']}", task["id"])
 
     ctx = ToolContext(cfg, db, role.name, task, list(ROLES.keys()))
+    ctx.allowed = frozenset(n for n in role.granted_tools() if n in REGISTRY and REGISTRY[n].available())
     from .audit import rules_text
     system = [{"type": "text", "text": system_prompt(role, cfg) + rules_text(db, role.name), "cache_control": {"type": "ephemeral"}}]
     messages: list[dict] = [{"role": "user", "content": _briefing(db, task, cfg)}]

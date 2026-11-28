@@ -28,15 +28,15 @@ class ProspectsTest(Base):
 
     def test_send_requires_registered_prospect_with_source(self):
         self.assertIn("non enregistré", self.send())
-        self.assertIn("Source invalide", run_tool("save_prospect", self.ctx(), {"email": "contact@ax-07.fr", "source": "le site"}))
-        out = run_tool("save_prospect", self.ctx(), {"email": "Contact@AX-07.fr", "source": "https://www.ax-07.fr/mentions-legales",
+        self.assertIn("Source invalide", run_tool("save_prospect", self.ctx("ventes"), {"email": "contact@ax-07.fr", "source": "le site"}))
+        out = run_tool("save_prospect", self.ctx("ventes"), {"email": "Contact@AX-07.fr", "source": "https://www.ax-07.fr/mentions-legales",
                                                      "company": "ax-07", "site": "ax-07.fr"})
         self.assertIn("enregistré", out)
         self.assertIn("en attente de validation", self.send())
         p = prospects.get(self.db, "contact@ax-07.fr")
         self.assertEqual(p["status"], "a_valider")
         self.assertIn("attend déjà", self.send())                                  # pas de doublon
-        self.assertIn("déjà connu", run_tool("save_prospect", self.ctx(), {"email": "contact@ax-07.fr", "source": "https://x.fr"}))
+        self.assertIn("déjà connu", run_tool("save_prospect", self.ctx("ventes"), {"email": "contact@ax-07.fr", "source": "https://x.fr"}))
 
     def test_rejected_email_restores_status(self):
         prospects.save(self.db, "a@b.fr", "https://b.fr")

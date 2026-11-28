@@ -128,10 +128,18 @@ def deliverable_preview(cfg, db, approval_id: int, sub: str = "") -> tuple[bytes
     att = json.loads(a["payload"]).get("attachment") if a and a["action"] == "send_email" else None
     if not att:
         raise ApiError(404, "Aucun livrable à prévisualiser")
-    base = cfg.workspace.resolve()
-    p = (base / att).resolve()
-    if base not in p.parents or not p.is_file():
-        raise ApiError(404, "Livrable introuvable")
+    payload = json.loads(a["payload"])
+    if payload.get("attachment_sha256"):
+        from .outgoing import OutgoingError, frozen_path
+        try:
+            p = frozen_path(cfg, payload)                 # exactement le fichier qui partira si tu valides
+        except OutgoingError as e:
+            raise ApiError(409, str(e))
+    else:
+        base = cfg.workspace.resolve()
+        p = (base / att).resolve()
+        if base not in p.parents or not p.is_file():
+            raise ApiError(404, "Livrable introuvable")
     if p.suffix.lower() == ".zip":
         sub = str(PurePosixPath("/" + (sub or "index.html"))).lstrip("/") or "index.html"
         if sub.endswith("/"):
