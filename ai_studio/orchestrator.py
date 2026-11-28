@@ -62,10 +62,16 @@ class Studio:
             busy = self.db.one("SELECT COUNT(*) FROM tasks WHERE agent=? AND objective_id=? AND status IN ('pending','running')", (who, o["id"]))[0]
             if busy:
                 continue
+            if o["project_manager"]:      # mission pilotée et à l'arrêt : relance immédiate, sans attendre le point périodique
+                from .missions import relaunch_mission
+                if relaunch_mission(self.db, "objectif", o["id"]):
+                    self.db.run("UPDATE objectives SET last_review_at=? WHERE id=?", (iso(), o["id"]))
+                    created += 1
+                    continue
             last = datetime.fromisoformat(o["last_review_at"]) if o["last_review_at"] else None
             if last and now() - last < every:
                 continue
-            if o["project_manager"]:      # mission pilotée : point périodique du chef de projet (si rien ne l'a réveillé)
+            if o["project_manager"]:
                 self.db.add_task(f"Point de mission #{o['id']}", who, "Point périodique : lance mission_status, fais avancer ce "
                                  "qui est bloqué ou à l'arrêt, ou clôture si la mission est réellement terminée.",
                                  priority=2, objective_id=o["id"], created_by="systeme")

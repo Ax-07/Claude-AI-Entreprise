@@ -318,13 +318,19 @@ def close(db, kind: str, mid: int, summary: str, by: str = PM) -> str:
 
 
 def relaunch_if_stalled(db, task) -> int | None:
-    """Après une tâche du chef de projet : si la mission n'est ni close ni livrée et que plus rien n'est en cours ni en
-    attente de validation, il est relancé. Après 2 relances sans qu'aucun autre agent n'ait travaillé, le PDG arbitre."""
+    """Après une tâche du chef de projet : relance si la mission s'est arrêtée (voir relaunch_mission)."""
     if task is None or task["agent"] != PM:
         return None
     m = mission_of(task)
     if not m or not has_pm(db, *m):
         return None
+    return relaunch_mission(db, *m)
+
+
+def relaunch_mission(db, kind: str, mid: int, request: str = "") -> int | None:
+    """Mission pilotée ni close ni livrée, sans rien en cours ni en attente de validation : le chef de projet est relancé.
+    Après 2 relances sans qu'aucun autre agent n'ait travaillé, le PDG arbitre. `request` : consigne du PDG ou du propriétaire."""
+    m = (kind, int(mid))
     d = detail(db, *m)
     if d["archived"] or (d["kind"] == "objectif" and d["status"] in ("done", "paused")) or (d["kind"] == "commande" and d["status"] == "livree"):
         return None
@@ -332,9 +338,16 @@ def relaunch_if_stalled(db, task) -> int | None:
         return None
     col = "objective_id" if m[0] == "objectif" else "order_ref"
     recent = db.q(f"SELECT agent, title FROM tasks WHERE {col}=? ORDER BY id DESC LIMIT 3", (m[1],))
+    if recent and recent[0]["agent"] == "pdg" and recent[0]["title"].startswith("Arbitrage") and not request:
+        # même l'arbitrage du PDG n'a rien relancé : on s'arrête et on prévient le propriétaire, une seule fois
+        key = f"mission_stuck_{m[0]}_{m[1]}"
+        if not db.kv_get(key):
+            db.kv_set(key, iso())
+            db.log("systeme", "mission", f"{d['title']} : bloquée malgré les relances et l'arbitrage du PDG — ta décision est nécessaire")
+        return None
     stalls = sum(1 for r in recent if r["agent"] == PM and r["title"].startswith("Relance :"))
     kw = {"objective_id": m[1] if m[0] == "objectif" else None, "order_ref": m[1] if m[0] == "commande" else None}
-    if stalls >= 2:
+    if stalls >= 2 and not request:         # une consigne explicite (PDG, propriétaire) relance toujours le chef de projet
         db.log("systeme", "mission", f"{d['title']} : à l'arrêt malgré 2 relances du chef de projet → arbitrage du PDG")
         return db.add_task(f"Arbitrage : mission à l'arrêt — {d['title']}"[:120], "pdg",
                            "Le chef de projet a été relancé deux fois sans faire avancer la mission. Lance mission_status, "
@@ -342,6 +355,7 @@ def relaunch_if_stalled(db, task) -> int | None:
                            "étape précise, changer d'approche, ou demander une décision au propriétaire (request_owner_decision).",
                            priority=1, created_by="systeme", **kw)
     return db.add_task(f"Relance : la mission n'avance plus"[:120], PM,
+                       (f"CONSIGNE DE RELANCE : {request}\n\n" if request else "") +
                        "Toutes les tâches de ta mission sont terminées mais elle n'est ni close ni livrée, et rien n'attend le "
                        "propriétaire. Lance mission_status puis : soit tu lances l'étape qui manque pour atteindre le résultat "
                        "demandé, soit tu clôtures (close_mission) si c'est réellement terminé. Si une étape a échoué ou n'a "

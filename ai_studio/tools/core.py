@@ -99,7 +99,8 @@ def launch_mission(ctx: ToolContext, title: str, instructions: str, agent: str =
 
 @tool("assign_project_manager",
       "Confie une mission (objectif ou commande) à un chef de projet qui la pilotera jusqu'au bout : planification, "
-      "délégation, suivi de chaque étape, contrôle et clôture. Pour toute mission de plusieurs étapes ou agents.",
+      "délégation, suivi de chaque étape, contrôle et clôture. Pour toute mission de plusieurs étapes ou agents. "
+      "Si la mission a déjà un chef de projet et qu'elle est à l'arrêt, il est relancé avec tes consignes (brief).",
       {"kind": {"type": "string", "enum": ["objectif", "commande"]}, "id": {"type": "integer", "description": "n° de l'objectif ou de la commande"},
        "brief": {"type": "string", "description": "consignes de lancement : priorités, contraintes, livrable attendu"}}, ["kind", "id"])
 def assign_project_manager(ctx: ToolContext, kind: str, id: int, brief: str = "") -> str:
@@ -109,7 +110,12 @@ def assign_project_manager(ctx: ToolContext, kind: str, id: int, brief: str = ""
     except KeyError:
         return "Mission introuvable."
     if has_pm(ctx.db, kind, int(id)):
-        return "Cette mission a déjà un chef de projet."
+        from ..missions import relaunch_mission
+        tid = relaunch_mission(ctx.db, kind, int(id), brief)
+        if tid:
+            return f"Cette mission avait déjà un chef de projet : il est relancé (tâche #{tid}) avec ta consigne."
+        return ("Cette mission a déjà un chef de projet et du travail est en cours ou attend une validation du "
+                "propriétaire : rien à relancer pour l'instant (mission_status pour le détail).")
     tid = assign_pm(ctx.db, kind, int(id), brief, ctx.agent)
     return f"Chef de projet nommé (tâche de lancement #{tid}). Il te remontera ce qui dépasse sa mission."
 
