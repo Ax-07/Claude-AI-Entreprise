@@ -56,6 +56,8 @@ class Studio:
             created += 1
         every = timedelta(minutes=int(self.cfg["runtime"]["ceo_review_minutes"]))
         for o in self.db.active_objectives():
+            if o["simple"]:               # mission simple : son unique tâche suffit, le propriétaire vérifie le résultat
+                continue
             who = o["project_manager"] or "pdg"
             busy = self.db.one("SELECT COUNT(*) FROM tasks WHERE agent=? AND objective_id=? AND status IN ('pending','running')", (who, o["id"]))[0]
             if busy:

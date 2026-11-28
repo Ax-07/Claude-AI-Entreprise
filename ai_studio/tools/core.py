@@ -81,8 +81,11 @@ def launch_mission(ctx: ToolContext, title: str, instructions: str, agent: str =
     if project_manager:
         assign_pm(ctx.db, "objectif", oid, instructions, ctx.agent)
         return f"Mission #{oid} lancée et confiée à un chef de projet."
+    ctx.db.run("UPDATE objectives SET simple=1 WHERE id=?", (oid,))
     tid = ctx.db.add_task(title, agent, instructions + "\n\nCette tâche est à elle seule la mission : quand elle est faite, "
-                          "termine-la avec un résultat clair ; la mission passera dans « À vérifier » pour le propriétaire.",
+                          "termine-la avec un résultat clair ; la mission passera dans « À vérifier » pour le propriétaire. "
+                          "Si la mémoire ou les emails montrent que la demande a DÉJÀ été traitée, ne la refais pas en double : "
+                          "dis précisément ce qui a été fait, quand, avec quel résultat, et ce que tu recommandes.",
                           max(1, min(5, int(priority or 2))), objective_id=oid, created_by=ctx.agent)
     ctx.db.log(ctx.agent, "delegation", f"Mission #{oid} : tâche #{tid} confiée à {agent}", tid)
     return f"Mission #{oid} lancée : tâche #{tid} confiée à {agent}."

@@ -152,7 +152,7 @@ def verify(cfg, db, kind: str, mid: int, verdict: str, note: str = "") -> str:
             db.run("UPDATE objectives SET owner_check='ok', owner_note=?, checked_at=?, status='done', done_at=COALESCE(done_at, ?) WHERE id=?",
                    (note or None, iso(), iso(), mid))
         else:
-            db.run("UPDATE objectives SET owner_check='issue', owner_note=?, checked_at=?, status='active' WHERE id=?", (note, iso(), mid))
+            db.run("UPDATE objectives SET owner_check='issue', owner_note=?, checked_at=?, status='active', simple=NULL WHERE id=?", (note, iso(), mid))
     else:
         from .commerce import add_owner_note
         if verdict == "ok":

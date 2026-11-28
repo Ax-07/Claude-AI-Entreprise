@@ -630,7 +630,12 @@ async function openInbox(){
     h("div",{class:"small muted",style:{margin:"6px 0"}}, m.from_addr, m.task_id ? h("button",{class:"link",style:{marginLeft:"10px"},onclick:()=>openTask(m.task_id)}, `tâche #${m.task_id} →`) : null),
     h("div",{class:"pre"}, m.body || "(vide)"))) : h("div",{class:"empty"},"Aucun email reçu depuis la connexion de la boîte. Seuls les messages arrivés après la connexion sont traités.")));
 }
-function openEvents(){ modal("Toute l’activité", h("div",{}, EVENTS.length ? EVENTS.map(evRow) : h("div",{class:"empty"},"Pas encore d’activité."))); }
+function openEvents(details){
+  const list = details ? EVENTS : EVENTS.filter(e => e.kind !== "tool");
+  modal("Toute l’activité", h("div",{},
+    h("label",{class:"small muted",style:{display:"flex",gap:"8px",alignItems:"center",marginBottom:"10px",cursor:"pointer"}},
+      h("input",{type:"checkbox",checked:!!details,onchange:e=>openEvents(e.target.checked)}), "Afficher le détail des outils utilisés par les agents"),
+    list.length ? list.map(evRow) : h("div",{class:"empty"},"Pas encore d’activité."))); }
 
 // ------------------------------------------------ rafraîchissement
 async function refresh(){

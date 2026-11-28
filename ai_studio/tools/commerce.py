@@ -25,6 +25,8 @@ def list_inbox(ctx: ToolContext, limit: int = 10, status: str = "") -> str:
     sql, args = "SELECT * FROM inbox", []
     if status:
         sql += " WHERE status=?"; args.append(status)
+    else:                       # messages automatiques et avis de non-distribution : déjà traités par le moteur
+        sql += " WHERE status NOT IN ('ignored','bounce')"
     rows = ctx.db.q(sql + " ORDER BY id DESC LIMIT ?", (*args, min(int(limit), 30)))
     if not rows:
         return "Aucun email reçu."
