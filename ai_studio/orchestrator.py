@@ -60,6 +60,9 @@ class Studio:
 
     def cycle(self) -> dict:
         backup.daily(self.cfg, self.db)
+        day = iso()[:10]
+        if self.db.kv_get("cache_purged_on") != day:           # bibliothèque de recherches : 30 jours de rétention
+            self.db.purge_cache(30); self.db.kv_set("cache_purged_on", day)
         commerce.sync_all(self.cfg, self.db)        # ventes Stripe et emails reçus (sans coût d'API)
         try:
             security.check(self.cfg, self.db)       # alertes de configuration critiques (sans coût d'API)

@@ -189,11 +189,15 @@ def _public_host(host: str) -> bool:
 @tool("fetch_url", "Télécharge une page web publique et renvoie son texte (sans coût de recherche).",
       {"url": {"type": "string"}}, ["url"])
 def fetch_url(ctx: ToolContext, url: str) -> str:
-    u = urllib.parse.urlparse(url.strip())
+    url = url.strip().split("#")[0]
+    u = urllib.parse.urlparse(url)
     if u.scheme not in ("http", "https") or not u.hostname:
         return "URL invalide (http/https uniquement)."
     if not _public_host(u.hostname):
         return "Refusé : adresse non publique."
+    hit = ctx.db.cache_get("page", url, PAGE_CACHE_DAYS)
+    if hit:
+        return f"[Page lue le {hit['created_at'][:10]} par {hit['agent']}, reprise de la bibliothèque sans nouveau téléchargement]\n" + hit["content"]
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (AI-Enterprise-Studio research bot)"})
     with urllib.request.urlopen(req, timeout=20) as r:
         ctype = r.headers.get("content-type", "")
@@ -206,10 +210,14 @@ def fetch_url(ctx: ToolContext, url: str) -> str:
         body = re.sub(r"\n\s*\n+", "\n\n", html.unescape("".join(p.parts)))
         body = re.sub(r"[ \t]+", " ", body).strip()
         text = (f"Titre : {p.title.strip()}\n\n" if p.title.strip() else "") + body
-    return text[:9000]
+    text = text[:9000]
+    if len(text.strip()) > 40:
+        ctx.db.cache_put("page", url, ctx.agent, ctx.task["id"] if ctx.task is not None else None, text)
+    return text
 
 
 BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
+SEARCH_CACHE_DAYS, PAGE_CACHE_DAYS = 7, 3     # une même recherche (ou page) récente est resservie sans coût
 
 
 def brave_request(params: dict) -> dict:
@@ -237,10 +245,16 @@ def brave_search(ctx: ToolContext, query: str, count: int = 5, country: str = "F
     import os
     if not os.environ.get("BRAVE_API_KEY"):
         return "Recherche indisponible : BRAVE_API_KEY absente du fichier .env."
+    country = (country or "FR").upper()[:2]
+    key = country + "|" + " ".join(query.lower().split())[:300]
+    hit = ctx.db.cache_get("search", key, SEARCH_CACHE_DAYS)
+    if hit:
+        return (f"[Recherche déjà faite le {hit['created_at'][:10]} par {hit['agent']} : résultats repris de la bibliothèque, "
+                "sans coût ni quota]\n" + hit["content"])
     limit = int(ctx.cfg["budget"]["web_searches_per_day"])
     if ctx.db.searches_today() >= limit:
-        return f"Refusé : limite de {limit} recherches web par jour atteinte. Utilise la mémoire ou fetch_url."
-    country = (country or "FR").upper()[:2]
+        return (f"Refusé : limite de {limit} recherches web par jour atteinte. Utilise search_library (recherches "
+                "déjà faites), la mémoire ou fetch_url.")
     params = {"q": query[:300], "count": max(1, min(int(count or 5), 10)), "country": country,
               "search_lang": "fr" if country == "FR" else "en"}
     data = brave_request(params)
@@ -253,7 +267,27 @@ def brave_search(ctx: ToolContext, query: str, count: int = 5, country: str = "F
     for i, r in enumerate(results, 1):
         extra = " ".join(_clean(x) for x in (r.get("extra_snippets") or [])[:2])
         lines.append(f"{i}. {_clean(r.get('title'))}\n   {r.get('url')}\n   {_clean(r.get('description'))} {extra}".rstrip())
-    return "\n".join(lines)[:6000]
+    out = "\n".join(lines)[:6000]
+    ctx.db.cache_put("search", key, ctx.agent, ctx.task["id"] if ctx.task is not None else None, out)
+    return out
+
+
+@tool("search_library",
+      "Cherche dans la bibliothèque de l'entreprise : recherches web et pages déjà lues par les agents ces 30 derniers "
+      "jours (gratuit). À consulter AVANT une nouvelle recherche web. Renvoie requête ou URL, date, agent et extrait.",
+      {"query": {"type": "string", "description": "mots-clés (ex. boulangerie Lyon avis)"},
+       "limit": {"type": "integer", "default": 8}}, ["query"])
+def search_library(ctx: ToolContext, query: str, limit: int = 8) -> str:
+    rows = ctx.db.cache_search(query, min(int(limit or 8), 15))
+    if not rows:
+        return "Rien dans la bibliothèque pour ces mots-clés : une recherche web est justifiée."
+    words = [w for w in query.lower().split() if len(w) > 2] or [query.lower()]
+    out = []
+    for r in rows:
+        c = r["content"]; i = max(0, min((c.lower().find(w) for w in words if c.lower().find(w) >= 0), default=0) - 120)
+        label = ("Recherche « " + r["key"].split("|", 1)[-1] + " »") if r["kind"] == "search" else "Page " + r["key"]
+        out.append(f"- {label} ({r['created_at'][:10]}, {r['agent']}) : …{' '.join(c[i:i + 400].split())}…")
+    return "\n".join(out) + "\n(Relance brave_search ou fetch_url avec la même requête ou URL pour le texte complet : il sera resservi sans coût.)"
 
 
 # ---------------------------------------------------------------- propriétaire

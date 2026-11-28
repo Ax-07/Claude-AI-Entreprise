@@ -140,6 +140,12 @@ _Mis à jour le 27/11/2026_
 - Demande du propriétaire : donner une mission au PDG depuis l'interface. Bouton « Parler au PDG » dans l'en-tête (et dans la fiche du Command HQ) : panneau de discussion à droite, réponse immédiate du PDG (modèle fort, coût affiché sous chaque réponse).
 - `ai_studio/chat.py` : table `chat`, 16 derniers messages en contexte, 6 étapes max, consignes de discussion (court, tutoiement, consulter les outils plutôt qu'inventer, une seule question si ambigu, ne pas faire le travail lui-même). Outils : nouveau `create_objective`, `delegate_task`, `company_stats`, `budget_status`, `list_tasks`, `get_task_result`, `list_orders`, `list_offers`, `list_sales`, `recall` — aucune action externe directe. Budget et erreurs du modèle renvoyés comme réponse lisible. API GET/POST /api/chat. 121 tests.
 
+## Bibliothèque de recherches (28/11/2026)
+- Constat : les résultats bruts des recherches web n'étaient gardés que pendant la tâche ; une même recherche refaite par un autre agent recoûtait et consommait le quota (30/jour, atteint).
+- Table `web_cache` : chaque recherche Brave (clé pays|requête normalisée) et chaque page lue (URL sans ancre) est enregistrée. Reprise gratuite et hors quota si moins de 7 jours (recherche) ou 3 jours (page) ; purge automatique au-delà de 30 jours (une fois par jour, dans le cycle).
+- Outil commun `search_library` (aussi dans la discussion avec le PDG) ; règle ajoutée : consulter la bibliothèque avant toute recherche web. L'outil serveur web_search d'Anthropic (utilisé seulement sans clé Brave) n'est pas mis en cache.
+- Tableau de bord : Connaissances → onglet « Recherches web » (filtre, contenu complet au clic). API GET /api/library (?q=, ?id=). 124 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.

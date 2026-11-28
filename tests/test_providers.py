@@ -148,6 +148,47 @@ class TestBrave(Base):
         self.assertEqual(self.db.searches_today(), 1)
         self.assertAlmostEqual(self.db.one("SELECT usd FROM costs WHERE model='brave-search'")[0], 0.005)
 
+    def test_search_library_reuses_results(self):
+        from ai_studio.tools import ToolContext, run_tool
+        from ai_studio.db import iso, now
+        from datetime import timedelta
+        self.make({"provider": "anthropic"})
+        os.environ["BRAVE_API_KEY"] = "bk-test"
+        fake = {"web": {"results": [{"title": "Boulangeries à Lyon", "url": "https://exemple.fr/b", "description": "Annuaire des boulangeries"}]}}
+        calls = []
+        ctx = ToolContext(self.cfg, self.db, "recherche", self.db.task(self.db.add_task("t", "recherche")), [])
+        with unittest.mock.patch.object(core_tools, "brave_request", lambda p: calls.append(p) or fake):
+            first = run_tool("brave_search", ctx, {"query": "Boulangeries  Lyon"})
+            again = run_tool("brave_search", ctx, {"query": "boulangeries lyon"})          # même requête, autre casse
+            other = run_tool("brave_search", ctx, {"query": "boulangeries lyon", "country": "BE"})
+        self.assertEqual(len(calls), 2)                                    # la 2e est resservie par la bibliothèque
+        self.assertIn("déjà faite", again); self.assertIn("https://exemple.fr/b", again)
+        self.assertNotIn("déjà faite", other)
+        self.assertEqual(self.db.searches_today(), 2)                     # ni coût ni quota pour la reprise
+        lib = run_tool("search_library", ctx, {"query": "boulangeries lyon"})
+        self.assertIn("Recherche « boulangeries lyon »", lib)
+        self.assertIn("une recherche web est justifiée", run_tool("search_library", ctx, {"query": "plombier Nantes"}))
+        # page lue : resservie pendant 3 jours, sans nouveau téléchargement
+        class Resp:
+            headers = {"content-type": "text/html"}
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self, n): return "<html><title>Boulangerie Martin</title><body>Pain au levain, ouvert le dimanche.</body></html>".encode()
+        opened = []
+        with unittest.mock.patch.object(core_tools, "_public_host", lambda h: True), \
+             unittest.mock.patch.object(core_tools.urllib.request, "urlopen", lambda *a, **k: opened.append(1) or Resp()):
+            run_tool("fetch_url", ctx, {"url": "https://martin.fr/#accueil"})
+            page = run_tool("fetch_url", ctx, {"url": "https://martin.fr/"})
+        self.assertEqual(len(opened), 1)
+        self.assertIn("reprise de la bibliothèque", page); self.assertIn("levain", page)
+        # au-delà de 7 jours la recherche est refaite ; au-delà de 30 jours elle est purgée
+        self.db.run("UPDATE web_cache SET created_at=? WHERE kind='search'", (iso(now() - timedelta(days=8)),))
+        with unittest.mock.patch.object(core_tools, "brave_request", lambda p: calls.append(p) or fake):
+            run_tool("brave_search", ctx, {"query": "boulangeries lyon"})
+        self.assertEqual(len(calls), 3)
+        self.db.run("UPDATE web_cache SET created_at=? WHERE kind='page'", (iso(now() - timedelta(days=31)),))
+        self.assertEqual(self.db.purge_cache(30), 1)
+
     def test_daily_search_limit(self):
         self.make({"provider": "anthropic", "budget": {"web_searches_per_day": 1}})
         os.environ["BRAVE_API_KEY"] = "bk-test"

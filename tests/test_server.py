@@ -48,6 +48,17 @@ class ServerTest(unittest.TestCase):
     def post(self, path, body):
         return self.req("POST", path, body, {"X-AI-Studio": "1"})
 
+    def test_library(self):
+        self.db.cache_put("search", "FR|boulangeries lyon", "recherche", None, "1. Boulangeries à Lyon https://exemple.fr")
+        self.db.cache_put("page", "https://martin.fr/", "atelier", None, "Pain au levain")
+        st, lib, _ = self.req("GET", "/api/library")
+        self.assertEqual((st, lib["total"], lib["searches"]), (200, 2, 1))
+        self.assertEqual(lib["items"][1]["key"], "boulangeries lyon")
+        st, lib, _ = self.req("GET", "/api/library?q=levain")
+        self.assertEqual([i["kind"] for i in lib["items"]], ["page"])
+        st, item, _ = self.req("GET", "/api/library?id=%d" % lib["items"][0]["id"])
+        self.assertEqual(item["content"], "Pain au levain")
+
     def test_dashboard_page_is_served_with_security_headers(self):
         st, html, r = self.req("GET", "/")
         self.assertEqual(st, 200)

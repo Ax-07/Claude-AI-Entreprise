@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # Activités de l'entreprise (modèle divisionnel avec services partagés). Les tâches sans activité sont « transverses ».
@@ -111,6 +111,16 @@ CREATE TABLE IF NOT EXISTS inbox (
     recorded_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_inbox_msgid ON inbox(message_id);
+CREATE TABLE IF NOT EXISTS web_cache (               -- bibliothèque de recherches : résultats web réutilisables
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,                              -- search | page
+    key TEXT NOT NULL,                               -- requête normalisée (pays|requête) ou URL
+    agent TEXT NOT NULL,
+    task_id INTEGER,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_web_cache ON web_cache(kind, key);
 CREATE TABLE IF NOT EXISTS chat (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     role TEXT NOT NULL,                              -- owner | pdg
@@ -308,6 +318,26 @@ class DB:
         else:
             r = self.one("SELECT COALESCE(SUM(usd),0) FROM costs WHERE month=?", (n.strftime("%Y-%m"),))
         return float(r[0])
+
+    # ---------- bibliothèque de recherches ----------
+    def cache_get(self, kind: str, key: str, max_age_days: float):
+        since = iso(now() - timedelta(days=max_age_days))
+        return self.one("SELECT * FROM web_cache WHERE kind=? AND key=? AND created_at>=? ORDER BY id DESC LIMIT 1", (kind, key, since))
+
+    def cache_put(self, kind: str, key: str, agent: str, task_id, content: str) -> int:
+        return self.run("INSERT INTO web_cache(kind, key, agent, task_id, content, created_at) VALUES (?,?,?,?,?,?)",
+                        (kind, key, agent, task_id, content, iso()))
+
+    def cache_search(self, query: str, limit: int = 8):
+        words = [w for w in query.lower().split() if len(w) > 2][:6] or [query.lower().strip()]
+        sql = "SELECT * FROM web_cache WHERE " + " AND ".join(["(lower(key) LIKE ? OR lower(content) LIKE ?)"] * len(words))
+        params = [x for w in words for x in (f"%{w}%", f"%{w}%")]
+        return self.q(sql + " ORDER BY id DESC LIMIT ?", (*params, int(limit)))
+
+    def purge_cache(self, days: int = 30) -> int:
+        cur = self.conn.execute("DELETE FROM web_cache WHERE created_at < ?", (iso(now() - timedelta(days=days)),))
+        self.conn.commit()
+        return cur.rowcount
 
     def searches_today(self) -> int:
         return int(self.one("SELECT COALESCE(SUM(web_searches),0) FROM costs WHERE day=?", (now().strftime("%Y-%m-%d"),))[0])
