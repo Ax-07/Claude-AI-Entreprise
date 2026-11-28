@@ -121,6 +121,9 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "", edits: dict
         add_owner_note(db, order, note)             # la consigne reste attachée à la commande, au-delà de cette tâche
     if not approve:
         db.set_approval(approval_id, status="rejected", decided_at=iso(), result=note or "Refusé")
+        if a["action"] == "send_email" and payload.get("prospect"):
+            from . import prospects
+            prospects.on_not_sent(db, payload["prospect"])
         outcome = f"REFUSÉ par le propriétaire. {note}".strip()
     elif a["action"] in EXECUTORS:
         missing = missing_setup(a["action"])
@@ -131,6 +134,9 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "", edits: dict
         try:
             res = EXECUTORS[a["action"]](cfg, payload)
             db.set_approval(approval_id, status="executed", decided_at=iso(), result=res)
+            if a["action"] == "send_email" and payload.get("prospect"):
+                from . import prospects
+                prospects.on_sent(cfg, db, payload["prospect"], payload.get("template", ""))
             if a["action"] == "send_email" and payload.get("in_reply_to"):
                 db.run("UPDATE inbox SET status='replied' WHERE id=?", (payload["in_reply_to"],))
             if a["action"] == "send_email" and payload.get("order"):
@@ -142,6 +148,9 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "", edits: dict
             outcome = f"VALIDÉ et exécuté : {res}." + (f" (Modifié par le propriétaire : {', '.join(changed)}.)" if changed else "") + f" {note}".rstrip()
         except Exception as e:
             db.set_approval(approval_id, status="error", decided_at=iso(), result=str(e))
+            if a["action"] == "send_email" and payload.get("prospect"):
+                from . import prospects
+                prospects.on_not_sent(db, payload["prospect"])
             outcome = f"VALIDÉ mais l'exécution a échoué : {e}"
     else:
         db.set_approval(approval_id, status="approved", decided_at=iso(), result=note or "Validé")

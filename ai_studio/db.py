@@ -141,6 +141,25 @@ CREATE TABLE IF NOT EXISTS activities (
     status TEXT NOT NULL DEFAULT 'active',           -- active | preparation | pause
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS prospects (              -- fichier prospects : qui a été contacté, quand, avec quelle réponse
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,                      -- en minuscules
+    name TEXT NOT NULL DEFAULT '',
+    company TEXT NOT NULL DEFAULT '',
+    site TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT '',                 -- où l'adresse professionnelle a été trouvée (URL) : obligatoire (RGPD)
+    offer TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'nouveau',          -- nouveau | a_valider | contacte | relance | repondu | interesse | client | refus | stop | sans_suite | invalide
+    objective_id INTEGER,
+    first_contact_at TEXT,
+    last_contact_at TEXT,
+    next_action_at TEXT,                             -- date de la relance prévue
+    replied_at TEXT,
+    notes TEXT NOT NULL DEFAULT '',
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS offers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,

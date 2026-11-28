@@ -64,6 +64,8 @@ class ScriptedAPI:
             if step == 0:
                 return {"stop_reason": "tool_use", "usage": usage, "content": [
                     tool_use(i, "recall", {"query": "avis google"}),
+                    tool_use(i, "save_prospect", {"email": "contact@boulangerie-exemple.fr", "source": "https://boulangerie-exemple.fr/contact",
+                                                  "company": "Boulangerie Exemple"}),
                     tool_use(i, "send_email", {"to": "contact@boulangerie-exemple.fr", "subject": "Vos avis Google",
                                                 "body": "Bonjour… Si vous ne souhaitez plus recevoir de message, répondez STOP.",
                                                 "reason": "Test de l'offre réponses aux avis"})]}

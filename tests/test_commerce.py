@@ -179,7 +179,7 @@ class InboxTest(Base):
         out = run_tool("send_email", self.ctx(), {"to": "marie@cafe.fr", "subject": "Re: Question", "body": "Voici",
                                                   "reason": "r", "in_reply_to": iid, "attachment": "livraisons/rapport.pdf"})
         self.assertIn("en attente", out)
-        bad = run_tool("send_email", self.ctx(), {"to": "a@b.fr", "subject": "s", "body": "b", "reason": "r", "attachment": "../../etc/passwd"})
+        bad = run_tool("send_email", self.ctx(), {"to": "marie@cafe.fr", "subject": "s", "body": "b", "reason": "r", "in_reply_to": iid, "attachment": "../../etc/passwd"})
         self.assertIn("hors de l'espace de travail", bad)
         self.assertEqual(self.db.one("SELECT COUNT(*) FROM approvals")[0], 1)
         aid = self.db.one("SELECT id FROM approvals WHERE action='send_email'")[0]
@@ -207,12 +207,18 @@ class InboxTest(Base):
 
 
 class AgentGuidanceTest(Base):
+    def setUp(self):
+        super().setUp()
+        from ai_studio import prospects
+        for e in ("a@b.fr", "c@d.fr", "moi@exemple.fr", "tiers@societe.fr"):     # prospects enregistrés (source publique)
+            prospects.save(self.db, e, "https://exemple.fr/contact")
+
     def test_email_tool_says_it_sends(self):
         from ai_studio.agents import RULES
         out = run_tool("send_email", self.ctx(), {"to": "a@b.fr", "subject": "s", "body": "b", "reason": "r"})
         self.assertIn("partira automatiquement", out)
         self.assertIn("pas encore configurée", out)             # SMTP absent : l'agent le sait, sans paniquer
-        self.assertIn("en attente", run_tool("draft_email", self.ctx(), {"to": "a@b.fr", "subject": "s", "body": "b", "reason": "r"}))
+        self.assertIn("en attente", run_tool("draft_email", self.ctx(), {"to": "c@d.fr", "subject": "s", "body": "b", "reason": "r"}))
         self.assertIn("ne lui demande jamais de faire lui-même", RULES)
         self.assertIn("Jamais pour faire valider un email", REGISTRY["request_owner_decision"].description)
 
@@ -314,7 +320,7 @@ class AgentGuidanceTest(Base):
         self.assertIn("390 €", b); self.assertIn("5 jours", b); self.assertIn("https://buy.stripe.com/x", b)
         self.assertIn("Refusé", run_tool("send_email", self.ctx(), {"to": "c@d.fr", "reason": "r", "template": "reponse_interesse",
                                          "fields": {"objet": "o", "offre": "Offre inconnue", "reponse": "Une réponse suffisamment longue."}}))
-        self.assertIn("Donne subject et body", run_tool("send_email", self.ctx(), {"to": "c@d.fr", "reason": "r"}))
+        self.assertIn("Donne subject et body", run_tool("send_email", self.ctx(), {"to": "moi@exemple.fr", "reason": "r"}))
 
     def test_approval_waits_for_setup_then_runs(self):
         from ai_studio.approvals import NotReady, decide

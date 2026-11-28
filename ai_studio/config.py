@@ -86,6 +86,8 @@ DEFAULTS: dict = {
     "commerce": {"stripe_sync_minutes": 10, "inbox_sync_minutes": 5, "inbox_tasks_per_day": 10,
                  "order_nudge_minutes": 30, "order_max_nudges": 3, "client_wait_hours": 48,
                  "realtime_inbox": True},          # surveillance en continu de la boîte mail (IMAP IDLE), en plus du relevé périodique
+    # Prospection : une seule relance, N jours après le premier email sans réponse ; sans suite N jours après la relance.
+    "prospects": {"followup_days": 7, "close_after_days": 7},
     # Sauvegarde quotidienne de la base et des livrables dans data/sauvegardes (les N plus récentes sont gardées).
     "backup": {"enabled": True, "keep": 14},
     "email": {

@@ -49,7 +49,7 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "signalée par la Trésorerie sans cause interne → vérification d'intrusion par la Cybersécurité) et ce qui doit "
          "remonter au propriétaire. Production : les sites web, applications et outils sur mesure vont à l'agent "
          "developpement ; les autres livrables clients (rapports, audits, contenus) à l'atelier.",
-         ["delegate_task", "launch_mission", "assign_project_manager", "mission_status", "budget_status", "company_stats", "set_objective_status", "list_sales", "list_inbox",
+         ["delegate_task", "launch_mission", "assign_project_manager", "mission_status", "budget_status", "company_stats", "set_objective_status", "list_sales", "list_inbox", "list_prospects",
           "list_orders", "set_order_status", "list_offers", "save_offer"], model="strong"),
     Role("recherche", "Labo Recherche", "Agent Recherche — veille et opportunités",
          "Tu étudies les marchés, les besoins, la concurrence et les prix ; tu identifies des niches et des "
@@ -68,14 +68,19 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "à l'activité du destinataire, avec possibilité de refuser les messages suivants. Pour écrire un email, "
          "commence par email_templates : s'il existe un modèle adapté, utilise-le (send_email avec template et fields) "
          "et ne remplis que les champs personnalisés, avec des faits vérifiés ; sinon rédige librement en vouvoyant, "
-         "court et sobre, et dis dans reason qu'aucun modèle ne convenait. Une seule relance par prospect, après 7 jours.",
-         ["fetch_url", "send_email", "email_templates", "propose_payment_link", "propose_page", "list_inbox", "read_email", "list_sales",
+         "court et sobre, et dis dans reason qu'aucun modèle ne convenait. Avant d'écrire à quelqu'un, consulte "
+         "list_prospects et enregistre-le avec save_prospect (source publique obligatoire) : jamais de doublon, jamais "
+         "de nouveau contact après un refus ou un « STOP ». La relance (une seule, après 7 jours sans réponse) est "
+         "déclenchée automatiquement : tu recevras une tâche, n'en programme pas toi-même. Quand un prospect répond, "
+         "mets à jour son statut (set_prospect_status).",
+         ["fetch_url", "send_email", "email_templates", "save_prospect", "list_prospects", "set_prospect_status", "propose_payment_link", "propose_page", "list_inbox", "read_email", "list_sales",
           "save_offer", "list_offers", "list_orders", "delegate_task"], web_search=True),
     Role("support", "Service Client", "Agent Support — relation client",
          "Tu prépares les réponses aux clients et prospects, tu rédiges les FAQ et les procédures, tu repères les "
          "problèmes récurrents et tu proposes des améliorations. Ton ton est poli, précis et rassurant ; tu vouvoies. "
-         "Pour répondre à un prospect intéressé, utilise le modèle reponse_interesse (email_templates).",
-         ["send_email", "email_templates", "deliver_order", "list_orders", "set_order_status", "list_offers", "list_inbox", "read_email",
+         "Pour répondre à un prospect intéressé, utilise le modèle reponse_interesse (email_templates) et mets à jour "
+         "son statut (set_prospect_status).",
+         ["send_email", "email_templates", "list_prospects", "set_prospect_status", "deliver_order", "list_orders", "set_order_status", "list_offers", "list_inbox", "read_email",
           "list_sales", "delegate_task"]),
     Role("atelier", "Atelier", "Agent Atelier — production des livrables clients",
          "Tu fabriques ce que les clients ont payé, à partir de la fiche d'offre (list_offers), de la commande "

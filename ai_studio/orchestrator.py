@@ -89,6 +89,11 @@ class Studio:
             self.db.purge_cache(30); self.db.kv_set("cache_purged_on", day)
         commerce.sync_all(self.cfg, self.db)        # ventes Stripe et emails reçus (sans coût d'API)
         try:
+            from . import prospects
+            prospects.due_followups(self.cfg, self.db)   # relance unique à J+7, puis « sans suite » (sans coût d'API)
+        except Exception as e:
+            self.db.log("systeme", "prospect", f"Suivi des prospects impossible : {e}")
+        try:
             security.check(self.cfg, self.db)       # alertes de configuration critiques (sans coût d'API)
         except Exception as e:
             self.db.log("systeme", "securite", f"Contrôle de sécurité impossible : {e}")

@@ -116,6 +116,71 @@ def save_offer(ctx: ToolContext, name: str, price_eur: float, summary: str, deli
     return f"Offre « {name} » ajoutée au catalogue (#{oid}). Pour la vendre : propose_payment_link avec offer=\"{name}\"."
 
 
+# ============================================================================ Prospects
+@tool("save_prospect",
+      "Enregistre (ou complète) un prospect AVANT de lui écrire : adresse professionnelle publique et l'URL où elle est "
+      "publiée (obligatoire). Le fichier prospects évite les doublons et garde l'historique (contacté, relancé, réponse).",
+      {"email": {"type": "string"}, "source": {"type": "string", "description": "URL publique où l'adresse a été trouvée"},
+       "name": {"type": "string", "description": "nom du contact (facultatif)"}, "company": {"type": "string"},
+       "site": {"type": "string", "description": "site du prospect"}, "offer": {"type": "string", "description": "offre envisagée"},
+       "notes": {"type": "string", "description": "faits utiles et vérifiés (activité, ville…)"}},
+      ["email", "source"])
+def save_prospect(ctx: ToolContext, email: str, source: str, name: str = "", company: str = "", site: str = "",
+                  offer: str = "", notes: str = "") -> str:
+    from .. import prospects
+    from ..approvals import EMAIL_RE
+    if not EMAIL_RE.match(email.strip()):
+        return "Adresse email invalide."
+    if not source.strip().lower().startswith(("http://", "https://")):
+        return "Source invalide : donne l'URL publique où l'adresse professionnelle est publiée."
+    oid = ctx.task["objective_id"] if ctx.task is not None else None
+    pid, created = prospects.save(ctx.db, email, source.strip(), name.strip(), company.strip(), site.strip(), offer.strip(),
+                                  notes.strip()[:400], ctx.agent, oid)
+    p = prospects.get(ctx.db, email)
+    if created:
+        ctx.db.log(ctx.agent, "prospect", f"Prospect enregistré : {p['email']} ({p['company'] or p['site'] or '—'})")
+        return f"Prospect #{pid} enregistré ({p['email']}). Tu peux lui écrire avec send_email (modèle de prospection)."
+    why = prospects.check_send(ctx.db, email, "")
+    return (f"Prospect #{pid} déjà connu ({prospects.STATUSES[p['status']]}) : fiche complétée."
+            + (f" Pas de nouvel email : {why}." if why else " Tu peux lui écrire."))
+
+
+@tool("list_prospects", "Fichier prospects : statut (contacté, relancé, a répondu, refus…), dates, source, notes.",
+      {"status": {"type": "string", "description": "filtre : nouveau, a_valider, contacte, relance, repondu, interesse, client, refus, stop, sans_suite, invalide"},
+       "query": {"type": "string", "description": "recherche dans l'adresse, le nom, l'entreprise ou le site"}})
+def list_prospects(ctx: ToolContext, status: str = "", query: str = "") -> str:
+    from .. import prospects
+    rows = prospects.listing(ctx.db, status.strip(), query.strip(), 40)
+    if not rows:
+        return "Aucun prospect" + (" correspondant." if status or query else " pour l'instant.")
+    c = prospects.counts(ctx.db)
+    head = "Bilan : " + ", ".join(f"{prospects.STATUSES[k]} {v}" for k, v in c.items()) + "\n"
+    return head + "\n".join(
+        f"- {r['email']} — {r['company'] or r['site'] or '?'}{' (' + r['name'] + ')' if r['name'] else ''} : "
+        f"{prospects.STATUSES[r['status']]}"
+        + (f", 1er contact {r['first_contact_at'][:10]}" if r['first_contact_at'] else "")
+        + (f", réponse {r['replied_at'][:10]}" if r['replied_at'] else "")
+        + (f", prochaine action {r['next_action_at'][:10]}" if r['next_action_at'] else "")
+        + (f" | offre : {r['offer']}" if r['offer'] else "") + f" | source : {r['source'] or '—'}"
+        + (f"\n  notes : {r['notes'][-300:]}" if r['notes'] else "") for r in rows)
+
+
+@tool("set_prospect_status",
+      "Met à jour le statut d'un prospect après sa réponse : interesse, refus, client, sans_suite (les autres statuts "
+      "sont mis automatiquement : contacté, relancé, a répondu, stop, adresse invalide).",
+      {"email": {"type": "string"}, "status": {"type": "string", "enum": ["interesse", "refus", "client", "sans_suite"]},
+       "note": {"type": "string", "description": "pourquoi (ce qu'il a dit)"}}, ["email", "status"])
+def set_prospect_status(ctx: ToolContext, email: str, status: str, note: str = "") -> str:
+    from .. import prospects
+    if status not in ("interesse", "refus", "client", "sans_suite"):
+        return "Statut possible : interesse, refus, client, sans_suite."
+    if not prospects.get(ctx.db, email):
+        return "Prospect inconnu (list_prospects)."
+    if not prospects.set_status(ctx.db, email, status, note.strip()[:300], next_action_at=None):
+        return "Impossible : ce prospect a demandé à ne plus être contacté."
+    return f"Statut mis à jour : {prospects.STATUSES[status]}."
+
+
 @tool("list_offers", "Catalogue des offres de l'entreprise (prix, livrable, délai, lien de paiement).", {})
 def list_offers(ctx: ToolContext) -> str:
     from ..commerce import offer_sheet
