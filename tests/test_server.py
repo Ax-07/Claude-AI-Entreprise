@@ -173,6 +173,28 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(len(c["days"]), 1)
 
 
+    def test_zip_and_html_preview(self):
+        import zipfile
+        from test_quality import GOOD, site
+        d = self.cfg.workspace / "livraisons" / "commande-1" / "site"
+        site(d, {"css/style.css": "body{color:red}", "app.txt": "x"})
+        with zipfile.ZipFile(d.parent / "site.zip", "w") as z:
+            for f in d.rglob("*"):
+                z.write(f, "site/" + f.relative_to(d).as_posix())
+        (d.parent / "rapport.html").write_text(GOOD, encoding="utf-8")
+        a1 = self.db.add_approval("support", None, "send_email", {"to": "a@b.fr", "subject": "s", "body": "b", "attachment": "livraisons/commande-1/site.zip"}, "r")
+        a2 = self.db.add_approval("support", None, "send_email", {"to": "a@b.fr", "subject": "s", "body": "b", "attachment": "livraisons/commande-1/rapport.html"}, "r")
+        st, body, r = self.req("GET", f"/api/approvals/{a1}/livrable/index.html")
+        self.assertEqual(st, 200); self.assertIn("Boulangerie Martin", body)
+        self.assertIn("sandbox", r.getheader("Content-Security-Policy"))
+        st, body, r = self.req("GET", f"/api/approvals/{a1}/livrable/css/style.css")
+        self.assertEqual((st, r.getheader("Content-Type")), (200, "text/css; charset=utf-8"))
+        self.assertEqual(self.req("GET", f"/api/approvals/{a1}/livrable/../../../secret.html")[0], 404)
+        self.assertEqual(self.req("GET", f"/api/approvals/{a1}/livrable/absent.html")[0], 404)
+        st, body, _ = self.req("GET", f"/api/approvals/{a2}/livrable")
+        self.assertEqual(st, 200); self.assertIn("four à bois", body)
+
+
 class MaquetteTest(ServerTest):
     def test_map_assets_served_compressed(self):
         import gzip as gz

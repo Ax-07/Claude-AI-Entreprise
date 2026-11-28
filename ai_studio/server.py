@@ -114,6 +114,44 @@ def page_preview(cfg, db, approval_id: int) -> bytes:
     return json.loads(a["payload"])["html"].encode("utf-8")
 
 
+PREVIEW_TYPES = {".html": "text/html; charset=utf-8", ".htm": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
+                 ".md": "text/plain; charset=utf-8", ".txt": "text/plain; charset=utf-8", ".svg": "image/svg+xml",
+                 ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif",
+                 ".ico": "image/x-icon", ".woff2": "font/woff2", ".woff": "font/woff"}
+
+
+def deliverable_preview(cfg, db, approval_id: int, sub: str = "") -> tuple[bytes, str]:
+    """Aperçu du livrable joint à un email en attente : page HTML, document, ou fichier d'une archive de site."""
+    import zipfile
+    from pathlib import PurePosixPath
+    a = db.approval(approval_id)
+    att = json.loads(a["payload"]).get("attachment") if a and a["action"] == "send_email" else None
+    if not att:
+        raise ApiError(404, "Aucun livrable à prévisualiser")
+    base = cfg.workspace.resolve()
+    p = (base / att).resolve()
+    if base not in p.parents or not p.is_file():
+        raise ApiError(404, "Livrable introuvable")
+    if p.suffix.lower() == ".zip":
+        sub = str(PurePosixPath("/" + (sub or "index.html"))).lstrip("/") or "index.html"
+        if sub.endswith("/"):
+            sub += "index.html"
+        ctype = PREVIEW_TYPES.get(PurePosixPath(sub).suffix.lower())
+        if not ctype:
+            raise ApiError(404, "Type de fichier non prévisualisable")
+        with zipfile.ZipFile(p) as z:
+            names = [n for n in z.namelist() if not n.endswith("/")]
+            top = names[0].split("/")[0] + "/" if names and all(n.startswith(names[0].split("/")[0] + "/") for n in names) else ""
+            for cand in (top + sub, top + sub + "/index.html"):
+                if cand in names:
+                    return z.read(cand), PREVIEW_TYPES.get(PurePosixPath(cand).suffix.lower(), ctype)
+        raise ApiError(404, f"{sub} absent de l'archive")
+    ctype = PREVIEW_TYPES.get(p.suffix.lower())
+    if not ctype:
+        raise ApiError(404, "Type de fichier non prévisualisable")
+    return p.read_bytes(), ctype
+
+
 def achievements(db, done: int) -> list[dict]:
     over_days = db.one("SELECT COUNT(*) FROM events WHERE kind='budget' AND message LIKE 'Pause : Budget du jour%'")[0]
     days_active = db.one("SELECT COUNT(DISTINCT day) FROM costs")[0]
@@ -421,14 +459,15 @@ def make_handler(cfg):
             self.end_headers()
             self.wfile.write(body)
 
-        def _preview(self, body: bytes):
-            """Aperçu d'une page avant publication : aucun script, isolée (sandbox)."""
+        def _preview(self, body: bytes, ctype: str = "text/html; charset=utf-8"):
+            """Aperçu d'une page ou d'un livrable avant validation : aucun script, isolé (sandbox)."""
             self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
-            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; sandbox")
+            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                             "img-src 'self' https: data:; font-src 'self' https: data:; sandbox")
             self.end_headers()
             self.wfile.write(body)
 
@@ -474,6 +513,8 @@ def make_handler(cfg):
                         return self._send(200, tasks(cfg, db, q("status"), q("agent"), int(q("limit", "50") or 50)))
                     if len(parts) == 2 and parts[0] == "tasks" and parts[1].isdigit():
                         return self._send(200, task_detail(cfg, db, int(parts[1])))
+                    if len(parts) >= 3 and parts[0] == "approvals" and parts[1].isdigit() and parts[2] == "livrable":
+                        return self._preview(*deliverable_preview(cfg, db, int(parts[1]), "/".join(parts[3:])))
                     if len(parts) == 3 and parts[0] == "approvals" and parts[1].isdigit() and parts[2] == "preview":
                         return self._preview(page_preview(cfg, db, int(parts[1])))
                     if parts == ["chat"]:

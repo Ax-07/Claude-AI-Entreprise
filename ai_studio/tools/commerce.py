@@ -190,11 +190,16 @@ def deliver_order(ctx: ToolContext, order: int, attachment: str, subject: str, b
         return f"Livrable introuvable : {attachment}. Il faut d'abord le produire."
     if p.stat().st_size < 400:
         return "Ce fichier est trop court pour être un livrable final. Produis le travail complet avant de livrer."
+    from ..quality import check_path, report, summary
+    qa = check_path(ctx.cfg.workspace.resolve(), p)
+    if qa["errors"]:
+        return ("Livraison refusée : le contrôle qualité a trouvé des erreurs. Corrige-les (ou délègue la correction au "
+                "producteur du livrable), relance check_deliverable, puis livre.\n" + report(qa))
     if ctx.db.one("SELECT 1 FROM approvals WHERE status='pending' AND action='send_email' AND json_extract(payload,'$.order')=?", (int(order),)):
         return "Une livraison de cette commande attend déjà la validation du propriétaire. Rien d'autre à faire."
     aid = ctx.db.add_approval(ctx.agent, ctx.task["id"] if ctx.task is not None else None, "send_email",
                               {"to": s["customer_email"], "subject": subject, "body": body, "attachment": attachment,
-                               "order": int(order)}, f"Livraison de la commande n°{order} ({s['product'] or 'commande'})")
+                               "order": int(order), "qa": summary(qa)}, f"Livraison de la commande n°{order} ({s['product'] or 'commande'})")
     ctx.db.log(ctx.agent, "approval", f"Livraison de la commande n°{order} en attente de validation (#{aid})")
     return (f"Livraison #{aid} en attente de validation : l'email partira automatiquement dès que le propriétaire la "
             "validera, et la commande sera marquée livrée. Rien d'autre à faire.")
@@ -298,3 +303,16 @@ def package_files(ctx: ToolContext, folder: str, name: str) -> str:
     rel = dest.relative_to(ctx.cfg.workspace.resolve()).as_posix()
     ctx.db.log(ctx.agent, "file", f"Archive créée : {rel} ({len(files)} fichiers)", ctx.task["id"] if ctx.task is not None else None)
     return f"Archive prête : {rel} ({len(files)} fichiers, {dest.stat().st_size // 1024} Ko). Livre-la avec deliver_order."
+
+
+@tool("check_deliverable",
+      "Contrôle qualité d'un livrable avant livraison : dossier de site ou archive .zip (pages, liens internes, titres, "
+      "description, mobile, mentions légales, contact, texte provisoire) ou document HTML/Markdown (longueur, sections, "
+      "sources, texte provisoire). Corrige toutes les ERREURS avant de livrer ; traite les avertissements si possible.",
+      {"path": {"type": "string", "description": "ex. livraisons/commande-3/site ou livraisons/commande-3/rapport.html"}}, ["path"])
+def check_deliverable(ctx: ToolContext, path: str) -> str:
+    from ..quality import check_path, report
+    p = _safe_path(ctx, path)
+    if not p.exists():
+        return f"Introuvable : {path}"
+    return report(check_path(ctx.cfg.workspace.resolve(), p))
