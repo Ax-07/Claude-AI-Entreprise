@@ -323,6 +323,11 @@ def cmd_supprimer_mission(cfg, db, a):
     _out(f"{r['title']} supprimée : {r['tasks']} tâche(s), {r['approvals']} validation(s).\nSauvegarde : {r['backup']}")
 
 
+def cmd_bilan(cfg, db, a):
+    from .reports import monthly, to_markdown
+    _out(to_markdown(monthly(cfg, db, a.mois or None)))
+
+
 def cmd_mode_test(cfg, db, a):
     """Active ou coupe le mode test dans config.json (le reste du fichier est conservé)."""
     import json as _json
@@ -500,6 +505,7 @@ def main(argv=None):
     s = sub.add_parser("commande-test"); s.add_argument("offre"); s.add_argument("-e", "--email", required=True); s.add_argument("-i", "--infos")
     s = sub.add_parser("commandes"); s.add_argument("-t", "--toutes", action="store_true")
     s = sub.add_parser("supprimer-mission"); s.add_argument("id", type=int); s.add_argument("--commande", action="store_true"); s.add_argument("--confirmer", action="store_true")
+    s = sub.add_parser("bilan"); s.add_argument("mois", nargs="?", help="AAAA-MM (mois en cours par défaut)")
     s = sub.add_parser("mode-test"); s.add_argument("etat", nargs="?", choices=["on", "off"]); s.add_argument("emails", nargs="*")
     s = sub.add_parser("consigne"); s.add_argument("n", type=int); s.add_argument("texte")
     s = sub.add_parser("livree"); s.add_argument("n", type=int); s.add_argument("-n", "--note")
@@ -517,7 +523,7 @@ def main(argv=None):
                 "validations": cmd_validations, "taches": cmd_taches, "voir": cmd_voir, "journal": cmd_journal,
                 "couts": cmd_couts, "agents": cmd_agents, "relancer": cmd_relancer, "objectifs": cmd_objectifs, "activites": cmd_activites,
                 "archiver": cmd_archiver, "serveur": cmd_serveur, "notifier-test": cmd_notifier_test,
-                "offres": cmd_offres, "client": cmd_client, "repartir-propre": cmd_repartir_propre, "importer-offres": cmd_importer_offres, "commande-test": cmd_commande_test, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne, "mode-test": cmd_mode_test, "supprimer-mission": cmd_supprimer_mission,
+                "offres": cmd_offres, "client": cmd_client, "repartir-propre": cmd_repartir_propre, "importer-offres": cmd_importer_offres, "commande-test": cmd_commande_test, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne, "mode-test": cmd_mode_test, "bilan": cmd_bilan, "supprimer-mission": cmd_supprimer_mission,
                 "memoire": cmd_memoire, "oublier": cmd_oublier, "retenir": cmd_retenir,
                 "sauvegarder": cmd_sauvegarder, "sauvegardes": cmd_sauvegardes, "restaurer": cmd_restaurer,
                 "demarrage-auto": cmd_demarrage_auto,

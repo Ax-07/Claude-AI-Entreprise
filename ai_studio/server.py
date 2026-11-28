@@ -254,7 +254,9 @@ def costs(cfg, db) -> dict:
         s = sales.get(m["id"]) if m["kind"] == "commande" else None
         if s and s["currency"] == "EUR":
             row["revenue_eur"] = s["amount"]
-            row["margin_eur"] = round(s["amount"] - row["cost_eur"], 2)
+            oc = cfg.get("offers", default={}) or {}       # même calcul que le bilan par offre : Stripe, cotisations, API
+            fees = s["amount"] * float(oc.get("stripe_pct", 0.028)) + float(oc.get("stripe_fixed_eur", 0.25))
+            row["margin_eur"] = round(s["amount"] - fees - s["amount"] * float(oc.get("social_rate", 0.256)) - row["cost_eur"], 2)
         by_mission.append(row)
     by_mission.sort(key=lambda r: -r["cost_usd"])
     outside = db.one("SELECT COALESCE(SUM(c.usd),0) FROM costs c LEFT JOIN tasks t ON t.id=c.task_id "
@@ -543,6 +545,13 @@ def make_handler(cfg):
                         return self._send(200, _chat_history(db, int(q("thread", "0") or 0)))
                     if parts == ["chat", "threads"]:
                         return self._send(200, _chat_threads(db))
+                    if parts == ["report"]:
+                        import re as _re
+                        from .reports import monthly
+                        m = q("month", "") or None
+                        if m and not _re.fullmatch(r"\d{4}-\d{2}", m):
+                            raise ApiError(400, "Mois au format AAAA-MM")
+                        return self._send(200, monthly(cfg, db, m))
                     if parts == ["prospects"]:
                         from . import prospects
                         return self._send(200, {"prospects": prospects.listing(db, limit=500), "counts": prospects.counts(db)})

@@ -74,7 +74,7 @@ DEFAULTS: dict = {
         "web_fetch": {"enabled": False, "type": "web_fetch_20260209", "max_uses": 3, "max_content_tokens": 6000},
     },
     # Notifications Windows : nouvelle validation à faire, budget atteint, erreur bloquante.
-    "notifications": {"windows": True, "approvals": True, "budget": True, "errors": True, "sales": True, "emails": True},
+    "notifications": {"windows": True, "approvals": True, "budget": True, "errors": True, "sales": True, "emails": True, "reports": True},
     # Boucle commerciale : fréquence de lecture de Stripe et de la boîte mail, plafond de réponses par jour.
     # Relecture juridique avant ta décision (l'avis s'affiche sur la carte de validation, sans la bloquer).
     # Emails de prospection : désactivé par défaut (coût), à activer quand la prospection démarre.
@@ -93,6 +93,8 @@ DEFAULTS: dict = {
     # Après la livraison : message de suivi (remerciement, avis, offre suivante) N jours après, validé comme tout email.
     # review_url : lien où laisser un avis (fiche Google…), facultatif.
     "aftercare": {"enabled": True, "days": 3, "review_url": ""},
+    # Bilan mensuel par offre, le 1er du mois (fichier rapports/bilan-AAAA-MM.md + analyse de Finance).
+    "reports": {"monthly": True},
     # Prospection : une seule relance, N jours après le premier email sans réponse ; sans suite N jours après la relance.
     "prospects": {"followup_days": 7, "close_after_days": 7},
     # Sauvegarde quotidienne de la base et des livrables dans data/sauvegardes (les N plus récentes sont gardées).

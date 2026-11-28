@@ -123,6 +123,17 @@ def record_feedback(ctx: ToolContext, order: int, feedback: str, satisfied: str)
     return record(ctx.cfg, ctx.db, int(order), feedback, {"oui": True, "non": False}.get(satisfied.strip().lower()))
 
 
+@tool("monthly_report", "Bilan chiffré par offre pour un mois (ventes, CA, coût d'API réel, marge, délais, satisfaction, "
+      "prospection). Calculé automatiquement, gratuit.", {"month": {"type": "string", "description": "AAAA-MM, vide = mois en cours"}})
+def monthly_report(ctx: ToolContext, month: str = "") -> str:
+    import re as _re
+    from ..reports import monthly, to_markdown
+    month = month.strip()
+    if month and not _re.fullmatch(r"\d{4}-\d{2}", month):
+        return "Mois au format AAAA-MM."
+    return to_markdown(monthly(ctx.cfg, ctx.db, month or None))
+
+
 # ============================================================================ Prospects
 @tool("save_prospect",
       "Enregistre (ou complète) un prospect AVANT de lui écrire : adresse professionnelle publique et l'URL où elle est "

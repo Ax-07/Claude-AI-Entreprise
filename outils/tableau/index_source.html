@@ -612,13 +612,26 @@ async function openObjectives(){
     h("span",{}, o.text), h("span",{class:"bar"}, h("i",{style:{width:pct(o.tasks_done,o.tasks_total)+"%",background:"linear-gradient(90deg,#6366F1,#22D3EE)"}})), h("span",{class:"small muted"}, `${o.tasks_done} / ${o.tasks_total} tâches terminées`))) : h("div",{class:"empty"},"Aucun objectif.")));
 }
 async function openCosts(){
-  const [c, acts] = await Promise.all([api("GET","/api/costs"), api("GET","/api/activities")]), max = Math.max(0.0001, ...c.days.map(d=>d.usd));
+  const [c, acts, rep] = await Promise.all([api("GET","/api/costs"), api("GET","/api/activities"), api("GET","/api/report")]), max = Math.max(0.0001, ...c.days.map(d=>d.usd));
+  const pc = v => v == null ? "—" : Math.round(v) + " %";
+  const offTable = h("div",{style:{marginBottom:"18px"}}, h("span",{class:"lab"},`Par offre — ${rep.month} (bilan complet le 1er du mois suivant, dans rapports/)`),
+    h("div",{style:{overflowX:"auto",marginTop:"6px"}}, h("table",{}, h("thead",{}, h("tr",{}, ["Offre","Ventes","CA","API / commande","Marge","Délai moyen (promis)","Satisfaction","Prospection"].map(x=>h("th",{},x)))),
+      h("tbody",{}, rep.offers.length ? rep.offers.map(o => h("tr",{},
+        h("td",{}, h("b",{}, o.offer), o.status==="draft" ? h("span",{class:"pill",style:{marginLeft:"6px"}},"à valider") : null),
+        h("td",{}, String(o.sales), o.test_orders ? h("span",{class:"small muted"}, ` +${o.test_orders} essai`) : null),
+        h("td",{}, eur(o.revenue)), h("td",{class:"muted"}, o.api_per_order_eur == null ? "—" : eur(o.api_per_order_eur)),
+        h("td",{style:{color:o.margin_pct == null ? "" : o.margin_pct >= 50 ? "#6EE7B7" : "#FCA5A5"}}, o.revenue ? `${eur(o.net)} (${pc(o.margin_pct)})` : "—"),
+        h("td",{class:"muted"}, (o.avg_delivery_h == null ? "—" : o.avg_delivery_h + " h") + ` (${o.promised_h} h)` + (o.late ? ` · ${o.late} retard(s)` : "")),
+        h("td",{class:"muted"}, o.satisfied || o.unsatisfied ? `${o.satisfied} 👍 · ${o.unsatisfied} 👎` : "—"),
+        h("td",{class:"muted"}, o.prospects ? `${o.prospects} contacté(s) · réponse ${pc(o.response_pct)} · ${o.clients} client(s)` : "—")))
+        : h("tr",{}, h("td",{class:"empty",colspan:"8"},"Aucune offre pour l’instant."))))),
+    h("div",{class:"small muted",style:{marginTop:"6px"}}, `Ce mois : CA ${eur(rep.revenue)} · API ${eur(rep.api_month_eur)} · résultat après frais, cotisations et toutes les dépenses d’API : ${eur(rep.net_after_all_api)}`));
   const ST = {active:"Active", preparation:"En préparation", pause:"En pause"};
   const actTable = h("div",{style:{marginBottom:"18px"}}, h("span",{class:"lab"},"Par activité — pour ajuster le budget sur les coûts réels"),
     h("table",{style:{marginTop:"6px"}}, h("thead",{}, h("tr",{}, ["Activité","État","API (mois)","API (total)","Revenus (mois)","Tâches"].map(x=>h("th",{},x)))),
       h("tbody",{}, acts.map(a => h("tr",{}, h("td",{}, h("b",{}, a.name), h("div",{class:"small muted"}, a.description)), h("td",{class:"muted"}, ST[a.status]||a.status),
         h("td",{}, money4(a.cost_month)), h("td",{class:"muted"}, money4(a.cost_total)), h("td",{}, a.id ? eur(a.revenue_month) : "—"), h("td",{class:"muted"}, `${a.tasks_done} / ${a.tasks_open} en cours`))))));
-  const misTable = h("div",{style:{marginBottom:"18px"}}, h("span",{class:"lab"},"Par mission — coût d’API, et pour une commande : chiffre d’affaires et marge"),
+  const misTable = h("div",{style:{marginBottom:"18px"}}, h("span",{class:"lab"},"Par mission — coût d’API, et pour une commande : chiffre d’affaires et marge (après Stripe, cotisations et API)"),
     h("div",{style:{overflowX:"auto",maxHeight:"40vh",marginTop:"6px"}}, h("table",{}, h("thead",{}, h("tr",{}, ["Mission","État","Tâches","Coût API","Chiffre d’affaires","Marge"].map(x=>h("th",{},x)))),
       h("tbody",{}, c.by_mission.length ? c.by_mission.map(m => h("tr",{class:"click",onclick:()=>openMission(m.kind, m.id)},
         h("td",{style:{maxWidth:"320px"}}, (m.kind==="objectif" ? `#${m.id} ` : "") + m.title, m.test ? h("span",{class:"pill",style:{marginLeft:"6px"}},"essai") : null),
@@ -628,7 +641,7 @@ async function openCosts(){
         h("td",{style:{color:m.margin_eur == null ? "" : m.margin_eur >= 0 ? "#6EE7B7" : "#FCA5A5"}}, m.margin_eur != null ? eur(m.margin_eur) : "—")))
         : h("tr",{}, h("td",{class:"empty",colspan:"6"},"Aucune mission avec des coûts pour l’instant."))))),
     h("div",{class:"small muted",style:{marginTop:"6px"}}, `Hors mission ce mois (revues quotidiennes, discussions avec le PDG…) : ${money4(c.outside_missions_month_usd)}. Conversion : 1 $ = ${c.usd_to_eur} € (prices.usd_to_eur dans config.json).`));
-  modal("Analyses — coûts API", h("div",{}, actTable, misTable, h("div",{style:{display:"flex",alignItems:"flex-end",gap:"6px",height:"140px",marginBottom:"8px"}}, c.days.length ? c.days.map(d => h("div",{title:`${d.day} : ${money4(d.usd)} · ${d.searches} recherche(s)`,style:{flex:"1",minWidth:"10px",height:Math.max(3,100*d.usd/max)+"%",background:"linear-gradient(180deg,#22D3EE,#6366F1)",borderRadius:"4px 4px 0 0"}})) : h("span",{class:"empty"},"Pas encore de dépense")),
+  modal("Analyses — offres et coûts", h("div",{}, offTable, actTable, misTable, h("div",{style:{display:"flex",alignItems:"flex-end",gap:"6px",height:"140px",marginBottom:"8px"}}, c.days.length ? c.days.map(d => h("div",{title:`${d.day} : ${money4(d.usd)} · ${d.searches} recherche(s)`,style:{flex:"1",minWidth:"10px",height:Math.max(3,100*d.usd/max)+"%",background:"linear-gradient(180deg,#22D3EE,#6366F1)",borderRadius:"4px 4px 0 0"}})) : h("span",{class:"empty"},"Pas encore de dépense")),
     h("div",{class:"small muted",style:{marginBottom:"14px"}},"14 derniers jours (survole une barre pour le détail)"),
     h("table",{}, h("thead",{}, h("tr",{}, ["Agent","Tokens entrée / sortie (mois)","Coût (mois)"].map(x=>h("th",{},x)))), h("tbody",{}, c.by_agent.map(a => h("tr",{}, h("td",{},a.agent), h("td",{class:"muted"}, `${Math.round((a.input_tokens||0)/1000)}k / ${Math.round((a.output_tokens||0)/1000)}k`), h("td",{}, money4(a.usd))))))));
 }
