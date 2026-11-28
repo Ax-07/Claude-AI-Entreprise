@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import os
 from pathlib import Path
 
@@ -20,6 +21,9 @@ DEFAULTS: dict = {
         "description": "Micro-entreprise française de services numériques opérée par des agents IA.",
         # Mentions légales affichées en pied de toutes les pages publiques (obligatoires pour une page de vente).
         "legal": {"name": "", "siret": "", "address": "", "email": "", "vat_exempt": True, "cgv_url": ""},
+        # Mode test (le temps du développement) : identité légale fictive pour les emails, envoi limité à ces
+        # adresses (celles du propriétaire, qui accepte d'être contacté). CLI : mode-test on EMAIL / mode-test off.
+        "test_mode": {"enabled": False, "recipients": []},
     },
     # "auto" : Anthropic si ANTHROPIC_API_KEY est dans .env, sinon OpenAI si OPENAI_API_KEY y est.
     "provider": "auto",
@@ -137,6 +141,26 @@ class Config:
 
     def ensure_dirs(self) -> None:
         self.workspace.mkdir(parents=True, exist_ok=True)
+
+
+EMAIL_RE = re.compile(r"^[^@\s,;<>]+@[^@\s,;<>]+\.[a-zA-Z]{2,}$")
+TEST_LEGAL = {"name": "AI Enterprise Studio (TEST)", "siret": "000 000 000 00000 (fictif)", "address": "Adresse de test"}
+
+
+def test_recipients(cfg) -> list[str] | None:
+    """Adresses autorisées si le mode test est actif, sinon None."""
+    t = cfg.get("company", "test_mode", default={}) or {}
+    return [r.strip().lower() for r in t.get("recipients", []) if r.strip()] if t.get("enabled") else None
+
+
+def sender_legal(cfg) -> dict:
+    """Identité de l'expéditeur des emails : la vraie, complétée par des valeurs fictives en mode test."""
+    legal = dict(cfg["company"].get("legal") or {})
+    rec = test_recipients(cfg)
+    if rec is not None:
+        for k, v in {**TEST_LEGAL, "email": rec[0] if rec else ""}.items():
+            legal[k] = legal.get(k) or v
+    return legal
 
 
 def load_config(root: Path | None = None) -> Config:
