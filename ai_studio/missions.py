@@ -54,14 +54,31 @@ def _summary(db, where: str, arg) -> dict:
             "last_activity": last, "stuck": stuck, "failed_ids": [r["id"] for r in rows if r["status"] == "failed"]}
 
 
-def _issues(declared_done: bool, active: bool, s: dict) -> list[str]:
+def _waiting(db) -> dict:
+    """Validations en attente, rattachées à leur mission : {("objectif", id) | ("commande", n): [n° de validation]}."""
+    import json
+    out = {}
+    for a in db.q("SELECT a.id, a.payload, t.objective_id, t.order_ref FROM approvals a LEFT JOIN tasks t ON t.id=a.task_id "
+                  "WHERE a.status='pending'"):
+        order = json.loads(a["payload"]).get("order") or a["order_ref"]
+        if order:
+            out.setdefault(("commande", int(order)), []).append(a["id"])
+        elif a["objective_id"]:
+            out.setdefault(("objectif", a["objective_id"]), []).append(a["id"])
+    return out
+
+
+def _issues(declared_done: bool, active: bool, s: dict, paused: bool = False, waiting=()) -> list[str]:
     c, issues = s["counts"], []
     if c["failed"]:
         issues.append(f"{c['failed']} tâche(s) en échec")
     if s["stuck"]:
         issues.append(f"{len(s['stuck'])} tâche(s) bloquée(s) en cours depuis plus de {STUCK_MINUTES} min")
-    if c["blocked"]:
+    if c["blocked"] and not paused:
         issues.append(f"{c['blocked']} tâche(s) bloquée(s)")
+    nobody = s["total"] and not (c["pending"] or c["running"] or c["blocked"])
+    if active and not declared_done and nobody and not waiting:
+        issues.append("toutes les tâches sont finies mais la mission n'est pas clôturée : plus personne n'y travaille")
     if declared_done and (c["pending"] or c["running"]):
         issues.append("déclarée terminée alors que des tâches restent ouvertes")
     if declared_done and s["total"] and not c["done"]:
@@ -71,25 +88,39 @@ def _issues(declared_done: bool, active: bool, s: dict) -> list[str]:
     return issues
 
 
+def _to_check(m: dict) -> bool:
+    """À vérifier par le propriétaire : déclarée terminée, ou toutes ses tâches finies sans rien en attente."""
+    if m["archived"] or m["owner_check"] == "ok" or not m["total"]:
+        return False
+    c = m["counts"]
+    return m["declared_done"] or not (c["pending"] or c["running"] or c["blocked"] or m["waiting"])
+
+
 def missions(db) -> list[dict]:
-    out = []
-    for o in db.q("SELECT * FROM objectives ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'paused' THEN 1 ELSE 2 END, id DESC"):
+    out, waiting = [], _waiting(db)
+    for o in db.q("SELECT * FROM objectives ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'paused' THEN 1 WHEN 'done' THEN 2 ELSE 3 END, id DESC"):
         s = _summary(db, "objective_id=?", o["id"])
-        done = o["status"] == "done"
+        done, w = o["status"] == "done", waiting.get(("objectif", o["id"]), [])
+        archived = o["status"] == "archived"
         out.append({"kind": "objectif", "id": o["id"], "title": _short(o["text"], 90), "text": o["text"], "activity": o["activity"],
-                    "state": {"active": "En cours", "paused": "En pause", "done": "Terminée (agents)"}[o["status"]], "status": o["status"],
-                    "declared_done": done, **s, "issues": _issues(done, o["status"] == "active", s),
+                    "state": {"active": "En cours", "paused": "En pause", "done": "Terminée (agents)", "archived": "Archivée"}.get(o["status"], o["status"]),
+                    "status": o["status"], "declared_done": done, "archived": archived, "waiting": w, **s,
+                    "issues": [] if archived else _issues(done, o["status"] == "active", s, o["status"] == "paused", w),
                     "owner_check": o["owner_check"], "owner_note": o["owner_note"], "checked_at": o["checked_at"], "created_at": o["created_at"]})
-    for r in db.q("SELECT rowid AS n, * FROM sales WHERE stage IS NOT NULL AND stage!='historique' ORDER BY created_at DESC LIMIT 40"):
+    for r in db.q("SELECT rowid AS n, * FROM sales WHERE stage IS NOT NULL AND (stage!='historique' OR owner_check='archived') "
+                  "ORDER BY created_at DESC LIMIT 60"):
         s = _summary(db, "order_ref=?", r["n"])
-        done = r["stage"] == "livree"
-        late = not done and r["due_at"] and r["due_at"] < iso()
-        st = {"a_livrer": "À livrer", "attente_client": "Attente client", "livree": "Livrée (agents)"}.get(r["stage"], r["stage"])
-        issues = _issues(done, True, s) + (["échéance dépassée"] if late else [])
+        done, w = r["stage"] == "livree", waiting.get(("commande", r["n"]), [])
+        archived = r["owner_check"] == "archived"
+        late = not done and not archived and r["due_at"] and r["due_at"] < iso()
+        st = "Archivée" if archived else {"a_livrer": "À livrer", "attente_client": "Attente client", "livree": "Livrée (agents)"}.get(r["stage"], r["stage"])
+        issues = [] if archived else _issues(done, r["stage"] != "attente_client", s, False, w) + (["échéance dépassée"] if late else [])
         out.append({"kind": "commande", "id": r["n"], "title": f"Commande n°{r['n']} · {r['product'] or 'commande'}", "text": r["product"] or "",
-                    "activity": "services", "state": st, "status": r["stage"], "declared_done": done, **s, "issues": issues,
+                    "activity": "services", "state": st, "status": r["stage"], "declared_done": done, "archived": archived, "waiting": w, **s, "issues": issues,
                     "owner_check": r["owner_check"], "owner_note": r["owner_notes"], "checked_at": r["checked_at"], "created_at": r["created_at"],
                     "test": not r["livemode"]})
+    for m in out:
+        m["to_check"] = _to_check(m)
     return out
 
 
@@ -109,6 +140,8 @@ def verify(cfg, db, kind: str, mid: int, verdict: str, note: str = "") -> str:
     """Le propriétaire confirme qu'une mission est vraiment terminée, ou la renvoie au PDG avec ce qui ne va pas."""
     m = detail(db, kind, mid)
     note = (note or "").strip()
+    if verdict == "archive":
+        return archive(db, kind, mid, m["title"], note)
     if verdict not in ("ok", "issue"):
         raise ValueError("Verdict inconnu")
     if verdict == "issue" and len(note) < 5:
@@ -139,3 +172,18 @@ def verify(cfg, db, kind: str, mid: int, verdict: str, note: str = "") -> str:
                 priority=1, created_by="proprietaire", objective_id=mid if kind == "objectif" else None,
                 order_ref=mid if kind == "commande" else None)
     return "Mission renvoyée au PDG avec ta remarque."
+
+
+def archive(db, kind: str, mid: int, title: str, note: str = "") -> str:
+    """Le propriétaire classe une mission qu'il ne veut plus suivre (doublon, essai, abandon) : ses tâches en attente sont annulées."""
+    if kind == "objectif":
+        db.run("UPDATE objectives SET status='archived', owner_note=?, checked_at=? WHERE id=?", (note or None, iso(), mid))
+        col = "objective_id"
+    else:
+        db.run("UPDATE sales SET owner_check='archived', checked_at=?, stage='historique' WHERE rowid=?", (iso(), mid))
+        col = "order_ref"
+    n = db.conn.execute(f"UPDATE tasks SET status='blocked', result='Annulée : mission archivée par le propriétaire' "
+                        f"WHERE {col}=? AND status IN ('pending','blocked')", (mid,)).rowcount
+    db.conn.commit()
+    db.log("proprietaire", "mission", f"{title} : archivée{' — ' + note if note else ''} ({n} tâche(s) en attente annulée(s))")
+    return f"Mission archivée ({n} tâche(s) en attente annulée(s))."
