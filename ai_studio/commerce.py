@@ -177,8 +177,12 @@ def test_order(cfg, db, offer_name: str, email: str, infos: str = "") -> int:
     o = db.one("SELECT * FROM offers WHERE lower(name)=lower(?) AND status='active'", (offer_name.strip(),))
     if not o:
         raise ValueError(f"Offre introuvable : {offer_name} (voir la commande offres)")
-    if "@" not in email:
+    from .approvals import EMAIL_RE
+    email = email.strip()
+    if not EMAIL_RE.match(email):
         raise ValueError("Adresse email invalide")
+    if email.lower() in {"ton@email.fr", "moi@exemple.fr", "client@exemple.fr"}:
+        raise ValueError(f"« {email} » est l'adresse d'exemple de la documentation : mets ta vraie adresse.")
     sale = {"id": "essai_%d" % int(now().timestamp() * 1000), "created_at": iso(), "amount": float(o["price_eur"]), "currency": "EUR",
             "customer_email": email.strip(), "customer_name": "Client d'essai", "product": o["name"], "payment_link": None, "livemode": 0}
     db.run("INSERT INTO sales(id, created_at, amount, currency, customer_email, customer_name, product, payment_link, livemode, recorded_at) "

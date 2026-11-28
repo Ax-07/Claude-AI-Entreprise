@@ -285,6 +285,19 @@ def cmd_commande_test(cfg, db, a):
          f"{a.email} après ta validation. Suivi : python -m ai_studio commandes")
 
 
+def cmd_client(cfg, db, a):
+    from .approvals import EMAIL_RE
+    from .commerce import get_order
+    o = get_order(db, a.n)
+    if not o:
+        _out(f"Commande n°{a.n} introuvable."); return
+    if not EMAIL_RE.match(a.email.strip()):
+        _out("Adresse email invalide."); return
+    db.run("UPDATE sales SET customer_email=? WHERE id=?", (a.email.strip(), o["id"]))
+    db.log("proprietaire", "commande", f"Commande n°{a.n} : email du client corrigé ({o['customer_email']} → {a.email.strip()})")
+    _out(f"Commande n°{a.n} : les prochains envois partiront vers {a.email.strip()}.")
+
+
 def cmd_commandes(cfg, db, a):
     from .commerce import STAGES
     sql = "SELECT rowid AS n, * FROM sales" + ("" if a.toutes else " WHERE stage IN ('a_livrer','attente_client')")
@@ -429,6 +442,7 @@ def main(argv=None):
     s = sub.add_parser("relancer"); s.add_argument("id", type=int, nargs="?")
     s = sub.add_parser("archiver"); s.add_argument("id", type=int)
     sub.add_parser("offres")
+    s = sub.add_parser("client"); s.add_argument("n", type=int); s.add_argument("email")
     s = sub.add_parser("importer-offres"); s.add_argument("fichier", nargs="?")
     s = sub.add_parser("commande-test"); s.add_argument("offre"); s.add_argument("-e", "--email", required=True); s.add_argument("-i", "--infos")
     s = sub.add_parser("commandes"); s.add_argument("-t", "--toutes", action="store_true")
@@ -448,7 +462,7 @@ def main(argv=None):
                 "validations": cmd_validations, "taches": cmd_taches, "voir": cmd_voir, "journal": cmd_journal,
                 "couts": cmd_couts, "agents": cmd_agents, "relancer": cmd_relancer, "objectifs": cmd_objectifs, "activites": cmd_activites,
                 "archiver": cmd_archiver, "serveur": cmd_serveur, "notifier-test": cmd_notifier_test,
-                "offres": cmd_offres, "importer-offres": cmd_importer_offres, "commande-test": cmd_commande_test, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne,
+                "offres": cmd_offres, "client": cmd_client, "importer-offres": cmd_importer_offres, "commande-test": cmd_commande_test, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne,
                 "memoire": cmd_memoire, "oublier": cmd_oublier, "retenir": cmd_retenir,
                 "sauvegarder": cmd_sauvegarder, "sauvegardes": cmd_sauvegardes, "restaurer": cmd_restaurer,
                 "demarrage-auto": cmd_demarrage_auto,

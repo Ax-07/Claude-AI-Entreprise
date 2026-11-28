@@ -332,9 +332,12 @@ def decide_approval(cfg, db, approval_id: int, body: dict) -> dict:
         raise ApiError(404, "Demande introuvable")
     from .approvals import NotReady
     try:
-        msg = decide(cfg, db, approval_id, decision == "approve", str(body.get("note") or "")[:1000])
+        edits = body.get("edits") if isinstance(body.get("edits"), dict) else None
+        msg = decide(cfg, db, approval_id, decision == "approve", str(body.get("note") or "")[:1000], edits)
     except NotReady as e:
         raise ApiError(409, str(e))
+    except ValueError as e:
+        raise ApiError(400, str(e))
     return {"ok": True, "message": msg}
 
 
