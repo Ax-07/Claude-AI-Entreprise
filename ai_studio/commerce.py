@@ -469,7 +469,15 @@ def _agent_for(db, addr: str) -> str:
     return "support"
 
 
+INBOX_LOCK = __import__("threading").Lock()     # relevé périodique et surveillance en temps réel ne se chevauchent pas
+
+
 def sync_inbox(cfg, db, connect=None) -> dict:
+    with INBOX_LOCK:
+        return _sync_inbox(cfg, db, connect)
+
+
+def _sync_inbox(cfg, db, connect=None) -> dict:
     host, user, pwd = imap_settings()
     M = connect() if connect else imaplib.IMAP4_SSL(host, 993, timeout=30)
     try:
@@ -558,6 +566,9 @@ def sync_inbox(cfg, db, connect=None) -> dict:
                    f"(list_orders ; délègue au PDG si la production doit reprendre)." if order else ""),
                 priority=1 if order else 2, created_by="systeme", order_ref=order["n"] if order else None)
             db.run("UPDATE inbox SET status='queued', task_id=? WHERE id=?", (tid, iid))
+            _notify(cfg, db, f"Email reçu de {name or addr}"[:80],
+                    (("⚠ Suspect — " if alerts else "") + f"{subject[:120]}" + (f" (commande n°{order['n']})" if order else "")
+                     + f" → {agent}"), "emails")
             db.log(agent, "email", f"Email reçu de {addr} (« {subject[:80]} ») → tâche #{tid}")
             queued_today += 1
             counts["queued"] += 1

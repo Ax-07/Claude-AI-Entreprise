@@ -193,6 +193,8 @@ _Mis à jour le 27/11/2026_
 
 - Coûts par mission et par tâche (28/11) : `missions._costs` (somme des coûts des tâches rattachées), colonne « Coût » dans le tableau des missions, coût par tâche et total dans le détail ; Analyses → tableau « Par mission » (coût USD et EUR, chiffre d'affaires et marge pour une commande, clic → mission) + coût « hors mission » du mois (revues quotidiennes, discussions). Conversion `prices.usd_to_eur` (0,92 par défaut, à ajuster). 146 tests.
 
+- Emails en temps réel (28/11, demande du propriétaire) : `ai_studio/mail_watch.py`, fil séparé lancé par le moteur (`commerce.realtime_inbox`, actif par défaut) : connexion IMAP en IDLE (le serveur signale l'arrivée), relevé immédiat avec le même traitement (tâche, alerte, rebond), reconnexion toutes les 25 min, nouvel essai après 1 min en cas de coupure (journalisé une fois). Le relevé périodique (5 min) reste en filet de sécurité ; un verrou empêche les deux de se chevaucher. Notification Windows « Email reçu de … » (objet, commande liée, agent chargé ; « ⚠ Suspect » si besoin) pour chaque email traité — pas pour les newsletters, messages automatiques ou ignorés (`notifications.emails`). Non testé contre le vrai serveur Gmail (IDLE simulé dans les tests). 151 tests.
+
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
 - Les noms de modèles OpenAI viennent de la page de prix officielle du 27/11/2026 ; si le compte n'y a pas accès, changer `models.openai` dans `config.json`.
