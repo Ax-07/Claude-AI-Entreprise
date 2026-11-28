@@ -53,6 +53,22 @@ class MissionsTest(Base):
         m = next(x for x in missions.missions(self.db) if x["id"] == dup and x["kind"] == "objectif")
         self.assertEqual((m["archived"], m["issues"], m["to_check"]), (True, [], False))
 
+    def test_simple_mission_not_reviewed_by_ceo(self):
+        from ai_studio.tools import ToolContext, run_tool
+        from ai_studio.agents import ROLES
+        from ai_studio.orchestrator import Studio
+        out = run_tool("launch_mission", ToolContext(self.cfg, self.db, "pdg", None, list(ROLES)),
+                       {"title": "Proposer un audit SEO à ax-07.fr", "instructions": "Contacter le propriétaire du site", "agent": "ventes"})
+        oid = int(out.split("#")[1].split()[0])
+        t = self.db.one("SELECT * FROM tasks WHERE objective_id=?", (oid,))
+        self.assertIn("DÉJÀ été traitée", t["description"])
+        self.db.set_task(t["id"], status="done", result="Email de prospection préparé")
+        Studio(self.cfg, self.db, None).schedule_reviews()
+        self.assertEqual(self.db.one("SELECT COUNT(*) FROM tasks WHERE agent='pdg'")[0], 0)        # pas de revue en double
+        self.assertTrue(next(m for m in missions.missions(self.db) if m["id"] == oid)["to_check"])  # directement au propriétaire
+        missions.verify(self.cfg, self.db, "objectif", oid, "issue", "Aucun email n'a été envoyé")
+        self.assertIsNone(self.db.one("SELECT simple FROM objectives WHERE id=?", (oid,))[0])         # le PDG reprend la main
+
     def test_stuck_and_idle_signals(self):
         oid = self.db.add_objective("Mission test")
         tid = self.db.add_task("t", "recherche", objective_id=oid)

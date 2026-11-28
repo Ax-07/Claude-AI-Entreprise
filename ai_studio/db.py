@@ -193,6 +193,7 @@ class DB:
         ("objectives", "project_manager", "TEXT"),        # mission confiée à un chef de projet (agent chef_projet)
         ("objectives", "pm_summary", "TEXT"),             # bilan de clôture du chef de projet
         ("sales", "project_manager", "TEXT"),
+        ("objectives", "simple", "INTEGER"),               # mission simple (une tâche, un agent) : pas de revue du PDG
         ("sales", "checked_at", "TEXT"),
         ("tasks", "order_ref", "INTEGER"),                # commande concernée (suivi jusqu'à la livraison)
         ("sales", "offer_id", "INTEGER"),
