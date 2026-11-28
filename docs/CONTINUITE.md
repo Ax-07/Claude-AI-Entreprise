@@ -225,6 +225,13 @@ _Mis à jour le 27/11/2026_
   - Relecture liée à la version : `confirm_content_review` enregistre `sales.content_review_file` et `content_review_sha`. `deliver_order` (`review_mismatch`, après le contrôle qualité) exige la version exacte relue : même fichier et même empreinte ; pour un `.zip`, le fichier relu doit être inchangé et présent à l'identique dans l'archive. Une relecture ancienne sans empreinte doit être refaite.
   - Limites : pour un site, seule la page relue est garantie dans l'archive (les autres pages passent par le contrôle qualité). Le coffre `pieces_validees` n'est pas encore dans les sauvegardes (à traiter avec OPS-01).
   - `tests/test_outgoing.py` : 11 tests, qui échouent tous sans la correction. `test_quality` passe par `confirm_content_review` au lieu d'écrire la relecture en base. 226 tests.
+- FIN-02 corrigé (28/11) : `commerce.sync_stripe` réécrit. Le défaut était plus grave que décrit : un client qui ouvre le lien de paiement juste avant un passage et paie juste après était perdu (le curseur avançait sur la date de création de la session). Au démarrage, la migration `stage IS NULL → historique` enterrait en plus une vente enregistrée sans commande.
+  - Fenêtre glissante : `created[gte]` = début du dernier passage COMPLET − 26 h (`STRIPE_LOOKBACK`, une session expire en 24 h). Couvre aussi un PC éteint plusieurs jours.
+  - Pagination complète (garde-fou de 100 pages) : si elle est incomplète, le curseur n'avance pas.
+  - Paiements différés (`status=complete`, non payé) : suivis dans le kv `stripe_async_pending` et relus par `checkout/sessions/<id>` hors de la fenêtre, pendant 14 jours au plus.
+  - Une session est payée si `payment_status` vaut paid ou no_payment_required. Enregistrement par `INSERT OR IGNORE`, avec l'étape « nouvelle » (le premier passage reste « historique »).
+  - `open_pending_orders` ouvre toute vente « nouvelle » ou à livrer sans tâche, même après un arrêt du programme. `open_order` est reprenable : il réutilise la tâche du chef de projet et la tâche Support existantes, et la note d'informations n'est pas dupliquée. La notification « Nouvelle vente » part une seule fois, après l'ouverture. Les commandes d'essai passent par l'étape « nouvelle ».
+  - `tests/test_stripe_sync.py` : 9 tests avec un faux Stripe, dont 8 échouent sur l'ancien code. `test_commerce` vérifie désormais `created[gte]`. 235 tests.
 
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.

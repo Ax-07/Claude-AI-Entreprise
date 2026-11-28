@@ -236,7 +236,7 @@ class DB:
         ("sales", "checked_at", "TEXT"),
         ("tasks", "order_ref", "INTEGER"),                # commande concernée (suivi jusqu'à la livraison)
         ("sales", "offer_id", "INTEGER"),
-        ("sales", "stage", "TEXT"),                       # a_livrer | attente_client | livree | historique
+        ("sales", "stage", "TEXT"),                       # nouvelle | a_livrer | attente_client | livree | historique
         ("sales", "due_at", "TEXT"),
         ("sales", "delivered_at", "TEXT"),
         ("sales", "nudges", "INTEGER NOT NULL DEFAULT 0"),
