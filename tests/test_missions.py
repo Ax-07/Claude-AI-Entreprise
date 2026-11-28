@@ -69,6 +69,26 @@ class MissionsTest(Base):
         missions.verify(self.cfg, self.db, "objectif", oid, "issue", "Aucun email n'a été envoyé")
         self.assertIsNone(self.db.one("SELECT simple FROM objectives WHERE id=?", (oid,))[0])         # le PDG reprend la main
 
+    def test_costs_per_mission_and_task(self):
+        from pathlib import Path as P
+        from ai_studio import commerce
+        from ai_studio.server import costs
+        commerce.import_offers(self.db, P(__file__).resolve().parents[1] / "catalogue" / "offres.json")
+        n = commerce.test_order(self.cfg, self.db, "Diagnostic SEO local", "proprio@studio.fr")
+        oid = self.db.add_objective("Prospection")
+        a = self.db.add_task("Lister", "recherche", objective_id=oid)
+        b = self.db.add_task("Rapport", "atelier", order_ref=n)
+        self.db.add_cost("recherche", a, "m", 1, 1, 0, 0.10); self.db.add_cost("recherche", a, "m", 1, 1, 0, 0.05)
+        self.db.add_cost("atelier", b, "m", 1, 1, 0, 0.50)
+        self.db.add_cost("pdg", None, "m", 1, 1, 0, 0.02)                       # discussion : hors mission
+        ms = {(m["kind"], m["id"]): m for m in missions.missions(self.db)}
+        self.assertEqual((ms[("objectif", oid)]["cost_usd"], ms[("commande", n)]["cost_usd"]), (0.15, 0.5))
+        self.assertEqual(missions.detail(self.db, "objectif", oid)["tasks"][0]["cost_usd"], 0.15)
+        c = costs(self.cfg, self.db)
+        order = next(r for r in c["by_mission"] if r["kind"] == "commande")
+        self.assertEqual((order["revenue_eur"], order["margin_eur"]), (89, round(89 - 0.5 * 0.92, 2)))
+        self.assertEqual(c["outside_missions_month_usd"], 0.02)
+
     def test_stuck_and_idle_signals(self):
         oid = self.db.add_objective("Mission test")
         tid = self.db.add_task("t", "recherche", objective_id=oid)

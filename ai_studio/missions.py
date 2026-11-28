@@ -96,8 +96,18 @@ def _to_check(m: dict) -> bool:
     return m["declared_done"] or not (c["pending"] or c["running"] or c["blocked"] or m["waiting"])
 
 
+def _costs(db) -> dict:
+    """Coût d'API cumulé par mission : {("objectif", id) | ("commande", n): usd}."""
+    out = {}
+    for r in db.q("SELECT t.objective_id o, t.order_ref n, SUM(c.usd) usd FROM costs c JOIN tasks t ON t.id=c.task_id "
+                  "WHERE t.objective_id IS NOT NULL OR t.order_ref IS NOT NULL GROUP BY t.objective_id, t.order_ref"):
+        key = ("commande", r["n"]) if r["n"] else ("objectif", r["o"])
+        out[key] = out.get(key, 0) + (r["usd"] or 0)
+    return out
+
+
 def missions(db) -> list[dict]:
-    out, waiting = [], _waiting(db)
+    out, waiting, costs = [], _waiting(db), _costs(db)
     for o in db.q("SELECT * FROM objectives ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'paused' THEN 1 WHEN 'done' THEN 2 ELSE 3 END, id DESC"):
         s = _summary(db, "objective_id=?", o["id"])
         done, w = o["status"] == "done", waiting.get(("objectif", o["id"]), [])
@@ -122,6 +132,7 @@ def missions(db) -> list[dict]:
                     "test": not r["livemode"], "pm": bool(r["project_manager"]), "pm_summary": None})
     for m in out:
         m["to_check"] = _to_check(m)
+        m["cost_usd"] = round(costs.get((m["kind"], m["id"]), 0), 4)
     return out
 
 
@@ -130,8 +141,9 @@ def detail(db, kind: str, mid: int) -> dict:
     if not m:
         raise KeyError("Mission introuvable")
     col = "objective_id" if kind == "objectif" else "order_ref"
-    m["tasks"] = [dict(r) for r in db.q(f"SELECT id, parent_id, title, agent, status, priority, result, created_by, updated_at, attempts "
-                                        f"FROM tasks WHERE {col}=? ORDER BY id", (int(mid),))]
+    m["tasks"] = [dict(r) for r in db.q(f"SELECT t.id, t.parent_id, t.title, t.agent, t.status, t.priority, t.result, t.created_by, "
+                                        f"t.updated_at, t.attempts, (SELECT ROUND(COALESCE(SUM(usd),0), 4) FROM costs c WHERE c.task_id=t.id) AS cost_usd "
+                                        f"FROM tasks t WHERE t.{col}=? ORDER BY t.id", (int(mid),))]
     for t in m["tasks"]:
         t["result"] = _short(t["result"] or "", 400)
     return m

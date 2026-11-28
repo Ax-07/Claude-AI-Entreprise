@@ -515,7 +515,7 @@ async function openMissions(filter){
     h("span",{style:{flex:"1"}}), h("button",{class:"link",onclick:()=>openTasks()},"Toutes les tâches →"));
   modal("Missions — avancement et vérification", h("div",{}, tabs,
     h("div",{class:"small muted",style:{marginBottom:"10px"}},"« À vérifier » : missions déclarées terminées par les agents, ou dont toutes les tâches sont finies sans rien en attente. Ouvre-les pour confirmer, les renvoyer au PDG, ou les archiver (doublon, essai, abandon)."),
-    h("div",{style:{overflowX:"auto"}}, h("table",{}, h("thead",{}, h("tr",{}, ["Mission","État (agents)","Avancement","Anomalies","Ta vérification","Activité"].map(x=>h("th",{},x)))),
+    h("div",{style:{overflowX:"auto"}}, h("table",{}, h("thead",{}, h("tr",{}, ["Mission","État (agents)","Avancement","Anomalies","Ta vérification","Coût","Activité"].map(x=>h("th",{},x)))),
       h("tbody",{}, shown.length ? shown.map(m => h("tr",{class:"click",onclick:()=>openMission(m.kind, m.id)},
         h("td",{style:{maxWidth:"340px"}}, h("b",{}, m.kind==="objectif" ? `#${m.id} ` : ""), m.title, m.test ? h("span",{class:"pill",style:{marginLeft:"6px"}},"essai") : null,
           m.pm ? h("span",{class:"pill",title:"Pilotée par un chef de projet",style:{marginLeft:"6px",color:"#A5B4FC"}},"chef de projet") : null),
@@ -525,8 +525,9 @@ async function openMissions(filter){
           m.waiting.length ? h("span",{style:{display:"block",color:"#FCD34D"}}, `En attente de ta validation (#${m.waiting.join(", #")})`) : null,
           !m.issues.length && !m.waiting.length ? h("span",{class:"muted"},"—") : null),
         h("td",{style:{whiteSpace:"nowrap",color:(MCHECK[m.owner_check]||[])[1]||"#8590B8"}}, (MCHECK[m.owner_check]||["—"])[0]),
+        h("td",{class:"muted",style:{whiteSpace:"nowrap"}}, money4(m.cost_usd)),
         h("td",{class:"muted",style:{whiteSpace:"nowrap"}}, m.last_activity ? ago(m.last_activity) : "—")))
-        : h("tr",{}, h("td",{class:"empty",colspan:"6"}, filter==="todo" ? "Rien à vérifier pour l’instant." : "Aucune mission.")))))));
+        : h("tr",{}, h("td",{class:"empty",colspan:"7"}, filter==="todo" ? "Rien à vérifier pour l’instant." : "Aucune mission.")))))));
 }
 async function openMission(kind, id){
   let m; try { m = await api("GET",`/api/missions/${kind}/${id}`); } catch(e){ return toast(e.message,false); }
@@ -536,11 +537,11 @@ async function openMission(kind, id){
   const ids = new Set(m.tasks.map(t=>t.id)), roots = m.tasks.filter(t => !t.parent_id || !ids.has(t.parent_id));
   const row = (t, depth) => [h("div",{class:"feedrow click",style:{paddingLeft:(depth*18)+"px",alignItems:"flex-start"},onclick:()=>openTask(t.id)},
       h("span",{class:"st-"+t.status,style:{fontSize:"12px",whiteSpace:"nowrap",minWidth:"86px"}}, STATUS[t.status]||t.status),
-      h("span",{style:{flex:"1",minWidth:"0",display:"flex",flexDirection:"column",gap:"2px"}}, h("span",{style:{fontSize:"13px"}}, h("b",{},`#${t.id} `), t.title, h("span",{class:"muted"}, " · " + t.agent)),
+      h("span",{style:{flex:"1",minWidth:"0",display:"flex",flexDirection:"column",gap:"2px"}}, h("span",{style:{fontSize:"13px"}}, h("b",{},`#${t.id} `), t.title, h("span",{class:"muted"}, " · " + t.agent + (t.cost_usd ? " · " + money4(t.cost_usd) : ""))),
         t.result ? h("span",{class:"small muted",style:{wordBreak:"break-word"}}, t.result) : null)),
     ...(kids[t.id]||[]).map(c => row(c, depth+1)).flat()];
   modal(m.title, h("div",{style:{display:"flex",flexDirection:"column",gap:"12px"}},
-    h("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap",alignItems:"center"}}, h("span",{class:"pill"}, m.state), progressBar(m),
+    h("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap",alignItems:"center"}}, h("span",{class:"pill"}, m.state), progressBar(m), h("span",{class:"pill",title:"Coût d’API cumulé de la mission"}, "coût " + money4(m.cost_usd)),
       m.owner_check ? h("span",{style:{color:MCHECK[m.owner_check][1],fontSize:"13px"}}, MCHECK[m.owner_check][0] + (m.checked_at ? " · " + ago(m.checked_at) : "")) : null),
     m.kind==="objectif" ? h("div",{class:"pre"}, m.text) : null,
     h("span",{class:"small",style:{color:m.pm?"#A5B4FC":"#8590B8"}}, m.pm ? "Pilotée par un chef de projet : il est réveillé à la fin de chaque étape et clôture la mission." : "Pilotée directement par le PDG."),
@@ -580,7 +581,17 @@ async function openCosts(){
     h("table",{style:{marginTop:"6px"}}, h("thead",{}, h("tr",{}, ["Activité","État","API (mois)","API (total)","Revenus (mois)","Tâches"].map(x=>h("th",{},x)))),
       h("tbody",{}, acts.map(a => h("tr",{}, h("td",{}, h("b",{}, a.name), h("div",{class:"small muted"}, a.description)), h("td",{class:"muted"}, ST[a.status]||a.status),
         h("td",{}, money4(a.cost_month)), h("td",{class:"muted"}, money4(a.cost_total)), h("td",{}, a.id ? eur(a.revenue_month) : "—"), h("td",{class:"muted"}, `${a.tasks_done} / ${a.tasks_open} en cours`))))));
-  modal("Analyses — coûts API", h("div",{}, actTable, h("div",{style:{display:"flex",alignItems:"flex-end",gap:"6px",height:"140px",marginBottom:"8px"}}, c.days.length ? c.days.map(d => h("div",{title:`${d.day} : ${money4(d.usd)} · ${d.searches} recherche(s)`,style:{flex:"1",minWidth:"10px",height:Math.max(3,100*d.usd/max)+"%",background:"linear-gradient(180deg,#22D3EE,#6366F1)",borderRadius:"4px 4px 0 0"}})) : h("span",{class:"empty"},"Pas encore de dépense")),
+  const misTable = h("div",{style:{marginBottom:"18px"}}, h("span",{class:"lab"},"Par mission — coût d’API, et pour une commande : chiffre d’affaires et marge"),
+    h("div",{style:{overflowX:"auto",maxHeight:"40vh",marginTop:"6px"}}, h("table",{}, h("thead",{}, h("tr",{}, ["Mission","État","Tâches","Coût API","Chiffre d’affaires","Marge"].map(x=>h("th",{},x)))),
+      h("tbody",{}, c.by_mission.length ? c.by_mission.map(m => h("tr",{class:"click",onclick:()=>openMission(m.kind, m.id)},
+        h("td",{style:{maxWidth:"320px"}}, (m.kind==="objectif" ? `#${m.id} ` : "") + m.title, m.test ? h("span",{class:"pill",style:{marginLeft:"6px"}},"essai") : null),
+        h("td",{class:"muted",style:{whiteSpace:"nowrap"}}, m.state), h("td",{class:"muted"}, m.tasks),
+        h("td",{style:{whiteSpace:"nowrap"}}, `${money4(m.cost_usd)} (${eur(m.cost_eur)})`),
+        h("td",{}, m.revenue_eur != null ? eur(m.revenue_eur) : "—"),
+        h("td",{style:{color:m.margin_eur == null ? "" : m.margin_eur >= 0 ? "#6EE7B7" : "#FCA5A5"}}, m.margin_eur != null ? eur(m.margin_eur) : "—")))
+        : h("tr",{}, h("td",{class:"empty",colspan:"6"},"Aucune mission avec des coûts pour l’instant."))))),
+    h("div",{class:"small muted",style:{marginTop:"6px"}}, `Hors mission ce mois (revues quotidiennes, discussions avec le PDG…) : ${money4(c.outside_missions_month_usd)}. Conversion : 1 $ = ${c.usd_to_eur} € (prices.usd_to_eur dans config.json).`));
+  modal("Analyses — coûts API", h("div",{}, actTable, misTable, h("div",{style:{display:"flex",alignItems:"flex-end",gap:"6px",height:"140px",marginBottom:"8px"}}, c.days.length ? c.days.map(d => h("div",{title:`${d.day} : ${money4(d.usd)} · ${d.searches} recherche(s)`,style:{flex:"1",minWidth:"10px",height:Math.max(3,100*d.usd/max)+"%",background:"linear-gradient(180deg,#22D3EE,#6366F1)",borderRadius:"4px 4px 0 0"}})) : h("span",{class:"empty"},"Pas encore de dépense")),
     h("div",{class:"small muted",style:{marginBottom:"14px"}},"14 derniers jours (survole une barre pour le détail)"),
     h("table",{}, h("thead",{}, h("tr",{}, ["Agent","Tokens entrée / sortie (mois)","Coût (mois)"].map(x=>h("th",{},x)))), h("tbody",{}, c.by_agent.map(a => h("tr",{}, h("td",{},a.agent), h("td",{class:"muted"}, `${Math.round((a.input_tokens||0)/1000)}k / ${Math.round((a.output_tokens||0)/1000)}k`), h("td",{}, money4(a.usd))))))));
 }
