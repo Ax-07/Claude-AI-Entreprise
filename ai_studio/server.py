@@ -543,6 +543,9 @@ def make_handler(cfg):
                         return self._send(200, _chat_history(db, int(q("thread", "0") or 0)))
                     if parts == ["chat", "threads"]:
                         return self._send(200, _chat_threads(db))
+                    if parts == ["prospects"]:
+                        from . import prospects
+                        return self._send(200, {"prospects": prospects.listing(db, limit=500), "counts": prospects.counts(db)})
                     if parts == ["missions"]:
                         from .missions import missions
                         return self._send(200, missions(db))

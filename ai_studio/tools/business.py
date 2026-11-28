@@ -61,6 +61,14 @@ def send_email(ctx: ToolContext, to: str, reason: str, subject: str = "", body: 
                attachment: str = "", template: str = "", fields: dict | None = None) -> str:
     if not EMAIL_RE.match(to.strip()):
         return "Adresse email invalide."
+    client = ctx.task is not None and ctx.task["order_ref"] is not None
+    client = client or bool(ctx.db.one("SELECT 1 FROM sales WHERE lower(customer_email)=lower(?)", (to.strip(),)))
+    prospect = not in_reply_to and not client
+    if prospect:                             # fichier prospects : enregistré, jamais de doublon ni de contact après un refus
+        from .. import prospects
+        why = prospects.check_send(ctx.db, to, template)
+        if why:
+            return f"Refusé : {why}."
     used = None
     if template:
         from .. import email_templates
@@ -92,8 +100,7 @@ def send_email(ctx: ToolContext, to: str, reason: str, subject: str = "", body: 
             return "Pièce jointe trop lourde (10 Mo maximum)."
         extra["attachment"] = attachment
     added = []
-    client = ctx.task is not None and ctx.task["order_ref"] is not None
-    if not in_reply_to and not client:       # premier contact (prospection) : identité de l'expéditeur et droit d'opposition ajoutés d'office
+    if prospect:                             # premier contact (prospection) : identité de l'expéditeur et droit d'opposition ajoutés d'office
         body, added = sender_footer(ctx.cfg, body)
         if added:
             reason = f"{reason}\n[Ajouté automatiquement : {', '.join(added)}]"
@@ -107,7 +114,10 @@ def send_email(ctx: ToolContext, to: str, reason: str, subject: str = "", body: 
         return "Refusé : limite quotidienne de brouillons d'emails atteinte."
     aid = ctx.db.add_approval(ctx.agent, ctx.task["id"] if ctx.task is not None else None, "send_email",
                               {"to": to.strip(), "subject": subject, "body": body, **extra,
-                               **({"template": used["id"]} if used else {})}, reason)
+                               **({"template": used["id"]} if used else {}), **({"prospect": to.strip().lower()} if prospect else {})},
+                              reason)
+    if prospect:
+        prospects.set_status(ctx.db, to, "a_valider", f"email #{aid} soumis" + (f" (modèle {used['id']})" if used else ""))
     ctx.db.log(ctx.agent, "approval", f"Email pour {to} en attente de validation (#{aid})")
     from ..approvals import missing_setup
     later = missing_setup("send_email")

@@ -104,7 +104,8 @@ class TestRunner(Base):
 
     def test_email_goes_to_approval_and_followup(self):
         tid = self.db.add_task("Prospecter", "ventes")
-        llm = FakeLLM([[tu("send_email", {"to": "contact@exemple.fr", "subject": "Bonjour", "body": "…", "reason": "test"})],
+        llm = FakeLLM([[tu("save_prospect", {"email": "contact@exemple.fr", "source": "https://exemple.fr/contact"}),
+                        tu("send_email", {"to": "contact@exemple.fr", "subject": "Bonjour", "body": "…", "reason": "test"})],
                        [tu("complete_task", {"result": "email préparé"})]])
         run_task(self.cfg, self.db, llm, self.guard, self.db.task(tid))
         pend = self.db.pending_approvals()

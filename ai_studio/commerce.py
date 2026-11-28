@@ -143,7 +143,10 @@ def open_order(cfg, db, s: dict) -> int:
         due = iso(datetime.fromisoformat(s["created_at"]) + timedelta(hours=int(offer["delay_hours"])))
     db.run("UPDATE sales SET stage='a_livrer', offer_id=?, due_at=? WHERE id=?", (offer["id"] if offer else None, due, s["id"]))
     n = order_number(db, s["id"])
-    db.run("UPDATE sales SET project_manager='chef_projet' WHERE id=?", (s["id"],))     # chaque commande a son chef de projet
+    db.run("UPDATE sales SET project_manager='chef_projet' WHERE id=?", (s["id"],))
+    if s.get("customer_email") and s.get("livemode"):        # une commande d'essai ne fait pas d'un prospect un client
+        from . import prospects
+        prospects.became_client(db, s["customer_email"])     # chaque commande a son chef de projet
     tid = db.add_task(f"Commande n°{n} : livrer {s['product'] or 'la commande'} ({s['customer_email'] or 'client'})"[:120], "chef_projet",
                       delivery_brief(db, n), priority=1, created_by="systeme", order_ref=n)
     db.run("UPDATE sales SET task_id=? WHERE id=?", (tid, s["id"]))
@@ -425,6 +428,8 @@ def handle_bounce(cfg, db, addrs: list[str], reason: str, inbox_id=None) -> list
             if str(p.get("to", "")).strip().lower() != addr:
                 continue
             db.set_approval(a["id"], status="bounced", result=f"{a['result']} — NON DISTRIBUÉ : {reason}")
+            from . import prospects
+            prospects.set_status(db, addr, "invalide", f"non distribué : {reason}"[:200], next_action_at=None)
             hits.append(a["id"])
             order = p.get("order")
             db.log("systeme", "email", f"Email #{a['id']} à {addr} NON DISTRIBUÉ ({reason})" + (f" — commande n°{order}" if order else ""))
@@ -463,6 +468,8 @@ def _agent_for(db, addr: str) -> str:
     """Un client (a déjà payé) → support ; quelqu'un à qui on a écrit (prospect) → ventes ; sinon support."""
     if db.one("SELECT 1 FROM sales WHERE lower(customer_email)=lower(?)", (addr,)):
         return "support"
+    if db.one("SELECT 1 FROM prospects WHERE email=lower(?)", (addr,)):
+        return "ventes"
     for a in db.q("SELECT payload FROM approvals WHERE action='send_email' AND status='executed'"):
         if json.loads(a["payload"]).get("to", "").lower() == addr.lower():
             return "ventes"
@@ -535,6 +542,13 @@ def _sync_inbox(cfg, db, connect=None) -> dict:
             if why:
                 counts["ignored"] += 1
                 continue
+            from . import prospects
+            pst = prospects.on_reply(db, addr, body)
+            if pst in ("stop", "refus"):     # opposition ou refus : fiche mise à jour, pas de réponse à préparer
+                db.run("UPDATE inbox SET status='ignored', reason=? WHERE id=?",
+                       ("prospect : " + ("demande à ne plus être contacté" if pst == "stop" else "a décliné la proposition"), iid))
+                counts["ignored"] += 1
+                continue
             if queued_today >= cap:
                 if db.kv_get("inbox_cap_day") != today:
                     db.kv_set("inbox_cap_day", today)
@@ -562,6 +576,9 @@ def _sync_inbox(cfg, db, connect=None) -> dict:
                 "- Vérifie la mémoire (recall) pour connaître l'offre, les prix et l'historique avec ce contact.\n"
                 "- Si le message n'appelle pas de réponse (spam, publicité, simple remerciement), termine la tâche en le disant.\n"
                 "- Si une décision du propriétaire est nécessaire (remboursement, devis particulier…), utilise request_owner_decision."
+                + ("\n- C'est un PROSPECT qui répond à notre prospection (list_prospects) : réponds dans le fil (in_reply_to), "
+                   "avec le modèle reponse_interesse s'il est intéressé, puis mets à jour son statut avec set_prospect_status "
+                   "(interesse, refus…)." if pst else "")
                 + (f"\n- Ce client a la commande n°{order['n']} en cours : utilise ses réponses pour faire avancer la livraison "
                    f"(list_orders ; délègue au PDG si la production doit reprendre)." if order else ""),
                 priority=1 if order else 2, created_by="systeme", order_ref=order["n"] if order else None)

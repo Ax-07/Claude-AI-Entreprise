@@ -238,7 +238,7 @@ $("#chatform").onsubmit = async e => { e.preventDefault(); const text = $("#chat
 document.addEventListener("keydown", e => { if(e.key==="Escape") $("#chat").classList.remove("on"); });
 
 // ------------------------------------------------ navigation (même menu que la maquette)
-const NAV = [["Vue d’ensemble","HOME",()=>window.scrollTo({top:0,behavior:"smooth"})],["Agents","USERS",()=>$("#agents").scrollIntoView({behavior:"smooth"})],["Missions","FLAG",()=>openMissions()],["Analyses","CHART",()=>openCosts()],["Connaissances","BOOK",()=>openFiles()],["Intégrations","PLUG",()=>openIntegrations()],["Paramètres","GEAR",()=>openSettings()]];
+const NAV = [["Vue d’ensemble","HOME",()=>window.scrollTo({top:0,behavior:"smooth"})],["Agents","USERS",()=>$("#agents").scrollIntoView({behavior:"smooth"})],["Missions","FLAG",()=>openMissions()],["Prospects","TARGET",()=>openProspects()],["Analyses","CHART",()=>openCosts()],["Connaissances","BOOK",()=>openFiles()],["Intégrations","PLUG",()=>openIntegrations()],["Paramètres","GEAR",()=>openSettings()]];
 put($("#nav"), NAV.map(([l,i,f],k) => h("button",{class:"navlink"+(k===0?" on":""),onclick:f}, ico(i, k===0?"#A5B4FC":"#8590B8", 18), l)));
 $("#btnobj").onclick = () => openObjectives(); $("#bell").onclick = () => $("#validations").scrollIntoView({behavior:"smooth"});
 $("#btnalltasks").onclick = () => openTasks(); $("#btnalltasks2").onclick = () => openTasks(); $("#btnallev").onclick = () => openEvents();
@@ -504,6 +504,34 @@ function progressBar(m){ const c = m.counts, t = Math.max(1, m.total), seg = (n,
   return h("div",{style:{display:"flex",flexDirection:"column",gap:"4px",minWidth:"150px"}},
     h("div",{style:{display:"flex",height:"8px",borderRadius:"4px",overflow:"hidden",background:"rgba(255,255,255,.06)"}}, seg(c.done,"#34D399"), seg(c.running,"#60A5FA"), seg(c.pending,"#A5B4FC"), seg(c.blocked,"#FBBF24"), seg(c.failed,"#F87171")),
     h("span",{class:"small muted"}, m.total ? `${c.done}/${m.total} tâche(s) réussie(s)` + (c.running ? ` · ${c.running} en cours` : "") + (c.pending ? ` · ${c.pending} en attente` : "") : "aucune tâche")); }
+const PST = {nouveau:["Nouveau","#8590B8"], a_valider:["Email à valider","#FCD34D"], contacte:["Contacté","#60A5FA"], relance:["Relancé","#A5B4FC"],
+  repondu:["A répondu","#22D3EE"], interesse:["Intéressé","#34D399"], client:["Client","#10B981"], refus:["Refus","#F87171"],
+  stop:["Ne plus contacter","#EF4444"], sans_suite:["Sans suite","#6B7280"], invalide:["Adresse invalide","#9CA3AF"]};
+async function openProspects(filter){
+  let d; try { d = await api("GET","/api/prospects"); } catch(e){ return toast(e.message,false); }
+  filter = filter || "actifs";
+  const groups = {actifs:["En cours", p => ["nouveau","a_valider","contacte","relance","repondu","interesse"].includes(p.status)],
+    reponses:["Réponses", p => ["repondu","interesse","client"].includes(p.status)], clos:["Clos", p => ["client","refus","stop","sans_suite","invalide"].includes(p.status)],
+    tous:["Tous", p => true]};
+  const shown = d.prospects.filter(groups[filter][1]);
+  const day = v => v ? new Date(v).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"}) : "—";
+  const c = d.counts, sent = (c.contacte||0)+(c.relance||0)+(c.repondu||0)+(c.interesse||0)+(c.client||0)+(c.refus||0)+(c.stop||0)+(c.sans_suite||0);
+  const answered = (c.repondu||0)+(c.interesse||0)+(c.client||0)+(c.refus||0)+(c.stop||0);
+  modal("Prospects — qui a été contacté, quand, avec quelle réponse", h("div",{},
+    h("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap",marginBottom:"10px",alignItems:"center"}},
+      Object.entries(groups).map(([k,[lbl,fn]]) => h("button",{class:"btn"+(k===filter?" on":""),onclick:()=>openProspects(k)}, `${lbl} (${d.prospects.filter(fn).length})`)),
+      h("span",{style:{flex:"1"}}), h("span",{class:"small muted"}, `${sent} contacté(s) · ${answered} réponse(s)` + (sent ? ` · taux de réponse ${Math.round(100*answered/sent)} %` : "") + ` · ${c.client||0} client(s)`)),
+    h("div",{class:"small muted",style:{marginBottom:"10px"}},"Une seule relance automatique 7 jours après le premier email sans réponse, puis « sans suite ». Une réponse « STOP » ou un refus retire le prospect définitivement."),
+    h("div",{style:{overflowX:"auto",maxHeight:"60vh"}}, h("table",{}, h("thead",{}, h("tr",{}, ["Prospect","Statut","1er contact","Réponse","Prochaine action","Offre","Source"].map(x=>h("th",{},x)))),
+      h("tbody",{}, shown.length ? shown.map(p => h("tr",{title:p.notes||""},
+        h("td",{}, h("b",{}, p.company || p.site || p.email), h("div",{class:"small muted"}, (p.name ? p.name + " · " : "") + p.email)),
+        h("td",{}, h("span",{class:"pill",style:{color:(PST[p.status]||[])[1]}}, (PST[p.status]||[p.status])[0])),
+        h("td",{class:"muted"}, day(p.first_contact_at)), h("td",{class:"muted"}, day(p.replied_at)),
+        h("td",{class:"muted"}, p.next_action_at ? (p.status==="relance" ? "sans suite le " : "relance le ") + day(p.next_action_at) : "—"),
+        h("td",{class:"muted"}, p.offer || "—"),
+        h("td",{}, p.source ? h("a",{href:p.source,target:"_blank",rel:"noopener noreferrer",class:"small"}, "lien") : "—"))) :
+        h("tr",{}, h("td",{colspan:"7",class:"empty"}, "Aucun prospect ici pour l’instant.")))))));
+}
 async function openMissions(filter){
   let list; try { list = await api("GET","/api/missions"); } catch(e){ return toast(e.message,false); }
   filter = filter || "todo";
