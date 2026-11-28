@@ -174,27 +174,24 @@ def stripe_recent_payments(ctx: ToolContext, limit: int = 10) -> str:
       "Propose la création d'un lien de paiement Stripe pour une offre du catalogue (soumis à validation du "
       "propriétaire). Indique offer = nom de la fiche d'offre : le nom et le prix sont repris de la fiche, et chaque "
       "vente sera rattachée à cette offre pour la livraison.",
-      {"offer": {"type": "string", "description": "nom de l'offre du catalogue (recommandé)"},
-       "product_name": {"type": "string"}, "amount_eur": {"type": "number"},
+      {"offer": {"type": "string", "description": "nom exact d'une offre VALIDÉE du catalogue (list_offers)"},
        "recurring": {"type": "string", "description": "vide = paiement unique, sinon 'month' ou 'year'"},
        "reason": {"type": "string"}},
-      ["reason"], sensitive=True, requires_env=("STRIPE_SECRET_KEY",))
-def propose_payment_link(ctx: ToolContext, reason: str, offer: str = "", product_name: str = "", amount_eur: float = 0,
-                         recurring: str = "") -> str:
-    offer_id = None
-    if offer:
-        o = ctx.db.one("SELECT * FROM offers WHERE lower(name)=lower(?) AND status='active'", (offer.strip(),))
-        if not o:
-            return f"Offre « {offer} » introuvable dans le catalogue (list_offers, save_offer)."
-        offer_id, product_name, amount_eur = o["id"], o["name"], o["price_eur"]
-    if not product_name:
-        return "Indique l'offre du catalogue (offer), ou à défaut product_name et amount_eur."
+      ["offer", "reason"], sensitive=True, requires_env=("STRIPE_SECRET_KEY",))
+def propose_payment_link(ctx: ToolContext, reason: str, offer: str = "", recurring: str = "", **_ignored) -> str:
+    if not offer.strip():
+        return "Indique l'offre du catalogue (offer) : seules les offres validées par le propriétaire peuvent être vendues."
+    o = ctx.db.one("SELECT * FROM offers WHERE lower(name)=lower(?)", (offer.strip(),))
+    if not o or o["status"] != "active":
+        return (f"Offre « {offer} » " + ("en attente de validation du propriétaire : pas de lien de paiement avant sa décision."
+                                       if o and o["status"] == "draft" else "absente du catalogue validé (list_offers)."))
+    offer_id, product_name, amount_eur = o["id"], o["name"], o["price_eur"]
     if not 1 <= float(amount_eur) <= 5000:
         return "Montant hors limites (1 à 5000 €)."
     aid = ctx.db.add_approval(ctx.agent, ctx.task["id"] if ctx.task is not None else None, "stripe_payment_link",
                               {"product_name": product_name, "amount_eur": float(amount_eur), "recurring": recurring,
                                "offer_id": offer_id}, reason)
-    note = "" if offer_id else " Sans fiche d'offre, les agents ne sauront pas quoi livrer : crée-la avec save_offer."
+    note = ""
     return f"Lien de paiement #{aid} en attente de validation : il sera créé automatiquement dès que le propriétaire validera.{note}"
 
 

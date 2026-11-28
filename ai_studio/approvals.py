@@ -124,6 +124,9 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "", edits: dict
         if a["action"] == "send_email" and payload.get("prospect"):
             from . import prospects
             prospects.on_not_sent(db, payload["prospect"])
+        if a["action"] == "offer":
+            from .offers import decide as decide_offer
+            decide_offer(db, payload, False)
         outcome = f"REFUSÉ par le propriétaire. {note}".strip()
     elif a["action"] in EXECUTORS:
         missing = missing_setup(a["action"])
@@ -152,6 +155,11 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "", edits: dict
                 from . import prospects
                 prospects.on_not_sent(db, payload["prospect"])
             outcome = f"VALIDÉ mais l'exécution a échoué : {e}"
+    elif a["action"] == "offer":
+        from .offers import decide as decide_offer
+        res = decide_offer(db, payload, True)
+        db.set_approval(approval_id, status="approved", decided_at=iso(), result=res)
+        outcome = f"VALIDÉ : {res}. {note}".strip()
     else:
         db.set_approval(approval_id, status="approved", decided_at=iso(), result=note or "Validé")
         outcome = f"Réponse du propriétaire : {note or 'OK, validé.'}"

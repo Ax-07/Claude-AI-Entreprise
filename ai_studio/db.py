@@ -204,6 +204,7 @@ class DB:
     # Colonnes ajoutées après coup : ajoutées aux bases existantes sans perte de données.
     MIGRATIONS = (
         ("chat", "thread_id", "INTEGER"),                 # discussion à laquelle appartient le message
+        ("offers", "pending", "TEXT"),                    # modification d'une offre active en attente de ta validation (JSON)
         ("objectives", "owner_check", "TEXT"),            # vérification du propriétaire : ok | issue
         ("objectives", "owner_note", "TEXT"),
         ("objectives", "checked_at", "TEXT"),
