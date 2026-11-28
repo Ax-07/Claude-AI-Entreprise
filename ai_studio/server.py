@@ -454,7 +454,7 @@ def make_handler(cfg):
                         "objectives": lambda: objectives(cfg, db), "files": lambda: files(cfg, db),
                         "map": lambda: map_settings(cfg, db), "integrations": lambda: integrations(cfg, db),
                         "sales": lambda: sales(cfg, db), "inbox": lambda: inbox(cfg, db),
-                        "activities": lambda: activities(cfg, db), "chat": lambda: _chat_history(db),
+                        "activities": lambda: activities(cfg, db),
                     }
                     if parts == ["tasks"]:
                         return self._send(200, tasks(cfg, db, q("status"), q("agent"), int(q("limit", "50") or 50)))
@@ -462,6 +462,10 @@ def make_handler(cfg):
                         return self._send(200, task_detail(cfg, db, int(parts[1])))
                     if len(parts) == 3 and parts[0] == "approvals" and parts[1].isdigit() and parts[2] == "preview":
                         return self._preview(page_preview(cfg, db, int(parts[1])))
+                    if parts == ["chat"]:
+                        return self._send(200, _chat_history(db, int(q("thread", "0") or 0)))
+                    if parts == ["chat", "threads"]:
+                        return self._send(200, _chat_threads(db))
                     if parts == ["library"]:
                         return self._send(200, library(db, q("q"), int(q("id", "0") or 0)))
                     if parts == ["insights"]:
@@ -482,6 +486,9 @@ def make_handler(cfg):
                         return self._send(200, set_map(cfg, db, body))
                     if parts == ["chat"]:
                         return self._send(200, _chat_send(cfg, db, body))
+                    if parts == ["chat", "threads"]:
+                        from .chat import new_thread
+                        return self._send(200, {"id": new_thread(db)})
                     if len(parts) == 2 and parts[0] == "objectives" and parts[1].isdigit():
                         return self._send(200, set_objective(cfg, db, int(parts[1]), body))
                     if len(parts) == 3 and parts[0] == "tasks" and parts[1].isdigit() and parts[2] == "retry":
@@ -550,15 +557,22 @@ def library(db, query: str = "", item: int = 0):
                        "agent": r["agent"], "task_id": r["task_id"], "created_at": r["created_at"], "size": len(r["content"])} for r in rows]}
 
 
-def _chat_history(db) -> list[dict]:
-    from .chat import history
-    return history(db)
+def _chat_history(db, thread: int = 0) -> dict:
+    from .chat import history, latest_thread
+    thread = thread or latest_thread(db)
+    t = db.one("SELECT * FROM chat_threads WHERE id=?", (thread,)) if thread else None
+    return {"thread": dict(t) if t else None, "messages": history(db, thread) if t else []}
+
+
+def _chat_threads(db) -> list[dict]:
+    from .chat import threads
+    return threads(db)
 
 
 def _chat_send(cfg, db, body: dict) -> dict:
     from .chat import send
     try:
-        return send(cfg, db, body.get("text", ""))
+        return send(cfg, db, body.get("text", ""), int(body.get("thread") or 0) or None)
     except ValueError as e:
         raise ApiError(400, str(e))
 

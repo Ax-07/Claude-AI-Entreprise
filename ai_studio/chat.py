@@ -30,14 +30,34 @@ Tu es en DISCUSSION DIRECTE avec le propriétaire, dans le tableau de bord. Règ
 - Les règles permanentes restent valables : toute action externe passe par la validation du propriétaire."""
 
 
-def history(db, limit: int = 60) -> list[dict]:
-    rows = db.q("SELECT id, role, text, cost_usd, created_at FROM chat ORDER BY id DESC LIMIT ?", (int(limit),))
+def threads(db, limit: int = 50) -> list[dict]:
+    """Discussions, la plus récente en premier, avec leur nombre de messages et leur coût."""
+    rows = db.q("SELECT t.*, COUNT(c.id) AS messages, COALESCE(SUM(c.cost_usd),0) AS cost_usd FROM chat_threads t "
+                "LEFT JOIN chat c ON c.thread_id=t.id GROUP BY t.id "
+                "ORDER BY t.updated_at DESC, COUNT(c.id)=0 DESC, MAX(c.id) DESC, t.id DESC LIMIT ?", (int(limit),))
+    return [dict(r) for r in rows]
+
+
+def new_thread(db, title: str = "Nouvelle discussion") -> int:
+    return db.run("INSERT INTO chat_threads(title, created_at, updated_at) VALUES (?,?,?)", (title, iso(), iso()))
+
+
+def latest_thread(db) -> int | None:
+    t = threads(db, 1)
+    return t[0]["id"] if t else None
+
+
+def history(db, thread: int | None = None, limit: int = 200) -> list[dict]:
+    thread = thread or latest_thread(db)
+    if not thread:
+        return []
+    rows = db.q("SELECT id, role, text, cost_usd, created_at FROM chat WHERE thread_id=? ORDER BY id DESC LIMIT ?", (int(thread), int(limit)))
     return [dict(r) for r in reversed(rows)]
 
 
-def _messages(db) -> list[dict]:
+def _messages(db, thread: int) -> list[dict]:
     msgs = []
-    for r in history(db, HISTORY):
+    for r in history(db, thread, HISTORY):
         role = "user" if r["role"] == "owner" else "assistant"
         if msgs and msgs[-1]["role"] == role:
             msgs[-1]["content"] += "\n\n" + r["text"]
@@ -48,14 +68,22 @@ def _messages(db) -> list[dict]:
     return msgs
 
 
-def send(cfg, db, text: str) -> dict:
+def send(cfg, db, text: str, thread: int | None = None) -> dict:
     """Enregistre le message du propriétaire, fait répondre le PDG et renvoie sa réponse."""
     text = " ".join(str(text or "").split()) if "\n" not in str(text or "") else str(text).strip()
     if not text:
         raise ValueError("Message vide.")
     if len(text) > 4000:
         raise ValueError("Message trop long (4 000 caractères au maximum).")
-    db.run("INSERT INTO chat(role, text, created_at) VALUES ('owner', ?, ?)", (text, iso()))
+    if thread and not db.one("SELECT 1 FROM chat_threads WHERE id=?", (int(thread),)):
+        raise ValueError("Discussion introuvable.")
+    if not thread:
+        thread = new_thread(db)
+    thread = int(thread)
+    if db.one("SELECT title FROM chat_threads WHERE id=?", (thread,))["title"] == "Nouvelle discussion":
+        title = text.split("\n")[0]
+        db.run("UPDATE chat_threads SET title=? WHERE id=?", (title[:60] + ("…" if len(title) > 60 else ""), thread))
+    db.run("INSERT INTO chat(role, text, thread_id, created_at) VALUES ('owner', ?, ?, ?)", (text, thread, iso()))
     db.log("proprietaire", "chat", f"Message au PDG : {text[:150]}")
     role = ROLES["pdg"]
     guard = BudgetGuard(cfg, db)
@@ -63,7 +91,7 @@ def send(cfg, db, text: str) -> dict:
     ctx = ToolContext(cfg, db, "pdg", None, list(ROLES))
     system = [{"type": "text", "text": system_prompt(role, cfg) + "\n" + CHAT_RULES, "cache_control": {"type": "ephemeral"}}]
     tools = [REGISTRY[n].spec() for n in TOOLS if n in REGISTRY and REGISTRY[n].available()]
-    messages, answer, cost, actions = _messages(db), "", 0.0, []
+    messages, answer, cost, actions = _messages(db, thread), "", 0.0, []
     try:
         llm = (LLM_FACTORY or make_llm)(cfg)
         for step in range(MAX_STEPS):
@@ -93,5 +121,6 @@ def send(cfg, db, text: str) -> dict:
     except LLMError as e:
         answer = f"Je ne peux pas répondre pour l'instant (erreur du modèle : {e})."
     answer = answer or ("C'est lancé." if actions else "(pas de réponse)")
-    mid = db.run("INSERT INTO chat(role, text, cost_usd, created_at) VALUES ('pdg', ?, ?, ?)", (answer, round(cost, 6), iso()))
-    return {"id": mid, "role": "pdg", "text": answer, "cost_usd": round(cost, 6), "actions": actions}
+    mid = db.run("INSERT INTO chat(role, text, cost_usd, thread_id, created_at) VALUES ('pdg', ?, ?, ?, ?)", (answer, round(cost, 6), thread, iso()))
+    db.run("UPDATE chat_threads SET updated_at=? WHERE id=?", (iso(), thread))
+    return {"id": mid, "role": "pdg", "text": answer, "cost_usd": round(cost, 6), "actions": actions, "thread": thread}
