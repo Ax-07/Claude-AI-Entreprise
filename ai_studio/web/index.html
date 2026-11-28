@@ -352,24 +352,38 @@ function renderDetail(){
 
 // ------------------------------------------------ validations (en haut de la colonne de droite)
 const ACTION = {send_email:"Envoi d'email", stripe_payment_link:"Lien de paiement Stripe", decision:"Décision demandée", publish_page:"Publication d'une page"};
+function approvalLines(a){ const pl = a.payload, lines = [];
+  if (a.action==="send_email") lines.push(`À : ${pl.to}`, `Objet : ${pl.subject}`, ...(pl.in_reply_to ? [`En réponse à l'email reçu #${pl.in_reply_to}`] : []), ...(pl.attachment ? [`Pièce jointe : ${pl.attachment}`] : []), "", pl.body);
+  else if (a.action==="publish_page") lines.push(`Adresse : ${pl.url}`, `Titre : ${pl.title}`, `Fichier : ${pl.file} (${Math.round((pl.size||0)/1024)} Ko)`);
+  else if (a.action==="stripe_payment_link") lines.push(`Produit : ${pl.product_name}`, `Montant : ${pl.amount_eur} €` + (pl.recurring ? ` / ${pl.recurring==="month"?"mois":"an"}` : ""));
+  else lines.push(pl.question || "", pl.context ? "\n" + pl.context : "");
+  return lines.join("\n"); }
+const agentPill = a => h("span",{style:{fontSize:"11px",color:C[a.agent],border:`1px solid ${C[a.agent]}88`,borderRadius:"999px",padding:"2px 9px",whiteSpace:"nowrap",alignSelf:"flex-start"}}, a.agent);
+const reviewBox = a => a.review ? h("div",{style:{fontSize:"12px",lineHeight:"1.45",padding:"8px 10px",borderRadius:"10px",background:"rgba(203,213,225,.07)",border:"1px solid rgba(203,213,225,.35)"}}, h("b",{},"Avis juridique : "), a.review)
+  : a.review_pending ? h("span",{class:"small muted"},"Relecture juridique en cours…") : null;
+// La décision se prend dans une fenêtre : le rafraîchissement automatique de la colonne n'efface plus ce que tu écris.
+function openApproval(a){
+  const note = h("textarea",{rows:"3",placeholder:a.action==="decision"?"Ta réponse…":"Note pour l’agent (facultative) : ce qu’il doit corriger, ce que tu as décidé…",style:{width:"100%",resize:"vertical"},"aria-label":"Note"});
+  const act = async ok => { if (a.action==="decision" && ok && !note.value.trim()) { note.focus(); return toast("Écris ta réponse avant de l’envoyer.", false); }
+    try { const r = await api("POST",`/api/approvals/${a.id}`,{decision: ok?"approve":"reject", note: note.value}); closeModal(); toast(r.message, ok); refresh(); } catch(e){ toast(e.message,false); } };
+  modal(`#${a.id} · ${ACTION[a.action]||a.action}`, h("div",{style:{display:"flex",flexDirection:"column",gap:"12px"}},
+    h("div",{style:{display:"flex",justifyContent:"space-between",gap:"8px",alignItems:"center"}}, a.reason ? h("span",{class:"small muted"}, a.reason) : h("span",{}), agentPill(a)),
+    h("pre",{class:"pre",style:{maxHeight:"52vh"}}, approvalLines(a)), reviewBox(a), note,
+    h("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}}, h("button",{class:"btn ok",onclick:()=>act(true)}, a.action==="decision"?"Répondre":a.action==="publish_page"?"Publier":"Valider"), h("button",{class:"btn no",onclick:()=>act(false)}, "Refuser"),
+      a.action==="publish_page" ? h("a",{class:"btn",href:`/api/approvals/${a.id}/preview`,target:"_blank",rel:"noopener",style:{textDecoration:"none",color:"#EEF1FF"}}, "Aperçu de la page") : null)));
+  setTimeout(() => note.focus(), 50);
+}
+let LAST_APPR = "";
 function renderApprovals(list){
+  const sig = JSON.stringify(list); if (sig === LAST_APPR) return; LAST_APPR = sig;     // rien de neuf : on ne redessine pas
   const head = hd("Validations", "SHIELD", "#FBBF24", h("span",{style:{fontSize:"12px",fontWeight:"600",color:list.length?"#0B1029":"#C7CEF0",background:list.length?"#FBBF24":"rgba(255,255,255,.06)",borderRadius:"999px",padding:"3px 10px"}}, String(list.length)));
   if (!list.length) return put($("#validations"), head, h("div",{class:"empty"},"Rien à valider pour l’instant. Les emails et paiements préparés par les agents apparaîtront ici."));
-  put($("#validations"), head, list.map(a => {
-    const note = h("input",{type:"text",placeholder:a.action==="decision"?"Ta réponse…":"Note (facultative)",style:{width:"100%"},"aria-label":"Note"}), pl = a.payload, lines = [];
-    if (a.action==="send_email") lines.push(`À : ${pl.to}`, `Objet : ${pl.subject}`, ...(pl.in_reply_to ? [`En réponse à l'email reçu #${pl.in_reply_to}`] : []), ...(pl.attachment ? [`Pièce jointe : ${pl.attachment}`] : []), "", pl.body);
-    else if (a.action==="publish_page") lines.push(`Adresse : ${pl.url}`, `Titre : ${pl.title}`, `Fichier : ${pl.file} (${Math.round((pl.size||0)/1024)} Ko)`);
-    else if (a.action==="stripe_payment_link") lines.push(`Produit : ${pl.product_name}`, `Montant : ${pl.amount_eur} €` + (pl.recurring ? ` / ${pl.recurring==="month"?"mois":"an"}` : ""));
-    else lines.push(pl.question || "", pl.context ? "\n" + pl.context : "");
-    const act = async ok => { try { const r = await api("POST",`/api/approvals/${a.id}`,{decision: ok?"approve":"reject", note: note.value}); toast(r.message, ok); refresh(); } catch(e){ toast(e.message,false); } };
-    return h("div",{class:"appr"}, h("div",{style:{display:"flex",justifyContent:"space-between",gap:"8px"}}, h("b",{}, `#${a.id} · ${ACTION[a.action]||a.action}`), h("span",{style:{fontSize:"11px",color:C[a.agent],border:`1px solid ${C[a.agent]}88`,borderRadius:"999px",padding:"2px 9px",whiteSpace:"nowrap",alignSelf:"flex-start"}}, a.agent)),
-      a.reason ? h("span",{class:"small muted"}, a.reason) : null, h("pre",{class:"pre",style:{maxHeight:"150px"}}, lines.join("\n")),
-      a.review ? h("div",{style:{fontSize:"12px",lineHeight:"1.45",padding:"8px 10px",borderRadius:"10px",background:"rgba(203,213,225,.07)",border:"1px solid rgba(203,213,225,.35)"}}, h("b",{},"Avis juridique : "), a.review)
-               : a.review_pending ? h("span",{class:"small muted"},"Relecture juridique en cours…") : null,
-      note,
-      h("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}}, h("button",{class:"btn ok",onclick:()=>act(true)}, a.action==="decision"?"Répondre":a.action==="publish_page"?"Publier":"Valider"), h("button",{class:"btn no",onclick:()=>act(false)}, "Refuser"),
-        a.action==="publish_page" ? h("a",{class:"btn",href:`/api/approvals/${a.id}/preview`,target:"_blank",rel:"noopener",style:{textDecoration:"none",color:"#EEF1FF"}}, "Aperçu de la page") : null));
-  }));
+  put($("#validations"), head, list.map(a => h("div",{class:"appr click",role:"button",tabindex:"0",onclick:()=>openApproval(a),onkeydown:e=>{ if(e.key==="Enter") openApproval(a); },title:"Ouvrir pour décider"},
+    h("div",{style:{display:"flex",justifyContent:"space-between",gap:"8px"}}, h("b",{}, `#${a.id} · ${ACTION[a.action]||a.action}`), agentPill(a)),
+    a.reason ? h("span",{class:"small muted"}, a.reason) : null,
+    h("pre",{class:"pre",style:{maxHeight:"92px",overflow:"hidden"}}, approvalLines(a)),
+    a.review ? h("span",{class:"small",style:{color:"#CBD5E1"}},"✓ Avis juridique disponible") : a.review_pending ? h("span",{class:"small muted"},"Relecture juridique en cours…") : null,
+    h("span",{class:"btn",style:{alignSelf:"flex-start"}}, a.action==="decision" ? "Répondre…" : "Examiner et décider…"))));
 }
 
 // ------------------------------------------------ performance (séries réelles)
