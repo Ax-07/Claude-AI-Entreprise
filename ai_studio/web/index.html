@@ -411,6 +411,7 @@ function openApproval(a){
           pl.attachment ? h("span",{class:"small muted",style:{display:"flex",gap:"10px",alignItems:"center",flexWrap:"wrap"}}, "Pièce jointe : " + pl.attachment,
             /\.(zip|html?|md|txt|pdf)$/i.test(pl.attachment) ? h("a",{class:"btn",href:`/api/approvals/${a.id}/livrable` + (/\.zip$/i.test(pl.attachment) ? "/index.html" : ""),target:"_blank",rel:"noopener",style:{textDecoration:"none",color:"#EEF1FF"}}, "Aperçu du livrable") : null) : null,
           pl.qa ? h("div",{style:{fontSize:"12px",lineHeight:"1.45",padding:"8px 10px",borderRadius:"10px",background:"rgba(52,211,153,.06)",border:"1px solid rgba(52,211,153,.35)"}}, h("b",{},"Contrôle qualité : "), pl.qa) : null,
+          pl.review ? h("div",{style:{fontSize:"12px",lineHeight:"1.45",padding:"8px 10px",borderRadius:"10px",background:"rgba(165,180,252,.07)",border:"1px solid rgba(165,180,252,.35)"}}, h("b",{},"Relecture du fond (chef de projet) : "), pl.review) : null,
           field("Texte", f.body))
       : h("pre",{class:"pre",style:{maxHeight:"52vh"}}, approvalLines(a)),
     reviewBox(a), note,

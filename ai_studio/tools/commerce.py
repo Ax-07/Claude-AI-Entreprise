@@ -202,16 +202,35 @@ def set_prospect_status(ctx: ToolContext, email: str, status: str, note: str = "
 @tool("list_offers", "Catalogue des offres de l'entreprise (prix, livrable, délai, lien de paiement).", {})
 def list_offers(ctx: ToolContext) -> str:
     from ..commerce import offer_sheet
+    from ..offers import margin, margin_text, method_path
     rows = ctx.db.q("SELECT * FROM offers WHERE status='active' ORDER BY id")
     drafts = ctx.db.q("SELECT * FROM offers WHERE status='draft' ORDER BY id")
     if not rows and not drafts:
         return "Catalogue vide. Propose une offre avec save_offer (elle sera validée par le propriétaire)."
-    out = "\n\n".join(f"#{o['id']} " + offer_sheet(o) + f"\n- Lien de paiement : {o['payment_link_url'] or 'aucun'}"
-                       + ("\n- Modification proposée en attente de validation (la version ci-dessus reste en vigueur)" if o["pending"] else "")
-                       for o in rows) or "Aucune offre validée pour l'instant."
+    def sheet(o):
+        mp = method_path(ctx.cfg, o["name"])
+        return (f"#{o['id']} " + offer_sheet(o)
+                + "\n- Statut : VALIDÉE par le propriétaire (peut être vendue et livrée)"
+                + f"\n- Lien de paiement : {o['payment_link_url'] or 'pas encore créé (propose_payment_link, validé par le propriétaire)'}"
+                + f"\n- Marge estimée par vente : {margin_text(margin(ctx.cfg, ctx.db, o['price_eur'], o['id']))}"
+                + f"\n- Méthode de production : {'oui — offer_method pour la lire' if mp else 'aucune (le producteur suit la fiche)'}"
+                + (f"\n- Offre suivante proposée après livraison : {o['next_offer']}" if o["next_offer"] else "")
+                + ("\n- Modification proposée en attente de validation (la version ci-dessus reste en vigueur)" if o["pending"] else ""))
+    out = "\n\n".join(sheet(o) for o in rows) or "Aucune offre validée pour l'instant."
     if drafts:
-        out += "\n\nEN ATTENTE DE VALIDATION (ne pas vendre ni proposer) : " + ", ".join(f"#{o['id']} {o['name']} ({o['price_eur']:.0f} €)" for o in drafts)
+        out += "\n\nBROUILLONS EN ATTENTE DE VALIDATION (ne pas vendre ni proposer) : " + ", ".join(f"#{o['id']} {o['name']} ({o['price_eur']:.0f} €)" for o in drafts)
     return out
+
+
+@tool("offer_method", "Méthode de production d'une offre (étapes, grille de notation, plan du livrable, interdits), si elle existe.",
+      {"offer": {"type": "string", "description": "nom de l'offre"}}, ["offer"])
+def offer_method(ctx: ToolContext, offer: str) -> str:
+    from ..offers import method_path
+    o = ctx.db.one("SELECT name FROM offers WHERE lower(name)=lower(?)", (offer.strip(),))
+    if not o:
+        return "Offre inconnue (list_offers)."
+    p = method_path(ctx.cfg, o["name"])
+    return p.read_text(encoding="utf-8")[:12000] if p else f"Pas de méthode écrite pour « {o['name']} » : le producteur suit la fiche d'offre."
 
 
 @tool("list_orders", "Commandes payées et leur état de livraison (à livrer, en attente du client, livrée).",
@@ -258,7 +277,35 @@ def set_order_status(ctx: ToolContext, order: int, status: str, note: str = "") 
     from ..db import iso
     ctx.db.run("UPDATE sales SET stage=?, stage_note=?, last_nudge_at=? WHERE rowid=?", (status, note[:300], iso(), int(order)))
     ctx.db.log(ctx.agent, "commande", f"Commande n°{order} → {status}. {note}".strip())
+    if status == "a_livrer":
+        from ..commerce import start_clock
+        start_clock(ctx.db, int(order), note[:80] or "informations jugées complètes")
     return f"Commande n°{order} : {status}."
+
+
+@tool("confirm_content_review",
+      "Confirme que tu as relu le FOND du livrable d'une commande (obligatoire avant la livraison) : chiffres comparés à "
+      "leurs sources, URL et dates valides, concurrents réels, aucune mesure non disponible présentée comme mesurée, "
+      "contenu conforme à la fiche d'offre et aux informations du client. Le résumé s'affiche au propriétaire.",
+      {"order": {"type": "integer"}, "file": {"type": "string", "description": "fichier relu (livraisons/…)"},
+       "checked": {"type": "string", "description": "ce que tu as vérifié, concrètement (ex. : 10 actions, 14 sources ouvertes, 3 concurrents existants)"},
+       "corrections": {"type": "string", "description": "corrections faites ou demandées, ou « aucune »"}},
+      ["order", "file", "checked", "corrections"])
+def confirm_content_review(ctx: ToolContext, order: int, file: str, checked: str, corrections: str) -> str:
+    from ..commerce import get_order
+    from ..db import iso
+    s = get_order(ctx.db, order)
+    if not s or s["stage"] in ("livree", "historique"):
+        return "Commande introuvable ou déjà livrée."
+    p = _safe_path(ctx, file)
+    if not p.is_file():
+        return f"Fichier introuvable : {file}. Relis le livrable réel."
+    if len(checked.strip()) < 40:
+        return "Décris concrètement ce que tu as vérifié (au moins une phrase précise : quoi, combien)."
+    text = f"{file} — vérifié : {checked.strip()[:600]} — corrections : {corrections.strip()[:300] or 'aucune'} ({ctx.agent})"
+    ctx.db.run("UPDATE sales SET content_review=?, content_review_at=? WHERE rowid=?", (text, iso(), int(order)))
+    ctx.db.log(ctx.agent, "commande", f"Commande n°{order} : fond du livrable relu ({file})")
+    return "Relecture enregistrée : la livraison peut être confiée au Service Client (deliver_order)."
 
 
 @tool("deliver_order",
@@ -281,6 +328,9 @@ def deliver_order(ctx: ToolContext, order: int, attachment: str, subject: str, b
         return f"Livrable introuvable : {attachment}. Il faut d'abord le produire."
     if p.stat().st_size < 400:
         return "Ce fichier est trop court pour être un livrable final. Produis le travail complet avant de livrer."
+    if not s["content_review"]:
+        return ("Livraison refusée : le fond du livrable n'a pas été relu. Le chef de projet doit le relire et le confirmer "
+                f"(confirm_content_review, order={order}) avant la livraison. Signale-le-lui dans ton résultat.")
     from ..quality import check_path, report, summary
     qa = check_path(ctx.cfg.workspace.resolve(), p)
     if qa["errors"]:
@@ -302,7 +352,7 @@ def deliver_order(ctx: ToolContext, order: int, attachment: str, subject: str, b
         ctx.db.log(ctx.agent, "file", f"Rapport converti en PDF : {sent} ({extra['pages']} page(s))")
     aid = ctx.db.add_approval(ctx.agent, ctx.task["id"] if ctx.task is not None else None, "send_email",
                               {"to": s["customer_email"], "subject": subject, "body": body, "attachment": sent,
-                               "order": int(order), "qa": summary(qa), **extra}, f"Livraison de la commande n°{order} ({s['product'] or 'commande'})")
+                               "order": int(order), "qa": summary(qa), "review": s["content_review"], **extra}, f"Livraison de la commande n°{order} ({s['product'] or 'commande'})")
     ctx.db.log(ctx.agent, "approval", f"Livraison de la commande n°{order} en attente de validation (#{aid})")
     return (f"Livraison #{aid} en attente de validation" + (f" (pièce jointe : {sent}, converti en PDF)" if extra else "") +
             " : l'email partira automatiquement dès que le propriétaire la validera, et la commande sera marquée livrée. "

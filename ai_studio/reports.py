@@ -36,7 +36,7 @@ def monthly(cfg, db, month: str | None = None) -> dict:
             api_usd += db.one("SELECT COALESCE(SUM(k.usd),0) FROM costs k JOIN tasks t ON t.id=k.task_id WHERE t.order_ref=?", (s["n"],))[0]
             if s["stage"] == "livree" and s["delivered_at"]:
                 delivered += 1
-                delays.append(_hours(s["created_at"], s["delivered_at"]))
+                delays.append(_hours(s["info_received_at"] or s["created_at"], s["delivered_at"]))   # le délai court dès les infos reçues
                 late += bool(s["due_at"] and s["delivered_at"] > s["due_at"])
         fees = sum(s["amount"] * pct + fixed for s in real)
         api_eur = api_usd * rate
