@@ -81,16 +81,79 @@ def _notify(cfg, db, title, message, kind):
         notify.send(cfg, db, title, message)
 
 
+STRIPE_LOOKBACK = timedelta(hours=26)    # une session de paiement Stripe expire au plus tard 24 h après sa création
+STRIPE_ASYNC_DAYS = 14                    # paiement différé (prélèvement SEPA…) : suivi pendant 14 jours au plus
+STRIPE_MAX_PAGES = 100                    # garde-fou : 10 000 sessions par passage
+PAID = ("paid", "no_payment_required")
+
+
+def _sale_from_session(s: dict) -> dict:
+    items = ((s.get("line_items") or {}).get("data") or [])
+    cust = s.get("customer_details") or {}
+    return {"id": s["id"], "created_at": iso(datetime.fromtimestamp(int(s.get("created", 0)), timezone.utc)),
+            "amount": (s.get("amount_total") or 0) / 100, "currency": (s.get("currency") or "eur").upper(),
+            "customer_email": cust.get("email"), "customer_name": cust.get("name"),
+            "product": ", ".join(i.get("description") or "" for i in items) or None,
+            "payment_link": s.get("payment_link"), "livemode": 1 if s.get("livemode") else 0}
+
+
+def _record_paid(db, s: dict, first: bool) -> bool:
+    """Enregistre une session payée (une seule fois). Une vente arrive à l'étape « nouvelle » : la commande est ouverte
+    juste après, et reprise au passage suivant si le programme s'arrête entre les deux (audit FIN-02)."""
+    sale = _sale_from_session(s)
+    cur = db.conn.execute(
+        "INSERT OR IGNORE INTO sales(id, created_at, amount, currency, customer_email, customer_name, product, payment_link, livemode, "
+        "recorded_at, stage) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (*sale.values(), iso(), "historique" if first else "nouvelle"))
+    db.conn.commit()
+    if cur.rowcount != 1:
+        return False
+    test = "" if sale["livemode"] else " (mode test)"
+    db.log("finance", "vente", f"Paiement reçu : {sale['amount']:.2f} {sale['currency']}{test} — {sale['product'] or 'produit non précisé'} "
+           f"de {sale['customer_email'] or 'client inconnu'}")
+    return True
+
+
+def open_pending_orders(cfg, db) -> list[int]:
+    """Ouvre les commandes des ventes enregistrées mais pas encore prises en charge (nouvelles, ou interrompues avant la
+    création de la tâche du chef de projet). Sans risque de doublon : open_order est reprenable."""
+    opened = []
+    rows = db.q("SELECT * FROM sales WHERE stage='nouvelle' OR (stage IN ('a_livrer','attente_client') AND task_id IS NULL) "
+                "ORDER BY created_at")
+    for r in rows:
+        sale = {k: r[k] for k in ("id", "created_at", "amount", "currency", "customer_email", "customer_name", "product",
+                                  "payment_link", "livemode")}
+        try:
+            n = open_order(cfg, db, sale)
+        except Exception as e:                                   # la vente reste « nouvelle » : nouvel essai au prochain passage
+            db.log("systeme", "commande", f"Ouverture de la commande {r['id']} impossible (nouvel essai au prochain passage) : {e}")
+            continue
+        opened.append(n)
+        if r["stage"] == "nouvelle" and not str(r["id"]).startswith("essai_"):
+            test = "" if sale["livemode"] else " (mode test)"
+            _notify(cfg, db, f"Nouvelle vente : {sale['amount']:.2f} {sale['currency']}{test}",
+                    f"{sale['product'] or 'Produit'} — {sale['customer_email'] or 'client'}. Les agents préparent la livraison.", "sales")
+    return opened
+
+
 def sync_stripe(cfg, db, request=None) -> dict:
-    """Enregistre les sessions de paiement réglées. Au tout premier passage, l'historique (30 jours) est importé
-    pour le tableau de bord mais sans créer de tâche de livraison."""
+    """Enregistre les paiements Stripe et ouvre les commandes correspondantes (audit FIN-02).
+
+    - Fenêtre glissante : chaque passage relit toutes les sessions créées depuis le début du dernier passage COMPLET,
+      moins 26 h. Une session ouverte avant un passage puis payée après est donc toujours vue (elle expire en 24 h).
+    - Pagination complète : si elle n'aboutit pas, le curseur n'avance pas.
+    - Paiements différés (session terminée mais pas encore payée) : revérifiés un par un jusqu'à 14 jours.
+    - Au tout premier passage, l'historique (30 jours) est importé pour le tableau de bord, sans créer de commande."""
+    import json as _json
     from .tools.business import stripe_request
     request = request or stripe_request
-    first = db.kv_get("stripe_sync_ts") is None
-    since = int(db.kv_get("stripe_sync_ts") or (now() - timedelta(days=30)).timestamp())
-    newest, new_sales, after = since, [], None
-    for _ in range(5):                                       # 500 sessions par passage au maximum
-        params = {"limit": 100, "created[gt]": since}
+    started = now()
+    cursor = db.kv_get("stripe_sync_ts")
+    first = cursor is None
+    since = (now() - timedelta(days=30)) if first else datetime.fromtimestamp(int(cursor), timezone.utc) - STRIPE_LOOKBACK
+    seen, new, after, complete = set(), 0, None, False
+    awaiting = _json.loads(db.kv_get("stripe_async_pending") or "{}")      # id de session → date de création (timestamp)
+    for _ in range(STRIPE_MAX_PAGES):
+        params = {"limit": 100, "created[gte]": int(since.timestamp())}
         if db.kv_get("stripe_no_expand") != "1":
             params["expand[]"] = "data.line_items"         # nom du produit acheté
         if after:
@@ -105,34 +168,46 @@ def sync_stripe(cfg, db, request=None) -> dict:
             page = request("GET", "checkout/sessions", params)
         rows = page.get("data", [])
         for s in rows:
-            newest = max(newest, int(s.get("created", 0)))
-            if s.get("payment_status") != "paid" or db.one("SELECT 1 FROM sales WHERE id=?", (s["id"],)):
-                continue
-            items = ((s.get("line_items") or {}).get("data") or [])
-            cust = s.get("customer_details") or {}
-            sale = {"id": s["id"], "created_at": iso(datetime.fromtimestamp(int(s.get("created", 0)), timezone.utc)),
-                    "amount": (s.get("amount_total") or 0) / 100, "currency": (s.get("currency") or "eur").upper(),
-                    "customer_email": cust.get("email"), "customer_name": cust.get("name"),
-                    "product": ", ".join(i.get("description") or "" for i in items) or None,
-                    "payment_link": s.get("payment_link"), "livemode": 1 if s.get("livemode") else 0}
-            db.run("INSERT INTO sales(id, created_at, amount, currency, customer_email, customer_name, product, payment_link, livemode, recorded_at) "
-                   "VALUES (?,?,?,?,?,?,?,?,?,?)", (*sale.values(), iso()))
-            new_sales.append(sale)
+            seen.add(s["id"])
+            if s.get("payment_status") in PAID:
+                awaiting.pop(s["id"], None)
+                new += _record_paid(db, s, first)
+            elif s.get("status") == "complete":           # payé plus tard (prélèvement) : suivi individuel
+                awaiting.setdefault(s["id"], int(s.get("created", 0)))
+            else:
+                awaiting.pop(s["id"], None)               # session ouverte : revue par la fenêtre ; expirée : abandonnée
         if not page.get("has_more") or not rows:
+            complete = True
             break
         after = rows[-1]["id"]
-    db.kv_set("stripe_sync_ts", str(newest))
-    for s in sorted(new_sales, key=lambda x: x["created_at"]):
-        test = "" if s["livemode"] else " (mode test)"
-        label = f"{s['amount']:.2f} {s['currency']}{test} — {s['product'] or 'produit non précisé'}"
-        db.log("finance", "vente", f"Paiement reçu : {label} de {s['customer_email'] or 'client inconnu'}")
-        if first:
-            db.run("UPDATE sales SET stage='historique' WHERE id=?", (s["id"],))
+    # paiements différés sortis de la fenêtre : revérifiés un par un
+    limit = int((now() - timedelta(days=STRIPE_ASYNC_DAYS)).timestamp())
+    for sid, created in list(awaiting.items()):
+        if sid in seen:
             continue
-        open_order(cfg, db, s)
-        _notify(cfg, db, f"Nouvelle vente : {s['amount']:.2f} {s['currency']}{test}",
-                f"{s['product'] or 'Produit'} — {s['customer_email'] or 'client'}. Les agents préparent la livraison.", "sales")
-    return {"new": len(new_sales), "first_sync": first}
+        if int(created) < limit:
+            awaiting.pop(sid)
+            db.log("finance", "vente", f"Paiement différé {sid} toujours non réglé après {STRIPE_ASYNC_DAYS} jours : abandon du suivi")
+            continue
+        try:
+            params = {} if db.kv_get("stripe_no_expand") == "1" else {"expand[]": "line_items"}
+            s = request("GET", f"checkout/sessions/{sid}", params)
+        except Exception as e:
+            db.log("finance", "erreur", f"Vérification du paiement différé {sid} impossible : {e}")
+            continue
+        if s.get("payment_status") in PAID:
+            awaiting.pop(sid)
+            new += _record_paid(db, s, first)
+        elif s.get("status") == "expired":
+            awaiting.pop(sid)
+    db.kv_set("stripe_async_pending", _json.dumps(awaiting))
+    if complete:
+        db.kv_set("stripe_sync_ts", str(int(started.timestamp())))
+    else:
+        db.log("finance", "erreur", f"Synchronisation Stripe incomplète (plus de {STRIPE_MAX_PAGES} pages) : le curseur "
+               "n'avance pas, la suite sera lue au prochain passage.")
+    opened = [] if first else open_pending_orders(cfg, db)
+    return {"new": new, "first_sync": first, "opened": len(opened), "complete": complete, "awaiting": len(awaiting)}
 
 
 def open_order(cfg, db, s: dict, infos: str = "") -> int:
@@ -148,14 +223,18 @@ def open_order(cfg, db, s: dict, infos: str = "") -> int:
     if s.get("customer_email") and s.get("livemode"):        # une commande d'essai ne fait pas d'un prospect un client
         from . import prospects
         prospects.became_client(db, s["customer_email"])
-    if infos.strip():
-        add_owner_note(db, n, "Informations du client : " + infos)
+    if infos.strip() and not db.one("SELECT 1 FROM tasks WHERE order_ref=? AND agent='chef_projet'", (n,)):
+        add_owner_note(db, n, "Informations du client : " + infos)      # pas en double si l'ouverture est reprise
     if not needs_info:
         start_clock(db, n, "fournies avec la commande" if infos.strip() else "rien à demander")
-    tid = db.add_task(f"Commande n°{n} : livrer {s['product'] or 'la commande'} ({s['customer_email'] or 'client'})"[:120], "chef_projet",
-                      delivery_brief(db, n), priority=1, created_by="systeme", order_ref=n)
+    prev = db.one("SELECT id FROM tasks WHERE order_ref=? AND agent='chef_projet' AND created_by='systeme' ORDER BY id LIMIT 1", (n,))
+    tid = prev["id"] if prev else db.add_task(
+        f"Commande n°{n} : livrer {s['product'] or 'la commande'} ({s['customer_email'] or 'client'})"[:120], "chef_projet",
+        delivery_brief(db, n), priority=1, created_by="systeme", order_ref=n)
     db.run("UPDATE sales SET task_id=? WHERE id=?", (tid, s["id"]))
-    if needs_info and s.get("customer_email"):
+    if needs_info and s.get("customer_email") and not db.one(
+            "SELECT 1 FROM tasks WHERE order_ref=? AND agent='support' AND created_by='systeme' AND title LIKE ?",
+            (n, f"Commande n°{n} : informations du client%")):
         prior = db.q("SELECT id, received_at, subject FROM inbox WHERE lower(from_addr)=lower(?) ORDER BY id DESC LIMIT 5",
                      (s["customer_email"],))
         from .tools.business import duplicate_contact
@@ -222,14 +301,14 @@ def test_order(cfg, db, offer_name: str, email: str, infos: str = "") -> int:
         raise ValueError(f"« {email} » est l'adresse d'exemple de la documentation : mets ta vraie adresse.")
     sale = {"id": "essai_%d" % int(now().timestamp() * 1000), "created_at": iso(), "amount": float(o["price_eur"]), "currency": "EUR",
             "customer_email": email.strip(), "customer_name": "Client d'essai", "product": o["name"], "payment_link": None, "livemode": 0}
-    db.run("INSERT INTO sales(id, created_at, amount, currency, customer_email, customer_name, product, payment_link, livemode, recorded_at) "
-           "VALUES (?,?,?,?,?,?,?,?,?,?)", (*sale.values(), iso()))
+    db.run("INSERT INTO sales(id, created_at, amount, currency, customer_email, customer_name, product, payment_link, livemode, recorded_at, stage) "
+           "VALUES (?,?,?,?,?,?,?,?,?,?,'nouvelle')", (*sale.values(), iso()))
     db.log("finance", "vente", f"Commande d'essai (sans paiement) : {o['name']} pour {email}")
     return open_order(cfg, db, sale, infos)
 
 
 # ============================================================================ Commandes : du paiement à la livraison
-STAGES = {"a_livrer": "à livrer", "attente_client": "en attente du client", "livree": "livrée", "historique": "historique"}
+STAGES = {"nouvelle": "enregistrée", "a_livrer": "à livrer", "attente_client": "en attente du client", "livree": "livrée", "historique": "historique"}
 
 
 def order_number(db, sale_id: str) -> int:

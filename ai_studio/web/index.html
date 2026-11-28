@@ -424,12 +424,23 @@ function openApproval(a){
 let LAST_APPR = "";
 function renderApprovals(list){
   const sig = JSON.stringify(list); if (sig === LAST_APPR) return; LAST_APPR = sig;     // rien de neuf : on ne redessine pas
+  const unsure = list.filter(a => a.uncertain); list = list.filter(a => !a.uncertain);
   const inReview = list.filter(a => a.in_review); list = list.filter(a => !a.in_review);
   const head = hd("Validations", "SHIELD", "#FBBF24", h("span",{style:{fontSize:"12px",fontWeight:"600",color:list.length?"#0B1029":"#C7CEF0",background:list.length?"#FBBF24":"rgba(255,255,255,.06)",borderRadius:"999px",padding:"3px 10px"}}, String(list.length)));
   const rv = inReview.length ? h("div",{class:"small muted",style:{padding:"8px 10px",borderRadius:"10px",border:"1px dashed rgba(203,213,225,.3)",marginBottom:"8px"},title:"Le Juridique relit ces demandes ; elles t’arriveront une fois conformes, ou corrigées par l’agent."},
     `⚖ ${inReview.length} demande(s) en relecture juridique : ` + inReview.map(a => `#${a.id} ${ACTION[a.action]||a.action} (${a.agent})`).join(", ")) : null;
-  if (!list.length) return put($("#validations"), head, rv, h("div",{class:"empty"},"Rien à valider pour l’instant. Les emails et paiements préparés par les agents apparaîtront ici."));
-  put($("#validations"), head, rv, list.map(a => h("div",{class:"appr click",role:"button",tabindex:"0",onclick:()=>openApproval(a),onkeydown:e=>{ if(e.key==="Enter") openApproval(a); },title:"Ouvrir pour décider"},
+  const resolve = async (a, done) => {
+    try { const r = await api("POST", `/api/approvals/${a.id}/resolve`, {done}); toast(r.message, true); LAST_APPR = ""; refresh(); }
+    catch(e){ toast(e.message, false); } };
+  const un = unsure.map(a => h("div",{style:{padding:"10px",borderRadius:"10px",border:"1px solid rgba(248,113,113,.55)",background:"rgba(248,113,113,.07)",marginBottom:"8px",display:"flex",flexDirection:"column",gap:"6px"}},
+    h("b",{}, `⚠ #${a.id} · ${ACTION[a.action]||a.action} : issue incertaine`),
+    h("span",{class:"small"}, (a.result || "Coupure pendant l’exécution.") + (a.action==="send_email" ? ` Vérifie dans Gmail (Messages envoyés) si l’email à ${a.payload.to} « ${a.payload.subject||""} » est parti.` : " Vérifie dans Stripe / GitHub.")),
+    h("span",{class:"small muted"}, "Rien ne sera renvoyé sans ta réponse."),
+    h("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
+      h("button",{class:"btn ok",onclick:()=>resolve(a, true)}, a.action==="send_email" ? "Il est bien parti" : "C’est fait"),
+      h("button",{class:"btn",onclick:()=>resolve(a, false)}, a.action==="send_email" ? "Il n’est pas parti (le remettre à valider)" : "Pas fait (le remettre à valider)"))));
+  if (!list.length) return put($("#validations"), head, ...un, rv, h("div",{class:"empty"},"Rien à valider pour l’instant. Les emails et paiements préparés par les agents apparaîtront ici."));
+  put($("#validations"), head, ...un, rv, list.map(a => h("div",{class:"appr click",role:"button",tabindex:"0",onclick:()=>openApproval(a),onkeydown:e=>{ if(e.key==="Enter") openApproval(a); },title:"Ouvrir pour décider"},
     h("div",{style:{display:"flex",justifyContent:"space-between",gap:"8px"}}, h("b",{}, `#${a.id} · ${ACTION[a.action]||a.action}`), agentPill(a)),
     a.reason ? h("span",{class:"small muted"}, a.reason) : null,
     h("pre",{class:"pre",style:{maxHeight:"92px",overflow:"hidden"}}, approvalLines(a)),
