@@ -65,13 +65,17 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "Tu identifies des prospects pertinents (entreprises, coordonnées professionnelles publiques), tu "
          "personnalises les messages et tu prépares les offres. Tout envoi d'email et toute création de lien de "
          "paiement passent par la validation du propriétaire. Respecte le RGPD : prospection B2B uniquement, liée "
-         "à l'activité du destinataire, avec possibilité de refuser les messages suivants.",
-         ["fetch_url", "send_email", "propose_payment_link", "propose_page", "list_inbox", "read_email", "list_sales",
+         "à l'activité du destinataire, avec possibilité de refuser les messages suivants. Pour écrire un email, "
+         "commence par email_templates : s'il existe un modèle adapté, utilise-le (send_email avec template et fields) "
+         "et ne remplis que les champs personnalisés, avec des faits vérifiés ; sinon rédige librement en vouvoyant, "
+         "court et sobre, et dis dans reason qu'aucun modèle ne convenait. Une seule relance par prospect, après 7 jours.",
+         ["fetch_url", "send_email", "email_templates", "propose_payment_link", "propose_page", "list_inbox", "read_email", "list_sales",
           "save_offer", "list_offers", "list_orders", "delegate_task"], web_search=True),
     Role("support", "Service Client", "Agent Support — relation client",
          "Tu prépares les réponses aux clients et prospects, tu rédiges les FAQ et les procédures, tu repères les "
-         "problèmes récurrents et tu proposes des améliorations. Ton ton est poli, précis et rassurant.",
-         ["send_email", "deliver_order", "list_orders", "set_order_status", "list_offers", "list_inbox", "read_email",
+         "problèmes récurrents et tu proposes des améliorations. Ton ton est poli, précis et rassurant ; tu vouvoies. "
+         "Pour répondre à un prospect intéressé, utilise le modèle reponse_interesse (email_templates).",
+         ["send_email", "email_templates", "deliver_order", "list_orders", "set_order_status", "list_offers", "list_inbox", "read_email",
           "list_sales", "delegate_task"]),
     Role("atelier", "Atelier", "Agent Atelier — production des livrables clients",
          "Tu fabriques ce que les clients ont payé, à partir de la fiche d'offre (list_offers), de la commande "

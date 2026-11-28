@@ -46,15 +46,32 @@ def sender_footer(cfg, body: str) -> tuple[str, list[str]]:
       "AUTOMATIQUEMENT dès que le propriétaire clique sur « Valider » dans le tableau de bord. Ne passe pas par un "
       "brouillon dans un fichier ni par request_owner_decision pour le faire valider, et ne demande jamais au "
       "propriétaire de l'envoyer lui-même. Pour la prospection B2B : message personnalisé, lié à l'activité du "
-      "destinataire, avec une phrase permettant de refuser les prochains messages.",
-      {"to": {"type": "string"}, "subject": {"type": "string"}, "body": {"type": "string"},
+      "destinataire. S'il existe un modèle adapté (email_templates), utilise-le : donne template et fields au lieu de "
+      "subject et body (prix, délai et offre sont repris du catalogue ; signature et phrase d'opposition sont ajoutées "
+      "automatiquement).",
+      {"to": {"type": "string"}, "subject": {"type": "string", "description": "objet (sans modèle)"},
+       "body": {"type": "string", "description": "texte (sans modèle)"},
+       "template": {"type": "string", "description": "identifiant du modèle (email_templates)"},
+       "fields": {"type": "object", "additionalProperties": {"type": "string"}, "description": "valeurs des champs du modèle, ex. {\"site\": \"ax-07.fr\", \"accroche\": \"…\"}"},
        "reason": {"type": "string", "description": "Pourquoi cet email (contexte pour le propriétaire)."},
        "in_reply_to": {"type": "integer", "description": "numéro de l'email reçu auquel on répond (garde le fil de discussion)"},
        "attachment": {"type": "string", "description": "fichier de l'espace de travail à joindre (ex. livraisons/rapport.pdf)"}},
-      ["to", "subject", "body", "reason"], sensitive=True)
-def send_email(ctx: ToolContext, to: str, subject: str, body: str, reason: str, in_reply_to: int = 0, attachment: str = "") -> str:
+      ["to", "reason"], sensitive=True)
+def send_email(ctx: ToolContext, to: str, reason: str, subject: str = "", body: str = "", in_reply_to: int = 0,
+               attachment: str = "", template: str = "", fields: dict | None = None) -> str:
     if not EMAIL_RE.match(to.strip()):
         return "Adresse email invalide."
+    used = None
+    if template:
+        from .. import email_templates
+        try:
+            subject, body, t = email_templates.render(ctx.cfg, ctx.db, template, fields if isinstance(fields, dict) else {})
+        except (KeyError, ValueError) as e:
+            return f"Refusé : {str(e).strip(chr(39))}. Corrige les champs et rappelle send_email."
+        used = t
+        reason = f"[Modèle : {t.get('name', t['id'])}] {reason}"
+    elif not (subject.strip() and body.strip()):
+        return "Donne subject et body, ou un modèle (template + fields : voir email_templates)."
     from ..config import test_recipients
     allowed = test_recipients(ctx.cfg)
     if allowed is not None and to.strip().lower() not in allowed:
@@ -89,7 +106,8 @@ def send_email(ctx: ToolContext, to: str, subject: str, body: str, reason: str, 
     if today >= int(ctx.cfg.get("email", "daily_limit", default=20)):
         return "Refusé : limite quotidienne de brouillons d'emails atteinte."
     aid = ctx.db.add_approval(ctx.agent, ctx.task["id"] if ctx.task is not None else None, "send_email",
-                              {"to": to.strip(), "subject": subject, "body": body, **extra}, reason)
+                              {"to": to.strip(), "subject": subject, "body": body, **extra,
+                               **({"template": used["id"]} if used else {})}, reason)
     ctx.db.log(ctx.agent, "approval", f"Email pour {to} en attente de validation (#{aid})")
     from ..approvals import missing_setup
     later = missing_setup("send_email")
@@ -97,6 +115,15 @@ def send_email(ctx: ToolContext, to: str, subject: str, body: str, reason: str, 
             "l'aura configurée et validé l'email.") if later else ""
     return (f"Email #{aid} en attente de validation : il partira automatiquement dès que le propriétaire le validera. "
             f"Rien d'autre à faire pour l'envoyer, ni relance ni demande au propriétaire.{note}")
+
+
+@tool("email_templates", "Liste les modèles d'emails (prospection, relance, réponse) et les champs à remplir pour send_email.", {})
+def email_templates(ctx: ToolContext) -> str:
+    from .. import email_templates as et
+    try:
+        return et.describe(ctx.cfg, ctx.db)
+    except ValueError as e:
+        return str(e)
 
 
 # ---------------------------------------------------------------- Stripe
