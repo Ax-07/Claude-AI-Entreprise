@@ -111,6 +111,47 @@ class MissionsTest(Base):
 
 
 class ProjectManagerTest(Base):
+    def test_only_project_manager_distributes_work(self):
+        from ai_studio.tools import run_tool
+        oid = self.db.add_objective("Prospection")
+        kick = missions.assign_pm(self.db, "objectif", oid)
+        step = self.db.add_task("Vérifier le contact", "ventes", parent_id=kick)
+        out = run_tool("delegate_task", self.ctx("ventes", step), {"agent": "chef_projet", "title": "Résultat", "description": "x"})
+        self.assertIn("pilotée par un chef de projet", out)
+        out = run_tool("delegate_task", self.ctx("chef_projet", kick), {"agent": "ventes", "title": "Rédiger l'email", "description": "x"})
+        self.assertIn("créée", out)
+        free = self.db.add_task("Hors mission", "ventes")
+        self.assertIn("créée", run_tool("delegate_task", self.ctx("ventes", free), {"agent": "recherche", "title": "t", "description": "d"}))
+
+    def test_stalled_mission_relaunched_then_escalated(self):
+        oid = self.db.add_objective("Prospection")
+        kick = missions.assign_pm(self.db, "objectif", oid)
+        self.db.set_task(kick, status="done", result="plan")
+        r1 = missions.relaunch_if_stalled(self.db, self.db.task(kick))
+        self.assertTrue(self.db.task(r1)["title"].startswith("Relance"))
+        self.assertIsNone(missions.relaunch_if_stalled(self.db, self.db.task(kick)))         # déjà relancé : on attend
+        self.db.set_task(r1, status="done", result="rien")
+        r2 = missions.relaunch_if_stalled(self.db, self.db.task(r1))
+        self.db.set_task(r2, status="done", result="rien")
+        esc = missions.relaunch_if_stalled(self.db, self.db.task(r2))
+        self.assertEqual((self.db.task(esc)["agent"], self.db.task(esc)["priority"]), ("pdg", 1))   # arbitrage du PDG
+
+    def test_silent_task_is_not_a_success(self):
+        from ai_studio.runner import run_task
+        from ai_studio.llm import BudgetGuard
+        from test_core import FakeLLM
+        oid = self.db.add_objective("Prospection")
+        missions.assign_pm(self.db, "objectif", oid)
+        self.db.run("UPDATE tasks SET status='done' WHERE agent='chef_projet'")
+        t = self.db.add_task("Préparer l'email", "ventes", objective_id=oid)
+        llm = FakeLLM([[], []])                                                  # l'agent ne dit rien
+        self.cfg.data["runtime"]["max_attempts"] = 2
+        g = BudgetGuard(self.cfg, self.db)
+        self.assertEqual(run_task(self.cfg, self.db, llm, g, self.db.task(t)), "pending")
+        self.assertEqual(run_task(self.cfg, self.db, llm, g, self.db.task(t)), "failed")
+        self.assertIn("sans résultat", self.db.task(t)["result"])
+        self.assertTrue(self.db.one("SELECT 1 FROM tasks WHERE agent='chef_projet' AND status='pending'"))   # chef de projet prévenu
+
     def ctx(self, agent, task_id=None):
         from ai_studio.agents import ROLES
         from ai_studio.tools import ToolContext

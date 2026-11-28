@@ -315,3 +315,35 @@ def close(db, kind: str, mid: int, summary: str, by: str = PM) -> str:
         db.run("UPDATE objectives SET status='done', done_at=?, pm_summary=?, owner_check=NULL WHERE id=?", (iso(), summary[:2000], mid))
     db.log(by, "mission", f"{m['title']} : clôturée par le chef de projet — {summary[:200]}")
     return "Mission clôturée : elle passe dans « À vérifier » pour le propriétaire."
+
+
+def relaunch_if_stalled(db, task) -> int | None:
+    """Après une tâche du chef de projet : si la mission n'est ni close ni livrée et que plus rien n'est en cours ni en
+    attente de validation, il est relancé. Après 2 relances sans qu'aucun autre agent n'ait travaillé, le PDG arbitre."""
+    if task is None or task["agent"] != PM:
+        return None
+    m = mission_of(task)
+    if not m or not has_pm(db, *m):
+        return None
+    d = detail(db, *m)
+    if d["archived"] or (d["kind"] == "objectif" and d["status"] in ("done", "paused")) or (d["kind"] == "commande" and d["status"] == "livree"):
+        return None
+    if d["counts"]["pending"] or d["counts"]["running"] or d["waiting"]:
+        return None
+    col = "objective_id" if m[0] == "objectif" else "order_ref"
+    recent = db.q(f"SELECT agent, title FROM tasks WHERE {col}=? ORDER BY id DESC LIMIT 3", (m[1],))
+    stalls = sum(1 for r in recent if r["agent"] == PM and r["title"].startswith("Relance :"))
+    kw = {"objective_id": m[1] if m[0] == "objectif" else None, "order_ref": m[1] if m[0] == "commande" else None}
+    if stalls >= 2:
+        db.log("systeme", "mission", f"{d['title']} : à l'arrêt malgré 2 relances du chef de projet → arbitrage du PDG")
+        return db.add_task(f"Arbitrage : mission à l'arrêt — {d['title']}"[:120], "pdg",
+                           "Le chef de projet a été relancé deux fois sans faire avancer la mission. Lance mission_status, "
+                           "identifie le blocage (étape manquante, avis bloquant, agent qui échoue) et décide : relancer une "
+                           "étape précise, changer d'approche, ou demander une décision au propriétaire (request_owner_decision).",
+                           priority=1, created_by="systeme", **kw)
+    return db.add_task(f"Relance : la mission n'avance plus"[:120], PM,
+                       "Toutes les tâches de ta mission sont terminées mais elle n'est ni close ni livrée, et rien n'attend le "
+                       "propriétaire. Lance mission_status puis : soit tu lances l'étape qui manque pour atteindre le résultat "
+                       "demandé, soit tu clôtures (close_mission) si c'est réellement terminé. Si une étape a échoué ou n'a "
+                       "rien produit, refais-la faire avec une consigne plus précise.",
+                       priority=2, created_by="systeme", **kw)

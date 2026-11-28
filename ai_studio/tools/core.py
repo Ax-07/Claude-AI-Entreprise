@@ -38,6 +38,12 @@ def delegate_task(ctx: ToolContext, agent: str, title: str, description: str, pr
     agent = agent.strip().lower()
     if agent not in ctx.agent_names:
         return f"Agent inconnu. Agents disponibles : {', '.join(ctx.agent_names)}"
+    from ..missions import has_pm, mission_of, PM
+    m = mission_of(ctx.task)
+    if m and has_pm(ctx.db, *m) and ctx.agent not in (PM, "pdg"):
+        return ("Refusé : cette mission est pilotée par un chef de projet, c'est lui qui distribue le travail. Ne lui "
+                "transmets rien par tâche : il est réveillé automatiquement à la fin de la tienne. Termine ta tâche avec "
+                "complete_task : ton résultat, le fichier produit, et ta recommandation pour l'étape suivante.")
     rt = ctx.cfg["runtime"]
     depth = int(ctx.task["depth"]) + 1 if ctx.task is not None else 0
     if depth > rt["max_delegation_depth"]:

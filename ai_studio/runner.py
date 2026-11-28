@@ -134,7 +134,7 @@ def run_task(cfg, db, llm, guard, task) -> str:
                 continue
             calls = [b for b in content if b.get("type") == "tool_use"]
             if not calls:
-                ctx.finished, ctx.result = True, last_text or "(aucun résultat)"
+                ctx.finished, ctx.result = True, last_text
                 break
             results = []
             for c in calls:
@@ -168,8 +168,18 @@ def run_task(cfg, db, llm, guard, task) -> str:
         return status
 
     cost = db.task_cost(task["id"])
-    result = ctx.result or last_text or "(terminé sans résultat explicite)"
+    if not (ctx.result or last_text).strip():
+        # l'agent s'est arrêté sans rien dire : ce n'est pas une réussite (le chef de projet ou le PDG doit le savoir)
+        status = "failed" if task["attempts"] + 1 >= int(rt["max_attempts"]) else "pending"
+        db.set_task(task["id"], status=status, cost_usd=cost, result="Arrêtée sans résultat : l'agent n'a rien produit ni conclu.")
+        db.log(role.name, "error", f"Tâche #{task['id']} arrêtée sans résultat" + (" (nouvel essai)" if status == "pending" else ""), task["id"])
+        if status == "failed":
+            wake_pm(db, task)
+        return status
+    result = ctx.result or last_text
     db.set_task(task["id"], status="done", result=result, cost_usd=cost)
     db.log(role.name, "done", f"Terminé : {task['title']} ({cost:.4f} $)", task["id"])
     wake_pm(db, task)                      # mission pilotée : le chef de projet relit l'étape et enchaîne
+    from .missions import relaunch_if_stalled
+    relaunch_if_stalled(db, task)          # le chef de projet a fini sa tâche mais la mission n'avance plus
     return "done"
