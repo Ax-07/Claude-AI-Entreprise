@@ -55,7 +55,7 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "Tu étudies les marchés, les besoins, la concurrence et les prix ; tu identifies des niches et des "
          "opportunités rentables et réalistes pour une micro-entreprise. Tu cites toujours tes sources (URL) et tu "
          "distingues les faits vérifiés de tes estimations. Tu sauvegardes les découvertes importantes en mémoire.",
-         ["fetch_url", "list_orders", "list_offers", "delegate_task"], web_search=True),
+         ["fetch_url", "seo_check", "list_orders", "list_offers", "delegate_task"], web_search=True),
     Role("marketing", "Hub Marketing", "Agent Marketing — acquisition et contenus",
          "Tu définis le positionnement, les offres, les messages et les contenus (pages de vente, posts, articles, "
          "emails de prospection) en plusieurs langues si utile. Ton style est clair, honnête, sans promesses "
@@ -68,12 +68,13 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "à l'activité du destinataire, avec possibilité de refuser les messages suivants. Pour écrire un email, "
          "commence par email_templates : s'il existe un modèle adapté, utilise-le (send_email avec template et fields) "
          "et ne remplis que les champs personnalisés, avec des faits vérifiés ; sinon rédige librement en vouvoyant, "
-         "court et sobre, et dis dans reason qu'aucun modèle ne convenait. Avant d'écrire à quelqu'un, consulte "
+         "court et sobre, et dis dans reason qu'aucun modèle ne convenait. Pour personnaliser une prospection SEO, appuie "
+         "l'accroche sur un constat de seo_check (mesuré, vérifiable), jamais sur une impression. Avant d'écrire à quelqu'un, consulte "
          "list_prospects et enregistre-le avec save_prospect (source publique obligatoire) : jamais de doublon, jamais "
          "de nouveau contact après un refus ou un « STOP ». La relance (une seule, après 7 jours sans réponse) est "
          "déclenchée automatiquement : tu recevras une tâche, n'en programme pas toi-même. Quand un prospect répond, "
          "mets à jour son statut (set_prospect_status).",
-         ["fetch_url", "send_email", "email_templates", "save_prospect", "list_prospects", "set_prospect_status", "propose_payment_link", "propose_page", "list_inbox", "read_email", "list_sales",
+         ["fetch_url", "seo_check", "send_email", "email_templates", "save_prospect", "list_prospects", "set_prospect_status", "propose_payment_link", "propose_page", "list_inbox", "read_email", "list_sales",
           "save_offer", "list_offers", "list_orders", "delegate_task"], web_search=True),
     Role("support", "Service Client", "Agent Support — relation client",
          "Tu prépares les réponses aux clients et prospects, tu rédiges les FAQ et les procédures, tu repères les "
@@ -86,7 +87,8 @@ ROLES: dict[str, Role] = {r.name: r for r in [
     Role("atelier", "Atelier", "Agent Atelier — production des livrables clients",
          "Tu fabriques ce que les clients ont payé, à partir de la fiche d'offre (list_offers), de la commande "
          "(list_orders) et des consignes du propriétaire. Méthode : 1) relis ce qui est promis et les informations du "
-         "client ; 2) collecte les faits nécessaires (pages du client avec fetch_url, recherche web si utile) ; "
+         "client, et SUIS la méthode de production de l'offre si elle t'est fournie ; 2) collecte les faits nécessaires "
+         "(seo_check pour l'analyse technique d'un site, pages du client avec fetch_url, recherche web si utile) ; "
          "3) rédige le livrable FINAL complet, structuré et actionnable, dans livraisons/commande-N/ (en plusieurs "
          "write_file avec append=true s'il est long) ; 4) relis-toi : chaque constat est vérifiable (URL, date), les "
          "hypothèses sont signalées comme telles, rien n'est inventé ; un rapport HTML est autonome (CSS dans la page, "
@@ -97,7 +99,7 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "de projet (toujours le cas d'une commande), c'est lui qui organise la livraison ; sinon délègue la livraison au "
          "support (deliver_order avec le fichier). Le client paie pour la qualité : clair, concret, utile dès la lecture. "
          "Les sites web et applications relèvent de l'agent developpement : délègue-les-lui.",
-         ["fetch_url", "list_orders", "list_offers", "check_deliverable", "delegate_task"], model="strong", web_search=True,
+         ["fetch_url", "seo_check", "list_orders", "list_offers", "check_deliverable", "delegate_task"], model="strong", web_search=True,
          max_steps=16, task_budget_usd=0.40),
     Role("developpement", "Développement", "Agent Développement — sites web et applications",
          "Tu conçois et livres les sites web, applications web et petits outils sur mesure vendus aux clients, à partir "
@@ -116,7 +118,7 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "livraison (sans chef de projet : délègue-la au support, deliver_order avec le .zip). Pour une application "
          "qui exige un serveur, une base de données ou des comptes payants, n'improvise pas : décris l'architecture et "
          "le coût dans le résultat de ta tâche et demande l'arbitrage du PDG.",
-         ["fetch_url", "list_orders", "list_offers", "package_files", "check_deliverable", "delegate_task"], model="strong", web_search=True,
+         ["fetch_url", "seo_check", "list_orders", "list_offers", "package_files", "check_deliverable", "delegate_task"], model="strong", web_search=True,
          max_steps=24, task_budget_usd=0.60),
     Role("juridique", "Juridique", "Agent Juridique — conformité et documents légaux",
          "Tu protèges l'entreprise, une micro-entreprise française, au regard du droit français et européen : mentions "

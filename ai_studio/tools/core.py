@@ -318,6 +318,33 @@ def fetch_url(ctx: ToolContext, url: str) -> str:
     return text
 
 
+@tool("seo_check",
+      "Analyse SEO technique d'un site (gratuite, sans recherche web) : title, meta description, titres, mobile, HTTPS, "
+      "robots.txt, sitemap, données structurées d'entreprise, téléphones et cohérence, liens cassés, mentions légales, "
+      "sur l'accueil et quelques pages internes. Renvoie des faits MESURÉS avec leur source et un score technique, et "
+      "enregistre l'analyse dans analyses/. Utilise-la au lieu de lire le code des pages toi-même.",
+      {"url": {"type": "string", "description": "adresse du site (accueil)"},
+       "max_pages": {"type": "integer", "description": "pages analysées, accueil compris (1 à 8, 5 par défaut)"}}, ["url"])
+def seo_check(ctx: ToolContext, url: str, max_pages: int = 5) -> str:
+    from .. import seo
+    url = url.strip()
+    key = re.sub(r"^https?://", "", url).rstrip("/").lower()
+    hit = ctx.db.cache_get("seo", key, 1)
+    if hit:
+        return f"[Analyse du {hit['created_at'][:16]} par {hit['agent']}, reprise sans nouveau téléchargement]\n" + hit["content"]
+    res = seo.check_site(url, max(1, min(8, int(max_pages or 5))))
+    out = seo.report(res)
+    host = re.sub(r"[^a-z0-9.-]", "", key.split("/")[0])[:60] or "site"
+    rel = f"analyses/seo-{host}-{res['checked_at'][:10]}.md"
+    f = ctx.cfg.workspace / rel
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(out + "\n", encoding="utf-8")
+    if res.get("home_status") == 200:
+        ctx.db.cache_put("seo", key, ctx.agent, ctx.task["id"] if ctx.task is not None else None, out)
+    ctx.db.log(ctx.agent, "file", f"Analyse SEO de {url} : score {res.get('score', '—')}/100 → {rel}")
+    return out + f"\n\n(Analyse enregistrée dans {rel}.)"
+
+
 BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
 SEARCH_CACHE_DAYS, PAGE_CACHE_DAYS = 7, 3     # une même recherche (ou page) récente est resservie sans coût
 

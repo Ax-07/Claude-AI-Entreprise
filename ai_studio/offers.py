@@ -103,3 +103,32 @@ def decide(db, payload: dict, approve: bool) -> str:
         return f"modification de « {o['name']} » refusée, la version actuelle reste en vente"
     db.run("UPDATE offers SET status='archived', updated_at=? WHERE id=?", (t, o["id"]))
     return f"offre « {o['name']} » refusée (archivée)"
+
+
+def slug(name: str) -> str:
+    import unicodedata, re
+    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+
+
+def method_path(cfg, offer_name: str):
+    """catalogue/methodes/<offre>.md (dossier du projet, ou celui du code), ou None."""
+    from pathlib import Path
+    from .config import ROOT
+    for base in (Path(cfg.root), ROOT):
+        p = base / "catalogue" / "methodes" / f"{slug(offer_name)}.md"
+        if p.is_file():
+            return p
+    return None
+
+
+def method_for_task(cfg, db, task) -> str:
+    """Méthode de production à suivre pour une tâche d'une commande, confiée au producteur de l'offre."""
+    if task["order_ref"] is None:
+        return ""
+    s = db.one("SELECT offer_id, product FROM sales WHERE rowid=?", (task["order_ref"],))
+    o = db.one("SELECT name, producer FROM offers WHERE id=?", (s["offer_id"],)) if s and s["offer_id"] else None
+    if not o or task["agent"] != o["producer"]:
+        return ""
+    p = method_path(cfg, o["name"])
+    return p.read_text(encoding="utf-8")[:12000] if p else ""
