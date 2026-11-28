@@ -56,6 +56,12 @@ def sync_all(cfg, db) -> dict:
             if db.kv_get(f"sync_{name}_error") != msg:      # on ne journalise qu'une fois la même erreur
                 db.kv_set(f"sync_{name}_error", msg)
                 db.log("systeme", "synchro", f"Synchronisation {name} impossible : {msg}")
+    if imap_settings()[1] and db.kv_get("bounce_backfill_done") != "1":     # une seule fois après la mise à jour
+        db.kv_set("bounce_backfill_done", "1")
+        try:
+            out["bounces_backfill"] = recheck_stored_bounces(cfg, db)
+        except Exception as e:
+            db.log("systeme", "email", f"Rattrapage des emails non distribués impossible : {e}")
     try:
         from .legal import queue_reviews
         out["reviews"] = queue_reviews(cfg, db)
@@ -372,6 +378,86 @@ def _ignore_reason(msg, from_addr: str, own: str) -> str | None:
     return None
 
 
+# ---------------------------------------------------------------- emails non distribués (rebonds)
+BOUNCE_FROM = re.compile(r"^(mailer-daemon|postmaster)@", re.I)
+BOUNCE_SUBJECT = re.compile(r"(delivery status notification|undeliver|delivery (has )?failed|mail delivery (failed|subsystem)|returned mail|"
+                            r"non remis|non distribu|échec de (la )?(remise|livraison)|address not found|adresse introuvable)", re.I)
+EMAIL_IN_TEXT = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+
+
+def bounce_recipients(from_addr: str, subject: str, text: str, own: str, failed_header: str = "") -> list[str]:
+    """Adresses qui n'ont pas reçu notre email, si ce message est un avis de non-distribution ; sinon liste vide."""
+    is_bounce = BOUNCE_FROM.search(from_addr or "") and (BOUNCE_SUBJECT.search(subject or "") or "Final-Recipient" in text)
+    is_bounce = is_bounce or (BOUNCE_SUBJECT.search(subject or "") and "Final-Recipient" in text)
+    if not is_bounce:
+        return []
+    found = [a.strip() for a in (failed_header or "").split(",") if "@" in a]
+    found += re.findall(r"Final-Recipient:\s*rfc822;\s*<?([^\s>]+@[^\s>]+)", text, re.I)
+    if not found:                                    # texte libre (Gmail : « wasn't delivered to x@y »)
+        found = [a for a in EMAIL_IN_TEXT.findall(text) if not BOUNCE_FROM.search(a) and a.lower() != own.lower()
+                 and not a.lower().endswith(("google.com", "googlemail.com"))]
+    seen, out = set(), []
+    for a in found:
+        a = a.strip("<>.;,").lower()
+        if a not in seen and a != own.lower():
+            seen.add(a); out.append(a)
+    return out[:5]
+
+
+def _bounce_reason(text: str) -> str:
+    for pat in (r"Diagnostic-Code:\s*smtp;\s*(.+)", r"(5\d\d[ .-]\d\.\d\.\d.{0,160})", r"(Address not found.{0,120})",
+                r"(The response (?:from the remote server )?was:.{0,160})"):
+        m = re.search(pat, text, re.I)
+        if m:
+            return " ".join(m.group(1).split())[:200]
+    return "adresse refusée ou introuvable"
+
+
+def handle_bounce(cfg, db, addrs: list[str], reason: str, inbox_id=None) -> list[int]:
+    """Un email envoyé n'a pas été distribué : on l'enregistre, on prévient le propriétaire et, s'il s'agissait d'une
+    livraison, la commande repart en « à livrer » avec une tâche pour trouver la bonne adresse."""
+    hits = []
+    since = iso(now() - timedelta(days=10))
+    for addr in addrs:
+        for a in db.q("SELECT * FROM approvals WHERE action='send_email' AND status='executed' AND decided_at>=? ORDER BY id DESC", (since,)):
+            p = json.loads(a["payload"])
+            if str(p.get("to", "")).strip().lower() != addr:
+                continue
+            db.set_approval(a["id"], status="bounced", result=f"{a['result']} — NON DISTRIBUÉ : {reason}")
+            hits.append(a["id"])
+            order = p.get("order")
+            db.log("systeme", "email", f"Email #{a['id']} à {addr} NON DISTRIBUÉ ({reason})" + (f" — commande n°{order}" if order else ""))
+            if order:
+                db.run("UPDATE sales SET stage='a_livrer', delivered_at=NULL WHERE rowid=?", (order,))
+                add_owner_note(db, order, f"La livraison envoyée à {addr} n'a pas été distribuée ({reason}). Ne pas renvoyer à cette adresse.")
+            db.add_task(f"Email non distribué à {addr}"[:120], "support" if order else a["agent"],
+                        f"L'email #{a['id']} (« {p.get('subject', '')} ») envoyé à {addr} a été REFUSÉ par le serveur du destinataire : {reason}.\n"
+                        + (f"Il s'agissait de la livraison de la commande n°{order} : elle repasse « à livrer ».\n" if order else "")
+                        + "Ne renvoie rien à cette adresse. Cherche une autre adresse fiable de ce contact (commande, emails reçus, mémoire). "
+                          "Si tu en trouves une, prépare un nouvel envoi vers elle (il sera validé par le propriétaire) ; sinon demande l'adresse "
+                          "correcte au propriétaire avec request_owner_decision.",
+                        priority=1, created_by="systeme", order_ref=order)
+            _notify(cfg, db, "Email non distribué", f"{addr} : {reason}" + (f" (commande n°{order})" if order else ""), "errors")
+            break
+        else:
+            db.log("systeme", "email", f"Avis de non-distribution pour {addr} ({reason}) : aucun envoi récent correspondant.")
+    if inbox_id:
+        db.run("UPDATE inbox SET status='bounce', reason=? WHERE id=?", ("non distribué : " + ", ".join(addrs), inbox_id))
+    return hits
+
+
+def recheck_stored_bounces(cfg, db, days: int = 10) -> list[int]:
+    """Rattrapage : avis de non-distribution reçus avant cette fonction (classés « expéditeur automatique »)."""
+    _, user, _ = imap_settings()
+    hits = []
+    since = iso(now() - timedelta(days=days))
+    for r in db.q("SELECT * FROM inbox WHERE status='ignored' AND recorded_at>=?", (since,)):
+        addrs = bounce_recipients(r["from_addr"] or "", r["subject"] or "", r["body"] or "", user or "")
+        if addrs:
+            hits += handle_bounce(cfg, db, addrs, _bounce_reason(r["body"] or ""), r["id"])
+    return hits
+
+
 def _agent_for(db, addr: str) -> str:
     """Un client (a déjà payé) → support ; quelqu'un à qui on a écrit (prospect) → ventes ; sinon support."""
     if db.one("SELECT 1 FROM sales WHERE lower(customer_email)=lower(?)", (addr,)):
@@ -422,6 +508,14 @@ def sync_inbox(cfg, db, connect=None) -> dict:
             except Exception:
                 received = iso()
             body = _text_of(msg)[:8000]
+            raw_text = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else str(raw)
+            failed = bounce_recipients(addr, subject, body + "\n" + raw_text[:20000], user, str(msg.get("X-Failed-Recipients") or ""))
+            if failed:
+                iid = db.run("INSERT INTO inbox(uid, message_id, from_addr, from_name, subject, received_at, body, status, reason, recorded_at) "
+                             "VALUES (?,?,?,?,?,?,?,?,?,?)", (uid, mid, addr, name, subject, received, body, "bounce", "", iso()))
+                handle_bounce(cfg, db, failed, _bounce_reason(body + "\n" + raw_text[:20000]), iid)
+                counts["new"] += 1; counts["bounces"] = counts.get("bounces", 0) + 1
+                continue
             why = _ignore_reason(msg, addr, user)
             from .security import suspicious_text
             alerts = suspicious_text(subject + "\n" + body)
