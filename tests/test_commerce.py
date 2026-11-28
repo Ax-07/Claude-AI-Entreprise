@@ -240,6 +240,39 @@ class AgentGuidanceTest(Base):
         self.assertIn("partira automatiquement", out)
         self.assertIn("Identité de l'expéditeur incomplète", self.db.pending_approvals()[0]["reason"])
 
+    def test_test_mode_fake_identity_and_recipient_lock(self):
+        import json as _j
+        from ai_studio.agents import ROLES, system_prompt
+        self.cfg.data["company"]["test_mode"] = {"enabled": True, "recipients": ["Moi@Exemple.fr"]}
+        out = run_tool("send_email", self.ctx(), {"to": "tiers@societe.fr", "subject": "s", "body": "b", "reason": "r"})
+        self.assertIn("mode test actif", out)
+        self.assertFalse(self.db.pending_approvals())
+        run_tool("send_email", self.ctx(), {"to": "moi@exemple.fr", "subject": "Audit", "body": "Bonjour", "reason": "prospection"})
+        a = self.db.pending_approvals()[0]
+        body = _j.loads(a["payload"])["body"]
+        self.assertIn("AI Enterprise Studio (TEST)", body)
+        self.assertIn("(fictif)", body)
+        self.assertTrue(a["reason"].startswith("[MODE TEST"))
+        self.assertNotIn("incomplète", a["reason"])
+        prompt = system_prompt(ROLES["juridique"], self.cfg)
+        self.assertIn("MODE TEST ACTIF", prompt)
+        self.assertIn("ok (mode test)", prompt)
+        self.cfg.data["company"]["test_mode"]["enabled"] = False
+        self.assertNotIn("MODE TEST", system_prompt(ROLES["juridique"], self.cfg))
+
+    def test_mode_test_cli_keeps_config(self):
+        import json as _j, types
+        from ai_studio.__main__ import cmd_mode_test
+        (self.dir / "config.json").write_text(_j.dumps({"budget": {"monthly_usd": 1.0}}))
+        cmd_mode_test(self.cfg, self.db, types.SimpleNamespace(etat="on", emails=["moi@exemple.fr"]))
+        data = _j.loads((self.dir / "config.json").read_text())
+        self.assertEqual(data["company"]["test_mode"], {"enabled": True, "recipients": ["moi@exemple.fr"]})
+        self.assertEqual(data["budget"]["monthly_usd"], 1.0)
+        with self.assertRaises(ValueError):
+            cmd_mode_test(self.cfg, self.db, types.SimpleNamespace(etat="on", emails=["pas-une-adresse"]))
+        cmd_mode_test(self.cfg, self.db, types.SimpleNamespace(etat="off", emails=[]))
+        self.assertFalse(_j.loads((self.dir / "config.json").read_text())["company"]["test_mode"]["enabled"])
+
     def test_approval_waits_for_setup_then_runs(self):
         from ai_studio.approvals import NotReady, decide
         run_tool("send_email", self.ctx(), {"to": "a@b.fr", "subject": "s", "body": "b", "reason": "r"})

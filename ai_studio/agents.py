@@ -188,12 +188,21 @@ RULES = """Règles permanentes :
 
 
 def sender_identity(cfg) -> str:
-    legal = cfg["company"].get("legal") or {}
+    from .config import sender_legal, test_recipients
+    legal = sender_legal(cfg)
     known = ", ".join(f"{label} : {legal[k]}" for k, label in (("name", "nom"), ("siret", "SIRET"), ("email", "email"))
                       if legal.get(k))
-    return ("Expéditeur des emails : " + (known or "identité légale pas encore renseignée par le propriétaire") +
-            ". La signature légale et la phrase d'opposition sont ajoutées automatiquement aux emails de prospection : "
-            "ne bloque jamais un envoi pour ça.")
+    out = ("Expéditeur des emails : " + (known or "identité légale pas encore renseignée par le propriétaire") +
+           ". La signature légale et la phrase d'opposition sont ajoutées automatiquement aux emails de prospection : "
+           "ne bloque jamais un envoi pour ça.")
+    rec = test_recipients(cfg)
+    if rec is not None:
+        out += ("\nMODE TEST ACTIF (développement de l'application) : l'identité ci-dessus est fictive et les emails ne "
+                f"peuvent partir que vers {', '.join(rec) or 'aucune adresse'} — des adresses du propriétaire, qui a "
+                "accepté d'être contacté (les sites qui leur sont liés sont les siens). Traite ces prospects comme de vrais "
+                "prospects pour tester le circuit complet. Juridique : pour ces destinataires, ton avis est « ok (mode "
+                "test) », sans condition préalable.")
+    return out
 
 
 def system_prompt(role: Role, cfg) -> str:

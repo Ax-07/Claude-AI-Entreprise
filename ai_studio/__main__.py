@@ -310,6 +310,28 @@ def cmd_commandes(cfg, db, a):
              + (f"  promise avant {s['due_at'][:16]}" if s["due_at"] else "") + (f"  relances : {s['nudges']}" if s["nudges"] else ""))
 
 
+def cmd_mode_test(cfg, db, a):
+    """Active ou coupe le mode test dans config.json (le reste du fichier est conservé)."""
+    import json as _json
+    from .config import EMAIL_RE as _re_ok  # noqa: F401  (validation ci-dessous)
+    path = cfg.root / "config.json"
+    data = _json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    tm = data.setdefault("company", {}).setdefault("test_mode", {"enabled": False, "recipients": []})
+    if a.etat == "on":
+        bad = [e for e in a.emails if not _re_ok.match(e)]
+        if bad or not a.emails:
+            raise ValueError("Donne au moins une adresse valide : mode-test on ton@adresse.fr" + (f" (invalide : {', '.join(bad)})" if bad else ""))
+        tm.update(enabled=True, recipients=a.emails)
+    elif a.etat == "off":
+        tm["enabled"] = False
+    if a.etat in ("on", "off"):
+        path.write_text(_json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    on = tm.get("enabled")
+    _out(("Mode test ACTIF : identité légale fictive, emails limités à " + ", ".join(tm.get("recipients", []))
+          if on else "Mode test désactivé : les emails utilisent la vraie identité (company.legal).")
+         + ("\nRedémarre le moteur pour que les agents en tiennent compte." if a.etat in ("on", "off") else ""))
+
+
 def cmd_consigne(cfg, db, a):
     from .commerce import add_owner_note, delivery_brief, get_order
     s = get_order(db, a.n)
@@ -464,6 +486,7 @@ def main(argv=None):
     s = sub.add_parser("importer-offres"); s.add_argument("fichier", nargs="?")
     s = sub.add_parser("commande-test"); s.add_argument("offre"); s.add_argument("-e", "--email", required=True); s.add_argument("-i", "--infos")
     s = sub.add_parser("commandes"); s.add_argument("-t", "--toutes", action="store_true")
+    s = sub.add_parser("mode-test"); s.add_argument("etat", nargs="?", choices=["on", "off"]); s.add_argument("emails", nargs="*")
     s = sub.add_parser("consigne"); s.add_argument("n", type=int); s.add_argument("texte")
     s = sub.add_parser("livree"); s.add_argument("n", type=int); s.add_argument("-n", "--note")
     s = sub.add_parser("memoire"); s.add_argument("recherche", nargs="?", default=""); s.add_argument("-n", type=int, default=30)
@@ -480,7 +503,7 @@ def main(argv=None):
                 "validations": cmd_validations, "taches": cmd_taches, "voir": cmd_voir, "journal": cmd_journal,
                 "couts": cmd_couts, "agents": cmd_agents, "relancer": cmd_relancer, "objectifs": cmd_objectifs, "activites": cmd_activites,
                 "archiver": cmd_archiver, "serveur": cmd_serveur, "notifier-test": cmd_notifier_test,
-                "offres": cmd_offres, "client": cmd_client, "repartir-propre": cmd_repartir_propre, "importer-offres": cmd_importer_offres, "commande-test": cmd_commande_test, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne,
+                "offres": cmd_offres, "client": cmd_client, "repartir-propre": cmd_repartir_propre, "importer-offres": cmd_importer_offres, "commande-test": cmd_commande_test, "commandes": cmd_commandes, "livree": cmd_livree, "consigne": cmd_consigne, "mode-test": cmd_mode_test,
                 "memoire": cmd_memoire, "oublier": cmd_oublier, "retenir": cmd_retenir,
                 "sauvegarder": cmd_sauvegarder, "sauvegardes": cmd_sauvegardes, "restaurer": cmd_restaurer,
                 "demarrage-auto": cmd_demarrage_auto,

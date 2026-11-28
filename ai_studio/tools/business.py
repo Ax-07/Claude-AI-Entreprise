@@ -23,7 +23,8 @@ OPT_OUT_RE = re.compile(r"(?i)\bstop\b|d[ée]sinscri|ne plus recevoir|vous oppos
 
 def sender_footer(cfg, body: str) -> tuple[str, list[str]]:
     """Signature légale (identité de l'expéditeur) et phrase d'opposition, si l'agent ne les a pas mises."""
-    legal = cfg["company"].get("legal") or {}
+    from ..config import sender_legal
+    legal = sender_legal(cfg)
     added, lines = [], []
     name = (legal.get("name") or "").strip()
     if name and name.lower() not in body.lower():
@@ -54,6 +55,11 @@ def sender_footer(cfg, body: str) -> tuple[str, list[str]]:
 def send_email(ctx: ToolContext, to: str, subject: str, body: str, reason: str, in_reply_to: int = 0, attachment: str = "") -> str:
     if not EMAIL_RE.match(to.strip()):
         return "Adresse email invalide."
+    from ..config import test_recipients
+    allowed = test_recipients(ctx.cfg)
+    if allowed is not None and to.strip().lower() not in allowed:
+        return (f"Refusé : mode test actif, seuls ces destinataires sont autorisés : {', '.join(allowed) or 'aucun'}. "
+                "N'essaie pas d'autre adresse ; indique-le dans ton résultat.")
     extra = {}
     if in_reply_to:
         m = ctx.db.one("SELECT id, message_id, subject FROM inbox WHERE id=?", (int(in_reply_to),))
@@ -75,7 +81,9 @@ def send_email(ctx: ToolContext, to: str, subject: str, body: str, reason: str, 
         if added:
             reason = f"{reason}\n[Ajouté automatiquement : {', '.join(added)}]"
     _, missing = __import__("ai_studio.commerce", fromlist=["legal_footer"]).legal_footer(ctx.cfg)
-    if not in_reply_to and not client and missing:
+    if allowed is not None:
+        reason = f"[MODE TEST — identité fictive] {reason}"
+    elif not in_reply_to and not client and missing:
         reason = f"{reason}\n⚠ Identité de l'expéditeur incomplète ({', '.join(missing)}) : renseigne company.legal dans config.json."
     today = ctx.db.one("SELECT COUNT(*) FROM approvals WHERE action='send_email' AND substr(created_at,1,10)=substr(datetime('now'),1,10)")[0]
     if today >= int(ctx.cfg.get("email", "daily_limit", default=20)):
