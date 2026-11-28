@@ -232,6 +232,15 @@ _Mis à jour le 27/11/2026_
   - Une session est payée si `payment_status` vaut paid ou no_payment_required. Enregistrement par `INSERT OR IGNORE`, avec l'étape « nouvelle » (le premier passage reste « historique »).
   - `open_pending_orders` ouvre toute vente « nouvelle » ou à livrer sans tâche, même après un arrêt du programme. `open_order` est reprenable : il réutilise la tâche du chef de projet et la tâche Support existantes, et la note d'informations n'est pas dupliquée. La notification « Nouvelle vente » part une seule fois, après l'ouverture. Les commandes d'essai passent par l'étape « nouvelle ».
   - `tests/test_stripe_sync.py` : 9 tests avec un faux Stripe, dont 8 échouent sur l'ancien code. `test_commerce` vérifie désormais `created[gte]`. 235 tests.
+- SEC-02 corrigé (28/11) : nouveau client réseau `ai_studio/net.py`, utilisé par `fetch_url` et `seo.default_fetch`. Deux trous réels : (1) `fetch_url` vérifiait l'adresse de départ, puis `urlopen` suivait les redirections sans contrôle (vérifié en test : redirection vers la box ou vers 169.254.169.254 suivie) ; (2) même dans `seo.py`, le nom était résolu une fois pour le contrôle et une seconde fois à la connexion (DNS rebinding : connexion partie vers 10.0.0.5 en test).
+  - `ip_allowed` : seulement `is_global`, ni multicast ni réservé. Les IPv4 encapsulées (::ffff:, 6to4, Teredo) sont vérifiées, ainsi que la plage des opérateurs 100.64/10.
+  - `resolve` : une seule adresse privée dans la réponse DNS suffit à refuser.
+  - `get_once` : connexion épinglée sur l'IP vérifiée (`_PinnedHTTP` et `_PinnedHTTPS`, le certificat TLS reste vérifié pour le nom) et deuxième IP si la première ne répond pas.
+  - `safe_get` : 5 redirections au plus, chacune revérifiée. Les URL avec identifiants et les schémas autres que http/https sont refusés.
+  - `_public_host` délègue à `net.is_public_host`. `fetch_url` ne fait plus de pré-contrôle (il créait une double résolution) et renvoie « Erreur HTTP n » au lieu d'une exception.
+  - Les appels vers des services fixes (Stripe, GitHub, Brave, fournisseurs d'IA) restent sur `urllib` : leur adresse est écrite dans le code.
+  - Les connexions épinglées ignorent un éventuel proxy système, ce qui est sans effet sur le PC du propriétaire.
+  - `tests/test_net.py` : 9 tests avec un vrai serveur local et un DNS simulé ; 4 échouent sur l'ancien code (les autres vérifient des règles déjà respectées). `test_seo` autorise 127.0.0.1 pour son seul serveur de test ; `test_providers` simule `net.safe_get`. 244 tests.
 
 ## Non vérifié
 - Les toasts et le démarrage automatique n'ont pas pu être testés sur un vrai Windows (pas de Windows dans l'environnement de Claude) : à vérifier avec `notifier-test` et `demarrage-auto`.
