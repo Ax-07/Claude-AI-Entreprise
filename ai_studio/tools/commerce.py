@@ -336,7 +336,7 @@ def deliver_order(ctx: ToolContext, order: int, attachment: str, subject: str, b
     if qa["errors"]:
         return ("Livraison refusée : le contrôle qualité a trouvé des erreurs. Corrige-les (ou délègue la correction au "
                 "producteur du livrable), relance check_deliverable, puis livre.\n" + report(qa))
-    if ctx.db.one("SELECT 1 FROM approvals WHERE status='pending' AND action='send_email' AND json_extract(payload,'$.order')=?", (int(order),)):
+    if ctx.db.one("SELECT 1 FROM approvals WHERE status IN ('pending','review') AND action='send_email' AND json_extract(payload,'$.order')=?", (int(order),)):
         return "Une livraison de cette commande attend déjà la validation du propriétaire. Rien d'autre à faire."
     extra, sent = {}, attachment
     if p.suffix.lower() in (".html", ".htm") and ctx.cfg.get("delivery", "pdf", default=True):
@@ -360,7 +360,8 @@ def deliver_order(ctx: ToolContext, order: int, attachment: str, subject: str, b
 
 
 # ============================================================================ Juridique
-@tool("legal_review", "Enregistre ton avis juridique sur une demande de validation (affiché au propriétaire avant sa décision).",
+@tool("legal_review", "Enregistre ton avis juridique sur une demande en relecture : « ok » la transmet au propriétaire avec ton "
+      "avis ; « corrections » ou « risque » la renvoie à l'agent qui l'a faite, pour correction avant le propriétaire.",
       {"approval_id": {"type": "integer"}, "verdict": {"type": "string", "description": "ok, corrections ou risque"},
        "notes": {"type": "string", "description": "points concrets à corriger, ou « rien à signaler »"}},
       ["approval_id", "verdict", "notes"])
@@ -372,11 +373,11 @@ def legal_review(ctx: ToolContext, approval_id: int, verdict: str, notes: str) -
     a = ctx.db.approval(int(approval_id))
     if not a:
         return "Demande introuvable."
-    if a["status"] != "pending":
+    if a["status"] not in ("pending", "review"):
         return f"Le propriétaire a déjà décidé ({a['status']}) : avis inutile, termine la tâche."
-    ctx.db.set_approval(int(approval_id), review=f"{VERDICTS[verdict]} — {notes.strip()[:1200]}")
+    from ..legal import apply_verdict
     ctx.db.log(ctx.agent, "juridique", f"Avis sur la demande #{approval_id} : {VERDICTS[verdict]}")
-    return "Avis enregistré : il s'affiche sur la demande de validation."
+    return apply_verdict(ctx.cfg, ctx.db, a, verdict, notes)
 
 
 @tool("list_activities", "Activités de l'entreprise (services, vidéo, e-commerce…) avec leurs coûts d'API, revenus et tâches.", {})

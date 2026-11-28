@@ -72,10 +72,9 @@ def check(cfg, db, stats: dict) -> list[str]:
     n = cfg["notifications"]
 
     if n.get("approvals", True):
-        last = int(db.kv_get("notified_approval_id", "0") or 0)
-        new = [a for a in db.pending_approvals() if a["id"] > last]
+        new = [a for a in db.pending_approvals() if not a["notified"]]     # y compris celles sorties de relecture juridique
         if new:
-            db.kv_set("notified_approval_id", str(max(a["id"] for a in new)))
+            db.run(f"UPDATE approvals SET notified=1 WHERE id IN ({','.join('?' * len(new))})", tuple(a["id"] for a in new))
             total = len(db.pending_approvals())
             if len(new) == 1:
                 a = new[0]

@@ -221,7 +221,7 @@ class DB:
         ("sales", "satisfied", "INTEGER"),                # 1 satisfait, 0 insatisfait, NULL inconnu
         ("sales", "info_received_at", "TEXT"),            # informations du client reçues : le délai promis démarre
         ("sales", "content_review", "TEXT"),              # relecture du fond par le chef de projet (avant livraison)
-        ("sales", "content_review_at", "TEXT"),                    # modification d'une offre active en attente de ta validation (JSON)
+        ("sales", "content_review_at", "TEXT"),
         ("objectives", "owner_check", "TEXT"),            # vérification du propriétaire : ok | issue
         ("objectives", "owner_note", "TEXT"),
         ("objectives", "checked_at", "TEXT"),
@@ -243,6 +243,7 @@ class DB:
         ("sales", "owner_notes", "TEXT"),
         ("approvals", "review", "TEXT"),                  # avis de l'agent juridique
         ("approvals", "review_task", "INTEGER"),          # tâche de relecture (0 = pas de relecture)
+        ("approvals", "notified", "INTEGER"),             # le propriétaire a été notifié de cette demande
         # activité de l'entreprise (services, vidéo, e-commerce…) : coûts et revenus mesurés par activité
         ("objectives", "activity", "TEXT"),
         ("tasks", "activity", "TEXT"),
@@ -259,6 +260,10 @@ class DB:
         for aid, name, desc, status in DEFAULT_ACTIVITIES:
             self.conn.execute("INSERT OR IGNORE INTO activities(id, name, description, status, created_at) VALUES (?,?,?,?,?)",
                               (aid, name, desc, status, iso()))
+        # notifications : les demandes déjà signalées avant le suivi par demande ne sont pas renotifiées
+        last = self.conn.execute("SELECT v FROM kv WHERE k='notified_approval_id'").fetchone()
+        if last and str(last[0] or "").isdigit():
+            self.conn.execute("UPDATE approvals SET notified=1 WHERE notified IS NULL AND id<=?", (int(last[0]),))
         # tout ce qui touche aux commandes et aux offres existantes relève des services numériques (seule activité jusqu'ici)
         self.conn.execute("UPDATE offers SET activity='services' WHERE activity IS NULL")
         self.conn.execute("UPDATE tasks SET activity='services' WHERE activity IS NULL AND order_ref IS NOT NULL")

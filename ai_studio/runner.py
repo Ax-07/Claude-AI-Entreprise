@@ -147,6 +147,9 @@ def run_task(cfg, db, llm, guard, task) -> str:
                 out = run_tool(c["name"], ctx, c.get("input") or {})
                 db.log(role.name, "tool", f"{c['name']}({json.dumps(c.get('input') or {}, ensure_ascii=False)[:200]}) → {out[:200]}", task["id"])
                 results.append({"type": "tool_result", "tool_use_id": c["id"], "content": out})
+            if any(getattr(REGISTRY.get(c["name"]), "sensitive", False) for c in calls):
+                from .legal import queue_reviews          # relecture juridique AVANT que la demande n'arrive au propriétaire
+                queue_reviews(cfg, db)
             messages.append({"role": "user", "content": results})
             if ctx.finished:
                 break
