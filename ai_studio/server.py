@@ -117,7 +117,7 @@ def page_preview(cfg, db, approval_id: int) -> bytes:
 PREVIEW_TYPES = {".html": "text/html; charset=utf-8", ".htm": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
                  ".md": "text/plain; charset=utf-8", ".txt": "text/plain; charset=utf-8", ".svg": "image/svg+xml",
                  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif",
-                 ".ico": "image/x-icon", ".woff2": "font/woff2", ".woff": "font/woff"}
+                 ".ico": "image/x-icon", ".woff2": "font/woff2", ".woff": "font/woff", ".pdf": "application/pdf"}
 
 
 def deliverable_preview(cfg, db, approval_id: int, sub: str = "") -> tuple[bytes, str]:
@@ -485,8 +485,11 @@ def make_handler(cfg):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
-            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-                             "img-src 'self' https: data:; font-src 'self' https: data:; sandbox")
+            if ctype == "application/pdf":       # la visionneuse PDF du navigateur ne s'ouvre pas dans une page « sandbox »
+                self.send_header("Content-Disposition", "inline")
+            else:
+                self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                                 "img-src 'self' https: data:; font-src 'self' https: data:; sandbox")
             self.end_headers()
             self.wfile.write(body)
 

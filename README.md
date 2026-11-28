@@ -97,6 +97,8 @@ Chaque offre a une fiche (prix, livrable, délai, informations à demander, agen
 Le catalogue de départ est dans `catalogue/offres.json` (Diagnostic SEO local, Site vitrine) : `python -m ai_studio importer-offres` le charge ou le met à jour (les liens de paiement déjà créés sont gardés).
 Pour repartir sur une base propre (après une phase d'essais) : arrête le moteur puis `python -m ai_studio repartir-propre --confirmer` (ajoute `--memoire-agents` pour effacer aussi les souvenirs des agents). Une sauvegarde est faite avant.
 
+Rapports livrés en PDF : les agents écrivent le rapport en HTML (contrôle qualité, aperçu) et `deliver_order` le convertit en PDF A4 paginé avec Microsoft Edge ou Google Chrome déjà installé (sans fenêtre). Le client reçoit le PDF, le HTML reste dans le dossier de la commande. Navigateur introuvable : livraison bloquée avec un message ; chemin réglable par `delivery.pdf_browser` dans config.json, `delivery.pdf: false` pour livrer le HTML.
+
 Modèles d'emails : `catalogue/modeles_email.json` (prospection Diagnostic SEO, prospection Site vitrine, relance unique, réponse à un prospect intéressé ; vouvoiement). Les agents remplissent seulement les champs personnalisés ; offre, prix, délai, informations à demander et lien de paiement viennent du catalogue ; un champ manquant, trop long ou « à compléter » est refusé. Tu peux modifier les textes du fichier sans redémarrer.
 
 Pour supprimer une seule mission : bouton « Supprimer » dans sa fiche (tableau des missions, deux clics), ou `python -m ai_studio supprimer-mission ID --confirmer` (`--commande` pour une commande d'essai). Sauvegarde faite avant ; coûts, bibliothèque, mémoire des agents et fichiers conservés ; refusé si un agent y travaille ou pour une commande réellement payée.

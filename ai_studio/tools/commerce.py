@@ -199,12 +199,25 @@ def deliver_order(ctx: ToolContext, order: int, attachment: str, subject: str, b
                 "producteur du livrable), relance check_deliverable, puis livre.\n" + report(qa))
     if ctx.db.one("SELECT 1 FROM approvals WHERE status='pending' AND action='send_email' AND json_extract(payload,'$.order')=?", (int(order),)):
         return "Une livraison de cette commande attend déjà la validation du propriétaire. Rien d'autre à faire."
+    extra, sent = {}, attachment
+    if p.suffix.lower() in (".html", ".htm") and ctx.cfg.get("delivery", "pdf", default=True):
+        # le client reçoit un PDF ; le HTML reste dans le dossier de la commande pour les corrections
+        from ..pdf import PdfError, html_to_pdf, page_count
+        try:
+            pdf = html_to_pdf(ctx.cfg, p, p.with_suffix(".pdf"))
+        except PdfError as e:
+            return (f"Livraison impossible : conversion du rapport en PDF échouée — {e}. N'envoie pas le HTML à la place : "
+                    "signale-le dans le résultat de ta tâche (le propriétaire doit régler le navigateur).")
+        sent = pdf.relative_to(ctx.cfg.workspace.resolve()).as_posix()
+        extra = {"source": attachment, "pages": page_count(pdf)}
+        ctx.db.log(ctx.agent, "file", f"Rapport converti en PDF : {sent} ({extra['pages']} page(s))")
     aid = ctx.db.add_approval(ctx.agent, ctx.task["id"] if ctx.task is not None else None, "send_email",
-                              {"to": s["customer_email"], "subject": subject, "body": body, "attachment": attachment,
-                               "order": int(order), "qa": summary(qa)}, f"Livraison de la commande n°{order} ({s['product'] or 'commande'})")
+                              {"to": s["customer_email"], "subject": subject, "body": body, "attachment": sent,
+                               "order": int(order), "qa": summary(qa), **extra}, f"Livraison de la commande n°{order} ({s['product'] or 'commande'})")
     ctx.db.log(ctx.agent, "approval", f"Livraison de la commande n°{order} en attente de validation (#{aid})")
-    return (f"Livraison #{aid} en attente de validation : l'email partira automatiquement dès que le propriétaire la "
-            "validera, et la commande sera marquée livrée. Rien d'autre à faire.")
+    return (f"Livraison #{aid} en attente de validation" + (f" (pièce jointe : {sent}, converti en PDF)" if extra else "") +
+            " : l'email partira automatiquement dès que le propriétaire la validera, et la commande sera marquée livrée. "
+            "Rien d'autre à faire.")
 
 
 # ============================================================================ Juridique
