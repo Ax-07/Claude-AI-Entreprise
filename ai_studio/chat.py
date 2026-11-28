@@ -16,15 +16,17 @@ from .tools import REGISTRY, ToolContext, run_tool
 LLM_FACTORY = None          # remplacé par un faux modèle dans les tests
 HISTORY = 16                # messages repris comme contexte (les plus récents)
 MAX_STEPS = 6
-TOOLS = ["create_objective", "assign_project_manager", "mission_status", "delegate_task", "company_stats", "budget_status", "list_tasks", "get_task_result",
+TOOLS = ["launch_mission", "assign_project_manager", "mission_status", "company_stats", "budget_status", "list_tasks", "get_task_result",
          "list_orders", "list_offers", "list_sales", "recall", "search_library"]
 
 CHAT_RULES = """
 Tu es en DISCUSSION DIRECTE avec le propriétaire, dans le tableau de bord. Règles de la discussion :
 - Réponds comme un dirigeant à son associé : court, clair, concret, en français, en le tutoyant. Pas de longs rapports.
 - Pour répondre sur l'état de l'entreprise, consulte les outils (company_stats, list_tasks, list_orders…) plutôt que d'inventer.
-- Quand le propriétaire te confie une mission, lance-la : create_objective pour une mission de fond que tu découperas,
-  delegate_task pour une demande précise à un agent. Dis ensuite en une phrase ce que tu as lancé et ce qui va se passer.
+- Tout travail demandé par le propriétaire devient une MISSION numérotée, suivie dans le tableau des missions : lance-la
+  avec launch_mission (mission simple : agent + consigne ; plusieurs étapes ou agents : project_manager=true). Pour une
+  mission existante, assign_project_manager ou mission_status. Dis ensuite en une phrase « Mission #N lancée », qui s'en
+  charge et ce qui va se passer. Ne confonds pas le numéro d'une mission avec celui d'une tâche.
 - Si la demande est ambiguë au point de risquer du travail inutile, pose UNE question courte avant de lancer quoi que ce soit.
 - Tu ne fais pas le travail toi-même dans la discussion : les agents s'en chargent au prochain cycle du moteur.
 - Les règles permanentes restent valables : toute action externe passe par la validation du propriétaire."""
@@ -110,7 +112,7 @@ def send(cfg, db, text: str, thread: int | None = None) -> dict:
             for c in calls:
                 out = run_tool(c["name"], ctx, c.get("input") or {})
                 db.log("pdg", "tool", f"[discussion] {c['name']}({json.dumps(c.get('input') or {}, ensure_ascii=False)[:200]}) → {out[:200]}")
-                if c["name"] in ("create_objective", "delegate_task"):
+                if c["name"] in ("launch_mission", "assign_project_manager"):
                     actions.append(out)
                 results.append({"type": "tool_result", "tool_use_id": c["id"], "content": out})
             messages.append({"role": "user", "content": results})
