@@ -135,21 +135,33 @@ def sync_stripe(cfg, db, request=None) -> dict:
     return {"new": len(new_sales), "first_sync": first}
 
 
-def open_order(cfg, db, s: dict) -> int:
-    """Transforme une vente enregistrée en commande à livrer : fiche d'offre, échéance et tâche de livraison du PDG."""
+def open_order(cfg, db, s: dict, infos: str = "") -> int:
+    """Transforme une vente enregistrée en commande : fiche d'offre, chef de projet et, si l'offre demande des
+    informations au client, demande préparée par le Service Client. Le délai promis démarre à la réception des
+    informations complètes (tout de suite si l'offre n'en demande pas ou si elles sont déjà fournies)."""
     offer = match_offer(db, s)
-    due = None
-    if offer:
-        due = iso(datetime.fromisoformat(s["created_at"]) + timedelta(hours=int(offer["delay_hours"])))
-    db.run("UPDATE sales SET stage='a_livrer', offer_id=?, due_at=? WHERE id=?", (offer["id"] if offer else None, due, s["id"]))
+    needs_info = bool(offer and (offer["required_info"] or "").strip()) and not infos.strip()
+    db.run("UPDATE sales SET stage=?, offer_id=?, due_at=NULL WHERE id=?",
+           ("attente_client" if needs_info else "a_livrer", offer["id"] if offer else None, s["id"]))
     n = order_number(db, s["id"])
-    db.run("UPDATE sales SET project_manager='chef_projet' WHERE id=?", (s["id"],))
+    db.run("UPDATE sales SET project_manager='chef_projet' WHERE id=?", (s["id"],))     # chaque commande a son chef de projet
     if s.get("customer_email") and s.get("livemode"):        # une commande d'essai ne fait pas d'un prospect un client
         from . import prospects
-        prospects.became_client(db, s["customer_email"])     # chaque commande a son chef de projet
+        prospects.became_client(db, s["customer_email"])
+    if infos.strip():
+        add_owner_note(db, n, "Informations du client : " + infos)
+    if not needs_info:
+        start_clock(db, n, "fournies avec la commande" if infos.strip() else "rien à demander")
     tid = db.add_task(f"Commande n°{n} : livrer {s['product'] or 'la commande'} ({s['customer_email'] or 'client'})"[:120], "chef_projet",
                       delivery_brief(db, n), priority=1, created_by="systeme", order_ref=n)
     db.run("UPDATE sales SET task_id=? WHERE id=?", (tid, s["id"]))
+    if needs_info and s.get("customer_email"):
+        db.add_task(f"Commande n°{n} : demander les informations au client"[:120], "support",
+                    f"Le client <{s['customer_email']}> vient de payer « {offer['name']} ». Pour produire, il nous faut : "
+                    f"{offer['required_info']}\nPrépare la demande avec send_email, template « demande_informations » "
+                    f"(fields : commande = {n}, salutation si tu connais le nom). Les informations à demander et le délai "
+                    "sont ajoutés automatiquement. Rien d'autre : la commande reste « en attente du client » et le délai "
+                    "démarre à sa réponse.", priority=1, created_by="systeme", order_ref=n)
     return n
 
 
@@ -198,9 +210,7 @@ def test_order(cfg, db, offer_name: str, email: str, infos: str = "") -> int:
     db.run("INSERT INTO sales(id, created_at, amount, currency, customer_email, customer_name, product, payment_link, livemode, recorded_at) "
            "VALUES (?,?,?,?,?,?,?,?,?,?)", (*sale.values(), iso()))
     db.log("finance", "vente", f"Commande d'essai (sans paiement) : {o['name']} pour {email}")
-    if infos.strip():
-        add_owner_note(db, order_number(db, sale["id"]), "Informations du client (commande d'essai) : " + infos)
-    return open_order(cfg, db, sale)
+    return open_order(cfg, db, sale, infos)
 
 
 # ============================================================================ Commandes : du paiement à la livraison
@@ -227,9 +237,24 @@ def match_offer(db, sale: dict):
 
 
 def offer_sheet(o) -> str:
+    start = "après réception des informations complètes du client" if (o["required_info"] or "").strip() else "après le paiement"
     return (f"Offre « {o['name']} » — {o['price_eur']:.2f} €\n- Résumé : {o['summary']}\n- Livrable : {o['deliverable']}\n"
-            f"- Délai promis : {o['delay_hours']} h après le paiement\n- À demander au client : {o['required_info'] or 'rien'}\n"
+            f"- Délai promis : {o['delay_hours']} h {start}\n- À demander au client : {o['required_info'] or 'rien'}\n"
             f"- Agent qui produit : {o['producer']}")
+
+
+def start_clock(db, n: int, why: str = "") -> bool:
+    """Les informations du client sont là : le délai promis démarre maintenant (une seule fois par commande)."""
+    s = get_order(db, n)
+    if not s or s["info_received_at"]:
+        return False
+    o = db.one("SELECT delay_hours FROM offers WHERE id=?", (s["offer_id"],)) if s["offer_id"] else None
+    t = now()
+    db.run("UPDATE sales SET info_received_at=?, due_at=COALESCE(?, due_at) WHERE rowid=?",
+           (iso(t), iso(t + timedelta(hours=int(o["delay_hours"]))) if o else None, int(n)))
+    db.log("systeme", "commande", f"Commande n°{n} : informations reçues{(' (' + why + ')') if why else ''}, le délai démarre"
+           + (f" — livraison promise avant le {iso(t + timedelta(hours=int(o['delay_hours'])))[:16]}" if o else ""))
+    return True
 
 
 def add_owner_note(db, n: int, text: str):
@@ -252,7 +277,9 @@ def delivery_brief(db, n: int, nudge: str = "") -> str:
     head = (f"{nudge}Commande n°{n}{test} : {s['amount']:.2f} {s['currency']} — {s['product'] or 'produit non précisé'}.\n"
             f"Client : {s['customer_name'] or ''} <{s['customer_email'] or 'email inconnu'}>. Payée le {s['created_at'][:16]}"
             + (f" (première tâche de livraison : #{s['task_id']})" if s["task_id"] else "") + ". "
-            f"État : {STAGES.get(s['stage'], s['stage'])}." + (f" Livraison promise avant le {s['due_at'][:16]}." if s["due_at"] else "") + "\n\n")
+            f"État : {STAGES.get(s['stage'], s['stage'])}." + (f" Livraison promise avant le {s['due_at'][:16]}." if s["due_at"] else
+            " Informations du client pas encore reçues : le délai n'a pas démarré (le Service Client les demande)." if not s["info_received_at"] else "")
+            + "\n\n")
     if s["owner_notes"]:
         head += ("CONSIGNES DU PROPRIÉTAIRE SUR CETTE COMMANDE — elles font foi : applique-les directement, sans chercher "
                  f"d'autre confirmation (ni du client ni de personne) :\n{s['owner_notes']}\n\n")
@@ -266,9 +293,13 @@ def delivery_brief(db, n: int, nudge: str = "") -> str:
         "charges n'est PAS un livrable).\n"
         f"2. Si le livrable n'existe pas : délègue sa production à l'agent {o['producer'] if o else 'atelier'} avec un "
         f"fichier attendu précis (livraisons/commande-{n}/…). Tu seras réveillé quand il sera prêt : vérifie-le "
-        f"(check_deliverable), puis passe à l'étape 3.\n"
-        f"3. Si le livrable existe : délègue au support la livraison (deliver_order, order={n}, avec le fichier en pièce jointe).\n"
-        "4. S'il manque une information et qu'une hypothèse raisonnable existe, avance avec cette hypothèse et indique-la "
+        f"(check_deliverable pour la forme), puis passe à l'étape 3.\n"
+        f"3. Relis le FOND du livrable (read_file) et confirme-le avec confirm_content_review(order={n}) : chiffres contre "
+        "leurs sources, URL et dates, concurrents réels, aucune mesure non disponible présentée comme mesurée, contenu "
+        "conforme à la fiche d'offre et aux informations du client. S'il y a un problème, renvoie au producteur avec la "
+        "correction précise. Sans cette relecture, la livraison est refusée.\n"
+        f"4. Puis délègue au support la livraison (deliver_order, order={n}, avec le fichier en pièce jointe).\n"
+        "5. S'il manque une information et qu'une hypothèse raisonnable existe, avance avec cette hypothèse et indique-la "
         "dans le livrable. Seulement si c'est impossible : fais demander l'information par le support (send_email), puis "
         f"set_order_status({n}, 'attente_client'). Ne redemande jamais ce qui est déjà connu ou fixé par le propriétaire.\n"
         "Annonce toujours au client le délai de l'offre, jamais « aucun délai confirmé ».")
@@ -566,6 +597,7 @@ def _sync_inbox(cfg, db, connect=None) -> dict:
                                "ORDER BY delivered_at DESC LIMIT 1", (addr,))
             if order:
                 db.run("UPDATE sales SET stage='a_livrer', nudges=0 WHERE rowid=?", (order["n"],))
+                start_clock(db, order["n"], "réponse du client")
             tid = db.add_task(
                 f"Répondre à {name or addr} : {subject}"[:120], agent,
                 f"Message reçu #{iid} de {name} <{addr}>, le {received}, objet : « {subject} ».\n\n"

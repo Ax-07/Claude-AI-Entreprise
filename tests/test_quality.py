@@ -54,6 +54,7 @@ class QualityTest(Base):
         site(d, {"services.html": PAGE.format(t="Services").replace("index.html", "tarifs.html")})
         self.assertIn("Archive prête", run_tool("package_files", self.ctx(), {"folder": f"livraisons/commande-{n}/site", "name": "site"}))
         args = {"order": n, "attachment": f"livraisons/commande-{n}/site.zip", "subject": "Votre site", "body": "Bonjour"}
+        self.db.run("UPDATE sales SET content_review='relu' WHERE rowid=?", (n,))      # relecture du fond testée à part
         out = run_tool("deliver_order", self.ctx("support"), args)
         self.assertIn("Livraison refusée", out); self.assertIn("tarifs.html", out)
         (d / "services.html").write_text(PAGE.format(t="Services"), encoding="utf-8")
@@ -73,6 +74,7 @@ class QualityTest(Base):
             "<!doctype html><html lang='fr'><head><meta charset='utf-8'><title>Diagnostic SEO local</title><style>body{font-family:sans-serif}</style></head><body>"
             "<h1>Diagnostic SEO local — ax-07.fr</h1>" + "<h2>Section</h2><p>Constat vérifiable, source : https://www.ax-07.fr/ consultée le 28/11/2026.</p>" * 30
             + "</body></html>", encoding="utf-8")
+        self.db.run("UPDATE sales SET content_review='relu' WHERE rowid=?", (n,))      # relecture du fond testée à part
         return n, {"order": n, "attachment": f"livraisons/commande-{n}/rapport.html", "subject": "Votre diagnostic", "body": "Bonjour"}
 
     def test_html_report_delivered_as_pdf(self):

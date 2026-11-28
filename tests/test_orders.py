@@ -1,4 +1,3 @@
-import json
 """Catalogue d'offres et suivi des commandes jusqu'à la livraison (Stripe et SMTP simulés)."""
 import os
 import sqlite3
@@ -101,11 +100,16 @@ class OrdersTest(Base):
         self.db.run("UPDATE offers SET payment_link_id='plink_x'")
         n = self.sell(product="Autre nom affiché")          # retrouvée par le lien de paiement
         s = commerce.get_order(self.db, n)
-        self.assertEqual(s["stage"], "a_livrer")
+        self.assertEqual((s["stage"], s["due_at"]), ("attente_client", None))     # infos à demander : le délai n'a pas démarré
         self.assertIsNotNone(s["offer_id"])
-        self.assertAlmostEqual((commerce.datetime.fromisoformat(s["due_at"]) - commerce.datetime.fromisoformat(s["created_at"])).total_seconds(), 48 * 3600)
-        t = self.db.one("SELECT * FROM tasks WHERE order_ref=?", (n,))
-        self.assertEqual(t["agent"], "chef_projet")
+        ask = self.db.one("SELECT * FROM tasks WHERE order_ref=? AND agent='support'", (n,))
+        self.assertIn("demande_informations", ask["description"]); self.assertIn("URL du site, ville", ask["description"])
+        self.assertTrue(commerce.start_clock(self.db, n, "réponse du client"))
+        self.assertFalse(commerce.start_clock(self.db, n))                         # une seule fois
+        s = commerce.get_order(self.db, n)
+        self.assertAlmostEqual((commerce.datetime.fromisoformat(s["due_at"]) - commerce.datetime.fromisoformat(s["info_received_at"])).total_seconds(), 48 * 3600, delta=2)
+        t = self.db.one("SELECT * FROM tasks WHERE order_ref=? AND agent='chef_projet'", (n,))
+        self.assertIn("confirm_content_review", t["description"])
         for expected in ("Rapport PDF priorisé", "l'agent recherche", f"deliver_order, order={n}", "n'est PAS un livrable",
                          "jamais « aucun délai confirmé »"):
             self.assertIn(expected, t["description"])
@@ -186,7 +190,14 @@ class OrdersTest(Base):
         self.assertIn("introuvable", run_tool("deliver_order", self.ctx(), {**args, "attachment": "livraisons/x.md"}))
         self.assertIn(f"livraisons/commande-{n}/rapport.md", run_tool("list_orders", self.ctx("pdg"), {}))
         out = run_tool("deliver_order", self.ctx(), {**args, "attachment": f"livraisons/commande-{n}/rapport.md"})
+        self.assertIn("fond du livrable n'a pas été relu", out)                      # relecture obligatoire
+        self.assertIn("Décris concrètement", run_tool("confirm_content_review", self.ctx("chef_projet"), {"order": n, "file": f"livraisons/commande-{n}/rapport.md", "checked": "ok", "corrections": ""}))
+        self.assertIn("introuvable", run_tool("confirm_content_review", self.ctx("chef_projet"), {"order": n, "file": "livraisons/x.md", "checked": "x" * 50, "corrections": ""}))
+        self.assertIn("Relecture enregistrée", run_tool("confirm_content_review", self.ctx("chef_projet"), {
+            "order": n, "file": f"livraisons/commande-{n}/rapport.md", "checked": "10 actions relues, 12 sources ouvertes et datées, 3 concurrents vérifiés", "corrections": "aucune"}))
+        out = run_tool("deliver_order", self.ctx(), {**args, "attachment": f"livraisons/commande-{n}/rapport.md"})
         self.assertIn("marquée livrée", out)
+        self.assertIn("12 sources ouvertes", json.loads(self.db.pending_approvals()[0]["payload"])["review"])
         self.assertIn("attend déjà", run_tool("deliver_order", self.ctx(), {**args, "attachment": f"livraisons/commande-{n}/rapport.md"}))
         aid = self.db.pending_approvals()[0]["id"]
         self.assertEqual(commerce.follow_orders(self.cfg, self.db)["nudged"], [])

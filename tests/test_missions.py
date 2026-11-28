@@ -102,7 +102,7 @@ class MissionsTest(Base):
         commerce.import_offers(self.db, Path(__file__).resolve().parents[1] / "catalogue" / "offres.json")
         n = commerce.test_order(self.cfg, self.db, "Site vitrine", "proprio@studio.fr")
         m = next(x for x in missions.missions(self.db) if x["kind"] == "commande")
-        self.assertEqual((m["title"], m["test"], m["state"]), (f"Commande n°{n} · Site vitrine", True, "À livrer"))
+        self.assertEqual((m["title"], m["test"], m["state"]), (f"Commande n°{n} · Site vitrine", True, "Attente client"))   # infos à demander
         missions.verify(self.cfg, self.db, "commande", n, "issue", "Le site n'a pas de page contact")
         self.assertIn("page contact", commerce.get_order(self.db, n)["owner_notes"])
         from ai_studio.server import events

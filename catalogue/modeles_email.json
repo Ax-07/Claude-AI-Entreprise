@@ -84,7 +84,7 @@
   "usage": "Répondre (in_reply_to) à un prospect qui montre de l'intérêt : réponse à sa question, informations nécessaires, prix et paiement.",
   "offer": "{offre}",
   "subject": "Re : {objet}",
-  "body": "Bonjour{salutation},\n\nMerci pour votre réponse.\n\n{reponse}\n\nPour réaliser le {offre}, j'aurais besoin des éléments suivants : {infos_requises}\n\nLe tarif est de {prix}, avec une livraison sous {delai} après le paiement.{lien_paiement}\n\nBien cordialement,",
+  "body": "Bonjour{salutation},\n\nMerci pour votre réponse.\n\n{reponse}\n\nPour réaliser le {offre}, j'aurais besoin des éléments suivants : {infos_requises}\n\nLe tarif est de {prix}, avec une livraison sous {delai} après la réception de ces éléments.{lien_paiement}\n\nBien cordialement,",
   "fields": {
    "objet": {
     "desc": "objet de l'email reçu (sans « Re : »)",
@@ -103,6 +103,30 @@
     "desc": "réponse précise à ce que le prospect a demandé (2 à 5 phrases)",
     "min": 20,
     "max": 800
+   }
+  }
+ },
+ {
+  "id": "demande_informations",
+  "name": "Demande d'informations après le paiement",
+  "usage": "Juste après le paiement d'une commande dont l'offre demande des informations au client. Déclenché automatiquement par le moteur.",
+  "offer": "{commande}",
+  "subject": "Votre commande {offre} : les informations dont nous avons besoin",
+  "body": "Bonjour{salutation},\n\nMerci pour votre commande de {offre} !\n\nPour la réaliser, nous avons besoin des éléments suivants : {infos_requises}\n\n{remarque}Il vous suffit de répondre à cet email. Le délai de livraison ({delai}) démarre à la réception de ces informations.\n\nBien cordialement,",
+  "fields": {
+   "commande": {
+    "desc": "numéro de la commande",
+    "max": 10
+   },
+   "salutation": {
+    "desc": "« Monsieur Dupont », « Madame Martin », ou vide",
+    "optional": true,
+    "max": 60
+   },
+   "remarque": {
+    "desc": "une précision utile si besoin, par exemple ce que l'on sait déjà (facultatif)",
+    "optional": true,
+    "max": 300
    }
   }
  },

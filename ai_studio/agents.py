@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 
-COMMON_TOOLS = ["list_activities", "complete_task", "remember", "recall", "search_library", "list_tasks", "get_task_result",
+COMMON_TOOLS = ["list_activities", "complete_task", "remember", "recall", "search_library", "list_tasks", "get_task_result", "offer_method",
                 "write_file", "read_file", "list_files", "request_owner_decision", "list_objectives"]
 
 
@@ -162,8 +162,8 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "fais pas le travail des spécialistes toi-même. Ce qui dépasse ta mission (budget, priorité entre missions, "
          "décision stratégique) se remonte au PDG avec delegate_task. Une commande se clôt d'elle-même à la livraison "
          "validée : ton rôle est d'y arriver dans le délai promis.",
-         ["mission_status", "close_mission", "delegate_task", "list_orders", "list_offers", "check_deliverable",
-          "set_order_status"], max_steps=14, task_budget_usd=0.25),
+         ["mission_status", "close_mission", "delegate_task", "list_orders", "list_offers", "check_deliverable", "confirm_content_review",
+          "set_order_status", "list_prospects"], max_steps=14, task_budget_usd=0.25),
     Role("rh", "Ressources humaines", "Agent RH — audit et amélioration des agents",
          "Tu audites le travail des agents, chefs de projet et PDG compris : réussite, coût, travail en double, "
          "circulation de l'information (délégations, mémoire et bibliothèque consultées), qualité vue par le propriétaire "

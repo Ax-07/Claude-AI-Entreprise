@@ -67,7 +67,9 @@ def order_values(cfg, db, n: int) -> dict:
         raise ValueError(f"Commande n°{n} introuvable (list_orders)")
     o = db.one("SELECT * FROM offers WHERE id=?", (s["offer_id"],)) if s["offer_id"] else None
     name = o["name"] if o else (s["product"] or "commande")
-    out = {"offre": name, "lien_avis": "", "suite": ""}
+    out = {"offre": name, "lien_avis": "", "suite": "",
+           "infos_requises": (o["required_info"] if o and o["required_info"] else "les informations utiles à la réalisation"),
+           "delai": _delay(o["delay_hours"]) if o else "le délai prévu"}
     url = (cfg.get("aftercare", "review_url", default="") or "").strip()
     if url:
         out["lien_avis"] = f"\n\nSi vous le souhaitez, vous pouvez aussi laisser un avis ici : {url}"
