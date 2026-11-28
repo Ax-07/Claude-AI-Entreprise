@@ -160,6 +160,16 @@ CREATE TABLE IF NOT EXISTS prospects (              -- fichier prospects : qui a
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS agent_rules (            -- consignes permanentes validées par le propriétaire (proposées par l'auditeur RH)
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent TEXT NOT NULL,
+    rule TEXT NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    active INTEGER NOT NULL DEFAULT 1,
+    approval_id INTEGER,
+    created_at TEXT NOT NULL,
+    removed_at TEXT
+);
 CREATE TABLE IF NOT EXISTS offers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,

@@ -21,6 +21,7 @@
   "hq": "pdg",
   "finance": "finance",
   "legal": "juridique",
+  "rh": "rh",
   "marketing": "marketing",
   "sales": "ventes",
   "support": "support",
@@ -41,7 +42,9 @@
   "legal": [
    "juridique"
   ],
-  "rh": [],
+  "rh": [
+   "rh"
+  ],
   "marketing": [
    "marketing"
   ],
@@ -229,14 +232,14 @@
    "id": "rh",
    "name": "Ressources humaines",
    "color": "#E879F9",
-   "agent": null,
-   "planned": true,
+   "agent": "rh",
+   "planned": false,
    "quarter": "direction",
    "division": "direction",
    "left": "50.00%",
    "top": "19.19%",
-   "role": "Direction · En préparation",
-   "desc": "Réserve d’agents spécialisés, mobilisés à la demande pour une mission précise, puis remis en réserve.",
+   "role": "Direction · Audit des agents",
+   "desc": "Audite chaque semaine le travail des agents, indépendamment du PDG, et propose des consignes que tu valides.",
    "variants": [
     {
      "L": "A",

@@ -90,7 +90,7 @@ INFO = {  # nom, couleur, agent, rôle affiché, description, échelle du bâtim
  "dev": ("Développement", "#22D3EE", "developpement", "Sites et applications", "Conçoit et livre les sites web, applications et outils sur mesure vendus aux clients.", .56),
  "video": ("Studio vidéo", "#F43F5E", None, "En préparation", "Future division vidéo : une chaîne YouTube de promotion de l’entreprise, puis des chaînes de contenu monétisées, à l’international.", .56),
  "ecommerce": ("E-commerce", "#A3E635", None, "En préparation", "Future division de vente en ligne (dropshipping international) : boutique, fournisseurs, commandes et retours.", .56),
- "rh": ("Ressources humaines", "#E879F9", None, "En préparation", "Réserve d’agents spécialisés, mobilisés à la demande pour une mission précise, puis remis en réserve.", .56),
+ "rh": ("Ressources humaines", "#E879F9", "rh", "Audit des agents", "Audite chaque semaine le travail des agents, indépendamment du PDG, et propose des consignes que tu valides.", .56),
  "infra": ("Infrastructure", "#2DD4BF", None, "En préparation", "Hébergement et mise en ligne des sites clients et de l’entreprise : domaines, HTTPS, surveillance, forfaits de maintenance.", .56),
  "auto": ("Automatisations", "#FACC15", None, "En préparation", "Intégrations et workflows (n8n, API, connecteurs) pour l’entreprise et à vendre aux clients.", .56),
  "legal": ("Juridique", "#CBD5E1", "juridique", "Conformité", "CGV, mentions, RGPD, factures : relit les actions avant ta décision.", .56),

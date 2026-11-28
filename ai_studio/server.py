@@ -29,7 +29,7 @@ WEB_DIR = Path(__file__).resolve().parent / "web"
 POLE_COLORS = {"pdg": "#818CF8", "recherche": "#34D399", "marketing": "#60A5FA", "ventes": "#A78BFA",
                "support": "#FBBF24", "data": "#F1F5F9", "finance": "#F472B6",
                "atelier": "#FB923C", "developpement": "#22D3EE", "chef_projet": "#A5B4FC", "juridique": "#CBD5E1",
-               "securite": "#F87171"}
+               "securite": "#F87171", "rh": "#E879F9"}
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 
 
@@ -552,6 +552,8 @@ def make_handler(cfg):
                         if m and not _re.fullmatch(r"\d{4}-\d{2}", m):
                             raise ApiError(400, "Mois au format AAAA-MM")
                         return self._send(200, monthly(cfg, db, m))
+                    if parts == ["agent-rules"]:
+                        return self._send(200, [dict(r) for r in db.q("SELECT id, agent, rule, reason, created_at FROM agent_rules WHERE active=1 ORDER BY agent, id")])
                     if parts == ["prospects"]:
                         from . import prospects
                         return self._send(200, {"prospects": prospects.listing(db, limit=500), "counts": prospects.counts(db)})
@@ -592,6 +594,12 @@ def make_handler(cfg):
                             raise ApiError(404, str(e))
                         except ValueError as e:
                             raise ApiError(400, str(e))
+                    if len(parts) == 3 and parts[0] == "agent-rules" and parts[1].isdigit() and parts[2] == "remove":
+                        from .audit import remove_rule
+                        try:
+                            return self._send(200, {"ok": True, "message": remove_rule(db, int(parts[1]))})
+                        except KeyError as e:
+                            raise ApiError(404, str(e))
                     if parts == ["chat", "threads"]:
                         from .chat import new_thread
                         return self._send(200, {"id": new_thread(db)})

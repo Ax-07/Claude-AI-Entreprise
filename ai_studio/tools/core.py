@@ -38,6 +38,9 @@ def delegate_task(ctx: ToolContext, agent: str, title: str, description: str, pr
     agent = agent.strip().lower()
     if agent not in ctx.agent_names:
         return f"Agent inconnu. Agents disponibles : {', '.join(ctx.agent_names)}"
+    if agent == "rh":
+        return ("Refusé : l'auditeur RH est indépendant, il ne reçoit pas de tâches des agents. Il audite chaque semaine "
+                "le travail de toute l'équipe et rend compte au propriétaire.")
     from ..missions import has_pm, mission_of, PM
     m = mission_of(ctx.task)
     if m and has_pm(ctx.db, *m) and ctx.agent not in (PM, "pdg"):
@@ -343,6 +346,53 @@ def seo_check(ctx: ToolContext, url: str, max_pages: int = 5) -> str:
         ctx.db.cache_put("seo", key, ctx.agent, ctx.task["id"] if ctx.task is not None else None, out)
     ctx.db.log(ctx.agent, "file", f"Analyse SEO de {url} : score {res.get('score', '—')}/100 → {rel}")
     return out + f"\n\n(Analyse enregistrée dans {rel}.)"
+
+
+@tool("agent_audit", "Dossier chiffré du travail des agents sur N jours (réussite, coûts, doublons, délégations, mémoire, "
+      "demandes au propriétaire acceptées/refusées/corrigées, pilotage des missions, consignes en vigueur). Gratuit.",
+      {"days": {"type": "integer", "description": "période en jours (7 par défaut, 90 au plus)"}})
+def agent_audit(ctx: ToolContext, days: int = 7) -> str:
+    from ..audit import dossier, to_markdown
+    return to_markdown(dossier(ctx.cfg, ctx.db, max(1, min(90, int(days or 7)))))
+
+
+@tool("propose_agent_rule",
+      "Propose au propriétaire une consigne permanente pour un agent (appliquée à toutes ses tâches après validation). "
+      "Une phrase courte, précise, vérifiable, appuyée sur une preuve chiffrée du dossier.",
+      {"agent": {"type": "string"}, "rule": {"type": "string", "description": "la consigne, à l'impératif, 300 caractères au plus"},
+       "evidence": {"type": "string", "description": "la preuve : chiffres du dossier, numéros de tâches"}},
+      ["agent", "rule", "evidence"])
+def propose_agent_rule(ctx: ToolContext, agent: str, rule: str, evidence: str) -> str:
+    agent, rule, evidence = agent.strip().lower(), " ".join(rule.split()), evidence.strip()
+    if agent not in ctx.agent_names:
+        return f"Agent inconnu. Agents : {', '.join(ctx.agent_names)}"
+    if not 15 <= len(rule) <= 300:
+        return "Consigne de 15 à 300 caractères."
+    if len(evidence) < 20:
+        return "Donne une preuve chiffrée (chiffres du dossier, numéros de tâches)."
+    if re.search(r"(?i)sans (validation|l'accord|demander)|ignore|contourne|ne (demande|soumets) (pas|plus)|envoie directement", rule):
+        return "Refusé : une consigne ne peut pas contourner les validations du propriétaire ni les règles existantes."
+    from ..audit import rules_for
+    cur = rules_for(ctx.db, agent)
+    if len(cur) >= int(ctx.cfg.get("audit", "max_rules_per_agent", default=8)):
+        return f"{agent} a déjà {len(cur)} consignes : propose plutôt d'en remplacer une (dis laquelle dans evidence)."
+    if any(rule.lower() == r.lower() for r in cur):
+        return "Cette consigne existe déjà."
+    if ctx.db.one("SELECT 1 FROM approvals WHERE action='agent_rule' AND status='pending' AND json_extract(payload,'$.agent')=? "
+                  "AND json_extract(payload,'$.rule')=?", (agent, rule)):
+        return "Cette consigne attend déjà la décision du propriétaire."
+    aid = ctx.db.add_approval(ctx.agent, ctx.task["id"] if ctx.task is not None else None, "agent_rule",
+                              {"agent": agent, "rule": rule, "evidence": evidence[:800], "current": cur},
+                              f"Consigne permanente proposée pour {agent}")
+    ctx.db.log(ctx.agent, "rh", f"Consigne proposée pour {agent} (#{aid}) : {rule[:100]}")
+    return f"Consigne #{aid} soumise au propriétaire : elle s'appliquera à toutes les tâches de {agent} s'il la valide."
+
+
+@tool("list_agent_rules", "Consignes permanentes en vigueur, par agent.", {"agent": {"type": "string"}})
+def list_agent_rules(ctx: ToolContext, agent: str = "") -> str:
+    rows = ctx.db.q("SELECT id, agent, rule, created_at FROM agent_rules WHERE active=1" + (" AND agent=?" if agent else "")
+                    + " ORDER BY agent, id", ((agent.strip().lower(),) if agent else ()))
+    return "\n".join(f"#{r['id']} {r['agent']} (depuis le {r['created_at'][:10]}) : {r['rule']}" for r in rows) or "Aucune consigne permanente."
 
 
 BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
