@@ -222,6 +222,8 @@ class DB:
         ("sales", "info_received_at", "TEXT"),            # informations du client reçues : le délai promis démarre
         ("sales", "content_review", "TEXT"),              # relecture du fond par le chef de projet (avant livraison)
         ("sales", "content_review_at", "TEXT"),
+        ("sales", "content_review_file", "TEXT"),         # fichier relu par le chef de projet (chemin dans l'espace de travail)
+        ("sales", "content_review_sha", "TEXT"),          # son empreinte SHA-256 : la livraison doit contenir cette version exacte
         ("objectives", "owner_check", "TEXT"),            # vérification du propriétaire : ok | issue
         ("objectives", "owner_note", "TEXT"),
         ("objectives", "checked_at", "TEXT"),
