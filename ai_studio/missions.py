@@ -106,7 +106,8 @@ def missions(db) -> list[dict]:
                     "state": {"active": "En cours", "paused": "En pause", "done": "Terminée (agents)", "archived": "Archivée"}.get(o["status"], o["status"]),
                     "status": o["status"], "declared_done": done, "archived": archived, "waiting": w, **s,
                     "issues": [] if archived else _issues(done, o["status"] == "active", s, o["status"] == "paused", w),
-                    "owner_check": o["owner_check"], "owner_note": o["owner_note"], "checked_at": o["checked_at"], "created_at": o["created_at"]})
+                    "owner_check": o["owner_check"], "owner_note": o["owner_note"], "checked_at": o["checked_at"], "created_at": o["created_at"],
+                    "pm": bool(o["project_manager"]), "pm_summary": o["pm_summary"]})
     for r in db.q("SELECT rowid AS n, * FROM sales WHERE stage IS NOT NULL AND (stage!='historique' OR owner_check='archived') "
                   "ORDER BY created_at DESC LIMIT 60"):
         s = _summary(db, "order_ref=?", r["n"])
@@ -118,7 +119,7 @@ def missions(db) -> list[dict]:
         out.append({"kind": "commande", "id": r["n"], "title": f"Commande n°{r['n']} · {r['product'] or 'commande'}", "text": r["product"] or "",
                     "activity": "services", "state": st, "status": r["stage"], "declared_done": done, "archived": archived, "waiting": w, **s, "issues": issues,
                     "owner_check": r["owner_check"], "owner_note": r["owner_notes"], "checked_at": r["checked_at"], "created_at": r["created_at"],
-                    "test": not r["livemode"]})
+                    "test": not r["livemode"], "pm": bool(r["project_manager"]), "pm_summary": None})
     for m in out:
         m["to_check"] = _to_check(m)
     return out
@@ -187,3 +188,118 @@ def archive(db, kind: str, mid: int, title: str, note: str = "") -> str:
     db.conn.commit()
     db.log("proprietaire", "mission", f"{title} : archivée{' — ' + note if note else ''} ({n} tâche(s) en attente annulée(s))")
     return f"Mission archivée ({n} tâche(s) en attente annulée(s))."
+
+
+# ============================================================================ chefs de projet
+PM = "chef_projet"
+
+
+def mission_of(task) -> tuple[str, int] | None:
+    if task is None:
+        return None
+    if task["order_ref"]:
+        return ("commande", int(task["order_ref"]))
+    if task["objective_id"]:
+        return ("objectif", int(task["objective_id"]))
+    return None
+
+
+def has_pm(db, kind: str, mid: int) -> bool:
+    if kind == "objectif":
+        r = db.one("SELECT project_manager FROM objectives WHERE id=?", (mid,))
+    else:
+        r = db.one("SELECT project_manager FROM sales WHERE rowid=?", (mid,))
+    return bool(r and r[0])
+
+
+def mission_cost(db, kind: str, mid: int) -> float:
+    col = "objective_id" if kind == "objectif" else "order_ref"
+    return float(db.one(f"SELECT COALESCE(SUM(c.usd),0) FROM costs c JOIN tasks t ON t.id=c.task_id WHERE t.{col}=?", (mid,))[0])
+
+
+def dossier(db, kind: str, mid: int) -> str:
+    """Tout ce qu'un chef de projet doit savoir de sa mission, en un seul texte."""
+    m = detail(db, kind, mid)
+    head = f"{m['title']} — état : {m['state']} — avancement : {m['counts']['done']}/{m['total']} tâche(s) réussie(s)."
+    if kind == "objectif":
+        o = db.one("SELECT * FROM objectives WHERE id=?", (mid,))
+        head += f"\nDemande du propriétaire : {o['text']}"
+        if o["owner_check"] == "issue" and o["owner_note"]:
+            head += f"\nREMARQUE DU PROPRIÉTAIRE (mission renvoyée, à traiter en priorité) : {o['owner_note']}"
+    else:
+        from .commerce import delivery_brief
+        head += "\n" + delivery_brief(db, mid)
+    if m["issues"]:
+        head += "\nAnomalies : " + " ; ".join(m["issues"])
+    if m["waiting"]:
+        head += f"\nEn attente de validation du propriétaire : #{', #'.join(map(str, m['waiting']))} (ne rien relancer en double)."
+    lines = []
+    for t in m["tasks"][-25:]:
+        lines.append(f"- #{t['id']} [{t['status']}] {t['agent']} : {t['title']}" + (f"\n    → {t['result'][:300]}" if t["result"] else ""))
+    return head + "\n\nTâches de la mission :\n" + ("\n".join(lines) or "(aucune)")
+
+
+def assign_pm(db, kind: str, mid: int, brief: str = "", by: str = "pdg") -> int | None:
+    """Confie une mission à un chef de projet et lui crée sa tâche de lancement."""
+    if kind == "objectif":
+        db.run("UPDATE objectives SET project_manager=? WHERE id=?", (PM, mid))
+    else:
+        db.run("UPDATE sales SET project_manager=? WHERE rowid=?", (PM, mid))
+    title = detail(db, kind, mid)["title"]
+    db.log(by, "mission", f"{title} : confiée à un chef de projet")
+    return db.add_task(f"Piloter : {title}"[:120], PM,
+                       (f"Consignes de lancement : {brief}\n\n" if brief else "") +
+                       "Tu es le chef de projet de cette mission. Lance mission_status, établis le plan, délègue les premières "
+                       "étapes et termine ta tâche : tu seras réveillé à la fin de chaque étape.",
+                       priority=2, created_by=by, objective_id=mid if kind == "objectif" else None,
+                       order_ref=mid if kind == "commande" else None)
+
+
+def wake_pm(db, task) -> int | None:
+    """Une étape de mission vient de se terminer : le chef de projet est réveillé (une seule tâche de suivi en attente)."""
+    if task is None or task["agent"] == PM:
+        return None
+    m = mission_of(task)
+    if not m or not has_pm(db, *m):
+        return None
+    col = "objective_id" if m[0] == "objectif" else "order_ref"
+    t = db.task(task["id"])
+    line = f"- #{t['id']} {t['agent']} « {t['title']} » → {t['status']}"
+    pending = db.one(f"SELECT id, description FROM tasks WHERE agent=? AND {col}=? AND status='pending' ORDER BY id LIMIT 1", (PM, m[1]))
+    if pending:                                   # déjà réveillé : on complète sa liste au lieu d'empiler les tâches
+        db.run("UPDATE tasks SET description=? WHERE id=?", (pending["description"] + "\n" + line, pending["id"]))
+        return pending["id"]
+    return db.add_task(f"Suivi : étape terminée ({t['agent']})"[:120], PM,
+                       "Étape(s) terminée(s) dans ta mission :\n" + line +
+                       "\n\nRelis le résultat (get_task_result), puis lance l'étape suivante, fais corriger, ou clôture.",
+                       priority=2, created_by="systeme", objective_id=m[1] if m[0] == "objectif" else None,
+                       order_ref=m[1] if m[0] == "commande" else None)
+
+
+def over_cap(cfg, db, task) -> str | None:
+    """Plafond de dépense d'une mission pilotée : au-delà, ses tâches attendent la décision du propriétaire."""
+    m = mission_of(task)
+    if not m or not has_pm(db, *m):
+        return None
+    cap = float(cfg.get("missions", "max_usd_per_mission", default=3.0) or 0)
+    spent = mission_cost(db, *m)
+    if cap and spent >= cap:
+        return f"plafond de la mission atteint ({spent:.2f} $ sur {cap:.2f} $)"
+    return None
+
+
+def close(db, kind: str, mid: int, summary: str, by: str = PM) -> str:
+    m = detail(db, kind, mid)
+    open_ = [t for t in m["tasks"] if t["status"] in ("pending", "running") and t["agent"] != PM]
+    if open_:
+        return "Clôture refusée : des tâches sont encore ouvertes (" + ", ".join(f"#{t['id']}" for t in open_[:6]) + "). Attends-les ou annule-les."
+    if m["waiting"]:
+        return f"Clôture refusée : la validation #{m['waiting'][0]} attend encore le propriétaire."
+    if kind == "commande":
+        if m["status"] != "livree":
+            return "Une commande se clôt par sa livraison : fais livrer le client (deliver_order via le support)."
+        db.run("UPDATE sales SET stage_note=? WHERE rowid=?", (summary[:300], mid))
+    else:
+        db.run("UPDATE objectives SET status='done', done_at=?, pm_summary=?, owner_check=NULL WHERE id=?", (iso(), summary[:2000], mid))
+    db.log(by, "mission", f"{m['title']} : clôturée par le chef de projet — {summary[:200]}")
+    return "Mission clôturée : elle passe dans « À vérifier » pour le propriétaire."

@@ -32,7 +32,8 @@
  },
  "agents_of_pole": {
   "hq": [
-   "pdg"
+   "pdg",
+   "chef_projet"
   ],
   "finance": [
    "finance"

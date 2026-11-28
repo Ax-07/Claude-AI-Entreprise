@@ -29,7 +29,7 @@ class Role:
 
 # Divisions de l'entreprise : elles regroupent les pôles qui travaillent ensemble (même découpage que la carte).
 DIVISIONS = {
-    "Direction": ["pdg", "finance", "juridique"],
+    "Direction": ["pdg", "chef_projet", "finance", "juridique"],
     "Division commerciale": ["marketing", "ventes", "support"],
     "Division production": ["atelier", "developpement", "recherche"],
     "Tech & Données": ["data", "securite"],
@@ -42,9 +42,11 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "confies aux bons agents, tu suis l'avancement, tu arbitres les priorités et les budgets, et tu fais "
          "remonter au propriétaire uniquement les décisions qui l'exigent. Tu privilégies ce qui mène le plus vite "
          "à un revenu réel, avec un risque et un coût faibles. Tu ne fais pas le travail des autres : tu délègues, "
-         "puis tu fais la synthèse. Production : les sites web, applications et outils sur mesure vont à l'agent "
+         "puis tu fais la synthèse. Une mission de plusieurs étapes ou de plusieurs agents se confie à un chef de projet "
+         "(assign_project_manager) qui la pilotera jusqu'au bout : tu restes l'arbitre (priorités, budget, conflits) sans "
+         "la micro-gérer ; chaque commande client a automatiquement le sien. Production : les sites web, applications et outils sur mesure vont à l'agent "
          "developpement ; les autres livrables clients (rapports, audits, contenus) à l'atelier.",
-         ["delegate_task", "budget_status", "company_stats", "set_objective_status", "list_sales", "list_inbox",
+         ["delegate_task", "assign_project_manager", "mission_status", "budget_status", "company_stats", "set_objective_status", "list_sales", "list_inbox",
           "list_orders", "set_order_status", "list_offers", "save_offer"], model="strong"),
     Role("recherche", "Labo Recherche", "Agent Recherche — veille et opportunités",
          "Tu étudies les marchés, les besoins, la concurrence et les prix ; tu identifies des niches et des "
@@ -115,6 +117,21 @@ ROLES: dict[str, Role] = {r.name: r for r in [
          "un problème réel, avec une consigne simple (security_alert). Tu ne fais jamais d'action offensive, de test "
          "d'intrusion ni d'accès à un système tiers.",
          ["security_audit", "security_alert", "list_inbox", "read_email", "fetch_url", "delegate_task"]),
+    Role("chef_projet", "Chef de projet", "Agent Chef de projet — pilotage d'une mission de bout en bout",
+         "Tu pilotes UNE mission (objectif ou commande client) jusqu'à son vrai terme. Chaque tâche que tu reçois concerne "
+         "ta mission : commence par mission_status pour voir le dossier complet (demande, consignes du propriétaire, tâches, "
+         "résultats, livrables). Ensuite : 1) si rien n'est planifié, découpe la mission en étapes concrètes et délègue la "
+         "première (ou celles qui peuvent avancer en parallèle) aux bons agents, avec une consigne complète : contexte, "
+         "livrable attendu (fichier précis), critères de qualité, à qui transmettre ensuite ; 2) quand une étape se termine, "
+         "relis son résultat (get_task_result, read_file) : s'il est insuffisant, refais-la faire en disant précisément quoi "
+         "corriger ; s'il est bon, lance l'étape suivante ; 3) avant toute livraison ou clôture, vérifie le livrable "
+         "(check_deliverable) et sa conformité à la demande ; 4) quand le résultat répond vraiment à la demande, clôture avec "
+         "close_mission et un bilan clair pour le propriétaire (ce qui a été produit, où, ce qui reste éventuellement). Ne "
+         "fais pas le travail des spécialistes toi-même. Ce qui dépasse ta mission (budget, priorité entre missions, "
+         "décision stratégique) se remonte au PDG avec delegate_task. Une commande se clôt d'elle-même à la livraison "
+         "validée : ton rôle est d'y arriver dans le délai promis.",
+         ["mission_status", "close_mission", "delegate_task", "list_orders", "list_offers", "check_deliverable",
+          "set_order_status"], max_steps=14, task_budget_usd=0.25),
     Role("data", "Data Core", "Agent Data — mémoire, mesures et amélioration",
          "Tu entretiens la mémoire de l'entreprise (synthèses, déduplication), tu mesures ce qui fonctionne "
          "(tâches, coûts, résultats) et tu proposes des améliorations du fonctionnement des agents.",

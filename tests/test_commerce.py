@@ -92,7 +92,7 @@ class StripeTest(Base):
         self.assertEqual(r["new"], 1)
         self.assertEqual(calls[0]["created[gt]"], old)
         self.assertEqual(calls[0]["expand[]"], "data.line_items")
-        t = self.db.one("SELECT * FROM tasks WHERE agent='pdg'")
+        t = self.db.one("SELECT * FROM tasks WHERE agent='chef_projet'")    # chaque commande a son chef de projet
         self.assertEqual(t["priority"], 1)
         self.assertIn("client@exemple.fr", t["description"])
         self.assertEqual(self.db.one("SELECT task_id FROM sales WHERE id='cs_new'")[0], t["id"])

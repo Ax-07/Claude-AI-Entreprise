@@ -74,5 +74,68 @@ class MissionsTest(Base):
         self.assertTrue(any(e["mission"] and e["mission"]["label"].startswith(f"Commande n°{n}") for e in ev))
 
 
+class ProjectManagerTest(Base):
+    def ctx(self, agent, task_id=None):
+        from ai_studio.agents import ROLES
+        from ai_studio.tools import ToolContext
+        return ToolContext(self.cfg, self.db, agent, self.db.task(task_id) if task_id else None, list(ROLES))
+
+    def test_full_cycle(self):
+        from ai_studio.tools import run_tool
+        oid = self.db.add_objective("Créer 3 articles de blog sur le SEO local")
+        out = run_tool("assign_project_manager", self.ctx("pdg"), {"kind": "objectif", "id": oid, "brief": "Priorité : qualité"})
+        self.assertIn("Chef de projet nommé", out)
+        self.assertIn("déjà un chef de projet", run_tool("assign_project_manager", self.ctx("pdg"), {"kind": "objectif", "id": oid}))
+        kick = self.db.one("SELECT * FROM tasks WHERE agent='chef_projet'")
+        self.assertEqual((kick["objective_id"], kick["priority"]), (oid, 2))
+        self.assertIn("Priorité : qualité", kick["description"])
+        self.assertIn("Demande du propriétaire : Créer 3 articles", run_tool("mission_status", self.ctx("chef_projet", kick["id"]), {}))
+        # le chef de projet délègue deux étapes ; à la fin de chacune, il est réveillé une seule fois
+        self.db.set_task(kick["id"], status="done", result="plan fait")
+        a = self.db.add_task("Article 1", "marketing", parent_id=kick["id"]); b = self.db.add_task("Article 2", "marketing", parent_id=kick["id"])
+        for t in (a, b):
+            self.db.set_task(t, status="done", result="article écrit")
+            missions.wake_pm(self.db, self.db.task(t))
+        wake = self.db.q("SELECT * FROM tasks WHERE agent='chef_projet' AND status='pending'")
+        self.assertEqual(len(wake), 1)
+        self.assertIn("Article 1", wake[0]["description"]); self.assertIn("Article 2", wake[0]["description"])
+        self.assertIsNone(missions.wake_pm(self.db, self.db.task(wake[0]["id"])))          # pas de réveil sur ses propres tâches
+        # clôture : refusée tant qu'il reste du travail, puis acceptée et soumise au propriétaire
+        c = self.db.add_task("Article 3", "marketing", objective_id=oid)
+        ctx = self.ctx("chef_projet", wake[0]["id"])
+        self.assertIn("refusée", run_tool("close_mission", ctx, {"summary": "Trois articles écrits dans contenus/blog/, prêts à publier."}))
+        self.db.set_task(c, status="done", result="ok")
+        self.assertIn("clôturée", run_tool("close_mission", ctx, {"summary": "Trois articles écrits dans contenus/blog/, prêts à publier."}))
+        m = next(x for x in missions.missions(self.db) if x["kind"] == "objectif")
+        self.assertEqual((m["status"], m["pm"], m["to_check"]), ("done", True, True))
+        self.assertIn("contenus/blog", m["pm_summary"])
+
+    def test_spending_cap_blocks_mission(self):
+        from ai_studio.runner import run_task
+        self.cfg.data["missions"] = {"max_usd_per_mission": 0.5}
+        oid = self.db.add_objective("Mission coûteuse")
+        missions.assign_pm(self.db, "objectif", oid)
+        t = self.db.add_task("Étape", "recherche", objective_id=oid)
+        self.db.add_cost("recherche", t, "m", 1, 1, 0, 0.6)
+        from test_core import FakeLLM
+        from ai_studio.llm import BudgetGuard
+        self.assertEqual(run_task(self.cfg, self.db, FakeLLM([]), BudgetGuard(self.cfg, self.db), self.db.task(t)), "blocked")
+        self.assertIn("plafond de la mission", self.db.task(t)["result"])
+
+    def test_orders_and_reviews_go_to_project_manager(self):
+        from pathlib import Path
+        from ai_studio import commerce
+        from ai_studio.orchestrator import Studio
+        commerce.import_offers(self.db, Path(__file__).resolve().parents[1] / "catalogue" / "offres.json")
+        n = commerce.test_order(self.cfg, self.db, "Site vitrine", "proprio@studio.fr")
+        self.assertTrue(missions.has_pm(self.db, "commande", n))
+        oid = self.db.add_objective("Mission pilotée")
+        missions.assign_pm(self.db, "objectif", oid)
+        self.db.run("UPDATE tasks SET status='done' WHERE agent='chef_projet' AND objective_id=?", (oid,))
+        Studio(self.cfg, self.db, None).schedule_reviews()
+        self.assertEqual(self.db.one("SELECT agent FROM tasks WHERE objective_id=? AND status='pending'", (oid,))[0], "chef_projet")
+        self.assertIsNone(self.db.one("SELECT 1 FROM tasks WHERE agent='pdg' AND title LIKE 'Revue de l''objectif #%' AND objective_id=?", (oid,)))
+
+
 if __name__ == "__main__":
     unittest.main()

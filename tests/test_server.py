@@ -82,7 +82,7 @@ class ServerTest(unittest.TestCase):
         self.assertFalse(s["engine"]["running"])
         st, ag, _ = self.req("GET", "/api/agents")
         by = {a["name"]: a for a in ag}
-        self.assertEqual(len(ag), 11)
+        self.assertEqual(len(ag), 12)
         self.assertEqual(by["atelier"]["division"], "Division production")
         self.assertEqual(by["data"]["division"], "Tech & Données")
         self.assertEqual(by["securite"]["division"], "Tech & Données")
@@ -210,7 +210,8 @@ class MaquetteTest(ServerTest):
         from ai_studio.agents import ROLES
         st, meta, _ = self.req("GET", "/carte.json")
         self.assertEqual(st, 200)
-        self.assertEqual(sorted(meta["agent_of_pole"].values()), sorted(ROLES))
+        self.assertEqual(sorted(a for ags in meta["agents_of_pole"].values() for a in ags), sorted(ROLES))
+        self.assertEqual(meta["agents_of_pole"]["hq"], ["pdg", "chef_projet"])                # les chefs de projet logent au HQ
         for p in meta["poles"]:
             letters = "ABCDEF" if p["id"] == "data" else "ABC"
             self.assertEqual("".join(v["L"] for v in p["variants"]), letters)

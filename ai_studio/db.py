@@ -190,6 +190,9 @@ class DB:
         ("objectives", "checked_at", "TEXT"),
         ("objectives", "done_at", "TEXT"),
         ("sales", "owner_check", "TEXT"),
+        ("objectives", "project_manager", "TEXT"),        # mission confiée à un chef de projet (agent chef_projet)
+        ("objectives", "pm_summary", "TEXT"),             # bilan de clôture du chef de projet
+        ("sales", "project_manager", "TEXT"),
         ("sales", "checked_at", "TEXT"),
         ("tasks", "order_ref", "INTEGER"),                # commande concernée (suivi jusqu'à la livraison)
         ("sales", "offer_id", "INTEGER"),
@@ -229,6 +232,8 @@ class DB:
             tid = self.conn.execute("INSERT INTO chat_threads(title, created_at, updated_at) VALUES (?,?,?)",
                                     ("Première discussion", first[0], first[1])).lastrowid
             self.conn.execute("UPDATE chat SET thread_id=? WHERE thread_id IS NULL", (tid,))
+        # commandes ouvertes avant les chefs de projet : elles en reçoivent un (les relances iront vers lui)
+        self.conn.execute("UPDATE sales SET project_manager='chef_projet' WHERE project_manager IS NULL AND stage IN ('a_livrer','attente_client')")
         self.conn.execute("UPDATE sales SET stage = CASE WHEN task_id IS NULL THEN 'historique' ELSE 'a_livrer' END WHERE stage IS NULL")
         self.conn.execute("UPDATE tasks SET order_ref = (SELECT s.rowid FROM sales s WHERE s.task_id = tasks.id) "
                           "WHERE order_ref IS NULL AND id IN (SELECT task_id FROM sales WHERE task_id IS NOT NULL)")

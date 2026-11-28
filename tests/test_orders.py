@@ -58,7 +58,7 @@ class OrdersTest(Base):
         self.assertIsNotNone(s["offer_id"])
         self.assertAlmostEqual((commerce.datetime.fromisoformat(s["due_at"]) - commerce.datetime.fromisoformat(s["created_at"])).total_seconds(), 48 * 3600)
         t = self.db.one("SELECT * FROM tasks WHERE order_ref=?", (n,))
-        self.assertEqual(t["agent"], "pdg")
+        self.assertEqual(t["agent"], "chef_projet")
         for expected in ("Rapport PDF priorisé", "l'agent recherche", f"deliver_order, order={n}", "n'est PAS un livrable",
                          "jamais « aucun délai confirmé »"):
             self.assertIn(expected, t["description"])
@@ -328,7 +328,7 @@ class CatalogueTest(Base):
         self.assertEqual((o["stage"], o["livemode"], o["amount"], o["offer_id"]), ("a_livrer", 0, 390, site["id"]))
         self.assertTrue(o["due_at"])
         t = self.db.task(o["task_id"])
-        self.assertEqual((t["agent"], t["order_ref"]), ("pdg", n))
+        self.assertEqual((t["agent"], t["order_ref"]), ("chef_projet", n))
         self.assertIn("Boulangerie Dupont", t["description"])                   # informations du client dans le brief
         self.assertIn("developpement", t["description"])                        # agent producteur de l'offre
 
