@@ -41,7 +41,8 @@ class IntakeTest(Base):
         self.assertIn("en attente de validation", out)
         p = json.loads(self.db.pending_approvals()[-1]["payload"])
         self.assertEqual(p["subject"], "Votre commande Diagnostic SEO local : les informations dont nous avons besoin")
-        self.assertIn("Nom et adresse de l'établissement", p["body"])
+        self.assertIn("----------\nNom et adresse de l'établissement :\nActivité et 3 services principaux :", p["body"])   # formulaire complet
+        self.assertIn("1 à 3 concurrents connus (facultatif) :\n----------", p["body"])
         self.assertIn("Le délai de livraison (3 jours) démarre à la réception de ces informations.", p["body"])
         self.assertIn("pas encore reçues", commerce.delivery_brief(self.db, n))
         # la réponse du client fait démarrer le délai
@@ -76,11 +77,14 @@ class IntakeTest(Base):
         _, body, _ = render(self.cfg, self.db, "reponse_interesse", {**f, "infos_manquantes": "toutes"})
         self.assertIn("Nom et adresse de l'établissement", body)
         _, body, _ = render(self.cfg, self.db, "reponse_interesse", {**f, "infos_manquantes": "la ville desservie"})
-        self.assertIn("il nous manque seulement : la ville desservie.", body); self.assertNotIn("Nom et adresse", body)
+        self.assertIn("il nous manque seulement quelques éléments.", body); self.assertNotIn("Nom et adresse", body)
+        self.assertIn("copiez ce modèle dans votre réponse", body)
+        self.assertIn("----------\nLa ville desservie :\n----------", body)                   # formulaire à copier-coller
         n = commerce.test_order(self.cfg, self.db, "Diagnostic SEO local", "marie@cafe-lumiere.fr")
         _, body, _ = render(self.cfg, self.db, "demande_informations", {"commande": str(n), "infos_manquantes": "vos 3 services principaux",
                                                                         "remarque": "Nous avons bien votre adresse et votre site."})
-        self.assertIn("Nous avons bien votre adresse et votre site.\n\nPour la réaliser, il nous manque seulement : vos 3 services principaux.", body)
+        self.assertIn("Nous avons bien votre adresse et votre site.\n\nPour la réaliser, il nous manque seulement quelques éléments.", body)
+        self.assertIn("----------\nVos 3 services principaux :\n----------", body)
 
     def test_order_from_prospect_who_already_wrote(self):
         self.db.run("INSERT INTO inbox(uid, message_id, from_addr, subject, body, status, received_at, recorded_at) "
