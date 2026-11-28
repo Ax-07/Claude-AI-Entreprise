@@ -503,6 +503,7 @@ def make_handler(cfg):
             self.send_header("Cache-Control", "no-cache" if etag else "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
             self.send_header("Content-Security-Policy",
                              "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                              "font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
@@ -546,10 +547,34 @@ def make_handler(cfg):
             url = urlparse(self.path)
             path, qs = url.path.rstrip("/") or "/", parse_qs(url.query)
             q = lambda k, d="": (qs.get(k) or [d])[0]
-            if method == "GET" and (path == "/" or not path.startswith("/api")):
+            from . import auth
+            session_ok = auth.valid(cfg, auth.cookie_value(self.headers))
+            if method == "GET" and path == "/" and "cle" in qs:          # lien d'accès : cookie posé, clé retirée de l'adresse
+                if not auth.valid(cfg, q("cle")):
+                    return self._send(403, auth.LOGIN_PAGE.encode(), "text/html; charset=utf-8")
+                self.send_response(303)
+                self.send_header("Location", "/")
+                self.send_header("Set-Cookie", auth.set_cookie_header(cfg))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            if method == "GET" and path == "/" and not session_ok:
+                return self._send(401, auth.LOGIN_PAGE.encode(), "text/html; charset=utf-8")
+            if method == "GET" and not path.startswith("/api"):
                 return self._static(path)
-            if method == "POST" and self.headers.get("X-AI-Studio") != "1":
-                return self._send(403, {"error": "En-tête X-AI-Studio manquant"})
+            if not session_ok:                                            # audit SEC-04 : clé secrète obligatoire
+                return self._send(401, {"error": "Session absente ou expirée : rouvre le tableau de bord avec ton lien "
+                                                 "d'accès (commande : python -m ai_studio lien)."})
+            if method == "POST":
+                origin = self.headers.get("Origin")
+                if self.headers.get("X-AI-Studio") != "1":
+                    return self._send(403, {"error": "En-tête X-AI-Studio manquant"})
+                if origin is not None and origin != f"http://{self.headers.get('Host')}":
+                    return self._send(403, {"error": "Origine refusée"})
+                if (self.headers.get("Sec-Fetch-Site") or "same-origin") not in ("same-origin", "none"):
+                    return self._send(403, {"error": "Requête d'un autre site refusée"})
             db = self._db()
             try:
                 parts = path.split("/")[2:]          # /api/<a>/<b>

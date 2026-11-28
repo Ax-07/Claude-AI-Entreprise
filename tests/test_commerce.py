@@ -418,12 +418,13 @@ class ServerCommerceTest(Base):
         os.environ.update(GITHUB_PAGES_REPO="Ax-07/ai-studio-site", GITHUB_TOKEN="t")
         self.db.add_approval("marketing", None, "publish_page", {"path": "o.html", "url": "u", "title": "T", "file": "f", "html": "<h1>Bonjour</h1>"}, "r")
         self.db.run("INSERT INTO sales(id, created_at, amount, currency, livemode, recorded_at) VALUES ('s', '2026-11-27T10:00:00+00:00', 49, 'EUR', 1, 'x')")
+        from ai_studio.auth import COOKIE, get_key
         srv = make_server(self.cfg, 0); port = srv.server_address[1]
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         self.addCleanup(srv.server_close); self.addCleanup(srv.shutdown)
         def get(path):
             c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-            c.request("GET", path, headers={"Host": f"127.0.0.1:{port}"})
+            c.request("GET", path, headers={"Host": f"127.0.0.1:{port}", "Cookie": f"{COOKIE}={get_key(self.cfg)}"})
             r = c.getresponse(); body = r.read(); c.close()
             return r, body
         r, body = get("/api/approvals")
@@ -438,7 +439,8 @@ class ServerCommerceTest(Base):
         self.db.add_approval("ventes", None, "send_email", {"to": "a@b.fr", "subject": "s", "body": "b"}, "r")
         c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
         c.request("POST", "/api/approvals/2", body=json.dumps({"decision": "approve"}),
-                  headers={"Host": f"127.0.0.1:{port}", "X-AI-Studio": "1", "Content-Type": "application/json"})
+                  headers={"Host": f"127.0.0.1:{port}", "X-AI-Studio": "1", "Content-Type": "application/json",
+                           "Cookie": f"{COOKIE}={get_key(self.cfg)}"})
         r = c.getresponse(); err = json.loads(r.read()); c.close()
         self.assertEqual(r.status, 409)
         self.assertIn("SMTP_HOST", err["error"])

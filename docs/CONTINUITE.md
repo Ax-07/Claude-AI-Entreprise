@@ -265,6 +265,13 @@ _Mis à jour le 27/11/2026_
   - Limite : le plafond est strict tant que l'entrée réelle ne dépasse pas l'estimation, qui est prudente.
   - Le runner et la discussion passent par `reserve` ; `check` (début de cycle) compte aussi les réservations.
   - `tests/test_budget.py` : 9 tests, dont le scénario de l'audit et 6 fils d'exécution en parallèle sur des connexions distinctes. 265 tests.
+- Phase 2, SEC-04 corrigé (28/11) : `ai_studio/auth.py`. Défaut confirmé : n'importe quel programme du PC pouvait lire l'API et valider des demandes avec le seul en-tête public `X-AI-Studio: 1`.
+  - Clé secrète créée au premier démarrage dans `data/cle-tableau-de-bord.txt` (hors de l'espace de travail des agents, droits 600 sous Linux et macOS).
+  - Le navigateur est ouvert au démarrage sur `/?cle=…` : le serveur pose un cookie `studio_session` (HttpOnly, SameSite=Strict, 1 an) puis redirige en 303 vers `/`, et la clé quitte l'adresse.
+  - Sans session : `/` affiche une page « Accès protégé » et toute route `/api` répond 401. Les fichiers statiques (carte, styles) restent publics, car ils ne contiennent rien de sensible.
+  - POST : il faut en plus `X-AI-Studio`, un `Origin` égal à l'hôte s'il est présent, et un `Sec-Fetch-Site` same-origin ou none, contre le CSRF. En-tête `Referrer-Policy: no-referrer`.
+  - Nouvelle commande `python -m ai_studio lien`, qui affiche le lien d'accès (à utiliser si le cookie a été effacé). Les notifications ouvrent l'adresse sans clé, ce qui suffit puisque le cookie est conservé.
+  - `tests/test_server.py` (AccessTest) : 5 tests, dont 4 échouent sur l'ancien serveur. Les fonctions d'appel des tests du serveur envoient désormais le cookie. 270 tests.
 
 ## Non vérifié
 - Contre les vrais services (seulement avec des simulations) : la synchronisation Stripe et les clés d'idempotence, la recherche dans « Messages envoyés » (IMAP \Sent), le client réseau sur de vrais sites.

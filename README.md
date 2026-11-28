@@ -70,7 +70,7 @@ python -m ai_studio tache "Rédiger une FAQ" -a support -d "FAQ pour l'offre X"
 
 ## Tableau de bord
 
-`python -m ai_studio serveur` ouvre le tableau de bord Command HQ sur http://127.0.0.1:8765, fidèle à la maquette validée : carte isométrique néon (vue ville avec bâtiments au choix A/B/C, vue bureaux), fiche du pôle, indicateurs, **validations en un clic**, performance, fil d'activité, succès, escouade d'agents, file de tâches, pipeline et prochains événements. Le menu ouvre les missions, objectifs, analyses de coûts, livrables, intégrations et paramètres.
+`python -m ai_studio serveur` ouvre le tableau de bord Command HQ sur http://127.0.0.1:8765 (accès protégé : le navigateur s'ouvre avec ton lien d'accès personnel et reste connecté ; pour le retrouver, `python -m ai_studio lien`), fidèle à la maquette validée : carte isométrique néon (vue ville avec bâtiments au choix A/B/C, vue bureaux), fiche du pôle, indicateurs, **validations en un clic**, performance, fil d'activité, succès, escouade d'agents, file de tâches, pipeline et prochains événements. Le menu ouvre les missions, objectifs, analyses de coûts, livrables, intégrations et paramètres.
 
 La carte est générée par `outils/carte/gen_carte.py` (à relancer seulement si on change le dessin). Tout est lu en direct dans la base, rafraîchi toutes les 5 secondes, et accessible uniquement depuis ton PC.
 
