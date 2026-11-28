@@ -133,7 +133,11 @@ def send_email(ctx: ToolContext, to: str, reason: str, subject: str = "", body: 
             return f"Pièce jointe introuvable : {attachment}"
         if p.stat().st_size > 10_000_000:
             return "Pièce jointe trop lourde (10 Mo maximum)."
-        extra["attachment"] = attachment
+        from ..outgoing import OutgoingError, freeze
+        try:
+            extra.update(freeze(ctx.cfg, p.relative_to(ctx.cfg.workspace.resolve()).as_posix()))
+        except OutgoingError as e:
+            return f"Refusé : {e}"
     added = []
     if prospect:                             # premier contact (prospection) : identité de l'expéditeur et droit d'opposition ajoutés d'office
         body, added = sender_footer(ctx.cfg, body)
@@ -172,7 +176,7 @@ def email_templates(ctx: ToolContext) -> str:
 
 
 # ---------------------------------------------------------------- Stripe
-def stripe_request(method: str, path: str, params: dict | None = None) -> dict:
+def stripe_request(method: str, path: str, params: dict | None = None, idempotency_key: str | None = None) -> dict:
     key = os.environ.get("STRIPE_SECRET_KEY", "")
     if not key:
         raise RuntimeError("STRIPE_SECRET_KEY absente du fichier .env")
@@ -183,7 +187,10 @@ def stripe_request(method: str, path: str, params: dict | None = None) -> dict:
     elif params:
         data = urllib.parse.urlencode(params).encode()
     auth = base64.b64encode(f"{key}:".encode()).decode()
-    req = urllib.request.Request(url, data=data, method=method, headers={"Authorization": f"Basic {auth}"})
+    headers = {"Authorization": f"Basic {auth}"}
+    if idempotency_key:            # même clé = même résultat chez Stripe pendant 24 h : un nouvel essai ne crée pas de doublon
+        headers["Idempotency-Key"] = idempotency_key
+    req = urllib.request.Request(url, data=data, method=method, headers=headers)
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.loads(r.read().decode())
 

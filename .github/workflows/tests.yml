@@ -1,0 +1,48 @@
+# Tests automatiques (audit QA-01) : à chaque push et à chaque PR, sous Windows (le PC du propriétaire) et Linux.
+# Aucun secret n'est utilisé : les tests emploient un faux modèle, un faux Stripe, un faux SMTP et un serveur local.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: ${{ matrix.os }} · Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python: ["3.10", "3.11", "3.13"]     # 3.10 : minimum documenté ; 3.11 : version du propriétaire
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Bac à sable de Chrome (Ubuntu 24.04)
+        if: runner.os == 'Linux'
+        # Ubuntu 24.04 restreint les espaces de noms utilisateur (AppArmor) : Chrome ne peut plus créer son bac à sable.
+        # On règle la machine de test plutôt que de désactiver le bac à sable dans le programme (audit SEC-07).
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          sudo apt-get install -y -qq poppler-utils >/dev/null   # pdftotext : lit le PDF du test d'isolation (SEC-07)
+      - name: Navigateur utilisé pour les PDF
+        run: python -c "from ai_studio import pdf; print(pdf.find_browser() or 'aucun (test de conversion réelle ignoré)')"
+      - name: Compilation
+        run: python -m compileall -q ai_studio tests
+      - name: Tests
+        run: python -m unittest discover -s tests -v

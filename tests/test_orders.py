@@ -62,7 +62,7 @@ class OrdersTest(Base):
         self.assertIn("créé automatiquement", out)
         aid = self.db.pending_approvals()[0]["id"]
         calls = iter([{"id": "price_1"}, {"id": "plink_9", "url": "https://buy.stripe.com/test_9"}])
-        with unittest.mock.patch.object(approvals, "stripe_request", lambda *a: next(calls)):
+        with unittest.mock.patch.object(approvals, "stripe_request", lambda *a, **k: next(calls)):
             approvals.decide(self.cfg, self.db, aid, True)
         o = self.db.one("SELECT * FROM offers")
         self.assertEqual((o["price_eur"], o["payment_link_id"]), (290, "plink_9"))

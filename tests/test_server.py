@@ -14,7 +14,8 @@ from ai_studio.db import DB
 from ai_studio.server import make_server
 
 
-class ServerTest(unittest.TestCase):
+class ServerBase(unittest.TestCase):
+    """Serveur réel et fonctions d'appel (sans test : les classes de tests en héritent sans dupliquer)."""
     def setUp(self):
         env = unittest.mock.patch.dict(os.environ, {}, clear=False)
         env.start(); self.addCleanup(env.stop)
@@ -33,9 +34,12 @@ class ServerTest(unittest.TestCase):
         self.addCleanup(self.srv.server_close)
         self.addCleanup(self.srv.shutdown)
 
-    def req(self, method, path, body=None, headers=None, host=None):
+    def req(self, method, path, body=None, headers=None, host=None, session=True):
         c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
         h = {"Host": host or f"127.0.0.1:{self.port}"}
+        if session:                                   # cookie posé par le lien d'accès (audit SEC-04)
+            from ai_studio.auth import COOKIE, get_key
+            h["Cookie"] = f"{COOKIE}={get_key(self.cfg)}"
         if body is not None:
             h["Content-Type"] = "application/json"
         h.update(headers or {})
@@ -48,6 +52,9 @@ class ServerTest(unittest.TestCase):
 
     def post(self, path, body):
         return self.req("POST", path, body, {"X-AI-Studio": "1"})
+
+
+class ServerTest(ServerBase):
 
     def test_agent_rules_list_and_remove(self):
         rid = self.db.run("INSERT INTO agent_rules(agent, rule, created_at) VALUES ('ventes', 'Consulte list_prospects avant tout email.', '2026-11-28T10:00:00+00:00')")
@@ -205,7 +212,7 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(st, 200); self.assertIn("four à bois", body)
 
 
-class MaquetteTest(ServerTest):
+class MaquetteTest(ServerBase):
     def test_map_assets_served_compressed(self):
         import gzip as gz
         c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
@@ -317,3 +324,63 @@ class MaquetteTest(ServerTest):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AccessTest(ServerBase):
+    """Accès protégé par clé secrète et cookie de session (audit SEC-04)."""
+
+    def test_local_program_without_key_cannot_read_or_act(self):
+        aid = self.db.add_approval("ventes", None, "decision", {"question": "On y va ?"}, "r")
+        st, body, _ = self.req("GET", "/api/approvals", session=False)
+        self.assertEqual(st, 401); self.assertIn("lien", body["error"])
+        st, _, _ = self.req("POST", f"/api/approvals/{aid}", {"decision": "approve"}, {"X-AI-Studio": "1"}, session=False)
+        self.assertEqual(st, 401)                                    # l'en-tête seul ne suffit plus
+        self.assertEqual(self.db.approval(aid)["status"], "pending")
+
+    def test_dashboard_page_requires_session(self):
+        st, body, _ = self.req("GET", "/", session=False)
+        self.assertEqual(st, 401)
+        self.assertIn("Accès protégé", body); self.assertNotIn("renderApprovals", body)
+        st, body, _ = self.req("GET", "/")
+        self.assertEqual(st, 200); self.assertIn("renderApprovals", body)
+
+    def test_access_link_sets_cookie_and_hides_key(self):
+        from ai_studio.auth import COOKIE, get_key
+        st, _, r = self.req("GET", "/?cle=mauvaise-cle", session=False)
+        self.assertEqual(st, 403)
+        st, _, r = self.req("GET", f"/?cle={get_key(self.cfg)}", session=False)
+        self.assertEqual((st, r.getheader("Location")), (303, "/"))           # la clé quitte la barre d'adresse
+        cookie = r.getheader("Set-Cookie")
+        for flag in ("HttpOnly", "SameSite=Strict", "Path=/"):
+            self.assertIn(flag, cookie)
+        value = cookie.split(";")[0]
+        st, _, _ = self.req("GET", "/api/status", headers={"Cookie": value}, session=False)
+        self.assertEqual(st, 200)
+        st, _, _ = self.req("GET", "/api/status", headers={"Cookie": f"{COOKIE}=devine"}, session=False)
+        self.assertEqual(st, 401)
+
+    def test_cross_site_post_refused_even_with_cookie(self):
+        aid = self.db.add_approval("ventes", None, "decision", {"question": "On y va ?"}, "r")
+        body = {"decision": "approve", "note": "oui"}
+        self.assertEqual(self.req("POST", f"/api/approvals/{aid}", body, {"X-AI-Studio": "1", "Origin": "http://evil.example"})[0], 403)
+        self.assertEqual(self.req("POST", f"/api/approvals/{aid}", body, {"X-AI-Studio": "1", "Sec-Fetch-Site": "cross-site"})[0], 403)
+        self.assertEqual(self.req("POST", f"/api/approvals/{aid}", body)[0], 403)        # sans l'en-tête de la page
+        self.assertEqual(self.db.approval(aid)["status"], "pending")
+        st, _, _ = self.req("POST", f"/api/approvals/{aid}", body,
+                            {"X-AI-Studio": "1", "Origin": f"http://127.0.0.1:{self.port}", "Sec-Fetch-Site": "same-origin"})
+        self.assertEqual(st, 200)
+
+    def test_key_is_stable_private_and_out_of_agents_reach(self):
+        from ai_studio import auth
+        from ai_studio.agents import ROLES
+        from ai_studio.tools import ToolContext, run_tool
+        k = auth.get_key(self.cfg)
+        self.assertEqual(auth.get_key(self.cfg), k)                     # même clé d'un démarrage à l'autre
+        self.assertGreaterEqual(len(k), 40)
+        p = auth.key_path(self.cfg)
+        self.assertNotIn(self.cfg.workspace.resolve(), p.resolve().parents)
+        if os.name == "posix":
+            self.assertEqual(p.stat().st_mode & 0o077, 0)              # lisible par le seul compte utilisateur
+        tid = self.db.add_task("t", "securite")
+        ctx = ToolContext(self.cfg, self.db, "securite", self.db.task(tid), list(ROLES))
+        self.assertIn("hors de l'espace de travail", run_tool("read_file", ctx, {"path": "../cle-tableau-de-bord.txt"}))

@@ -176,8 +176,11 @@ class TestBrave(Base):
             def __exit__(self, *a): return False
             def read(self, n): return "<html><title>Boulangerie Martin</title><body>Pain au levain, ouvert le dimanche.</body></html>".encode()
         opened = []
+        from ai_studio import net
+        page_html = Resp().read(0)
+        fake_get = lambda url, **k: opened.append(1) or {"status": 200, "headers": {"content-type": "text/html"}, "body": page_html, "url": url, "chain": []}
         with unittest.mock.patch.object(core_tools, "_public_host", lambda h: True), \
-             unittest.mock.patch.object(core_tools.urllib.request, "urlopen", lambda *a, **k: opened.append(1) or Resp()):
+             unittest.mock.patch.object(net, "safe_get", fake_get):
             run_tool("fetch_url", ctx, {"url": "https://martin.fr/#accueil"})
             page = run_tool("fetch_url", ctx, {"url": "https://martin.fr/"})
         self.assertEqual(len(opened), 1)

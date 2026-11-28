@@ -22,23 +22,11 @@ PRIORITY = ("contact", "service", "prestation", "tarif", "a-propos", "about", "m
 
 
 # ------------------------------------------------------------------ téléchargement (adresses publiques uniquement)
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *a, **k):
-        return None
-
-
 def default_fetch(url: str, timeout: int = 15) -> dict:
-    """GET sans suivre les redirections (elles sont suivies et vérifiées par `fetch`)."""
-    opener = urllib.request.build_opener(_NoRedirect)
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/html,application/xhtml+xml,*/*"})
-    t = time.time()
-    try:
-        r = opener.open(req, timeout=timeout)
-        status, headers, body = r.status, dict(r.headers), r.read(MAX_BYTES)
-    except urllib.error.HTTPError as e:
-        status, headers, body = e.code, dict(e.headers or {}), (e.read(200_000) if e.fp else b"")
-    return {"status": status, "headers": {k.lower(): v for k, v in headers.items()}, "body": body,
-            "ms": int((time.time() - t) * 1000)}
+    """GET sans suivre les redirections (elles sont suivies et vérifiées par `fetch`), connecté à l'IP publique
+    vérifiée : un DNS qui change de réponse entre le contrôle et la connexion ne mène pas au réseau local."""
+    from .net import get_once
+    return get_once(url, timeout=timeout, max_bytes=MAX_BYTES, headers={"User-Agent": UA})
 
 
 def fetch(url: str, getter=default_fetch, is_public=None) -> dict:
