@@ -423,14 +423,15 @@ def cmd_repartir_propre(cfg, db, a):
         _out("Remise à zéro : supprime missions, tâches, journal, validations, discussions et commandes d'essai ; déplace "
              "les fichiers de travail dans data/archives/. Conserve configuration, offres, ventes réelles, coûts, emails, "
              "bibliothèque de recherches et ta mémoire. Une sauvegarde complète est faite avant.\n"
-             "Arrête d'abord le moteur, puis relance avec --confirmer (ajoute --memoire-agents pour effacer aussi les "
-             "souvenirs des agents).")
+             "Les prospects de test (tes adresses du mode test) sont effacés ; les autres sont gardés, et les oppositions "
+             "« STOP » toujours.\nArrête d'abord le moteur, puis relance avec --confirmer (--memoire-agents : efface aussi les "
+             "souvenirs des agents ; --prospects : efface tout le fichier prospects sauf les « STOP »).")
         return
     from .reset import fresh_start
-    r = fresh_start(cfg, db, a.memoire_agents)
+    r = fresh_start(cfg, db, a.memoire_agents, a.prospects)
     _out(f"Remise à zéro faite. Sauvegarde : {r['backup']}\n"
          f"Supprimé : {r['tasks']} tâche(s), {r['objectives']} mission(s), {r['approvals']} validation(s), "
-         f"{r['test_orders']} commande(s) d'essai" + (f", {r['agent_memories']} souvenir(s) d'agents" if a.memoire_agents else "") +
+         f"{r['test_orders']} commande(s) d'essai, {r['prospects']} prospect(s)" + (f", {r['agent_memories']} souvenir(s) d'agents" if a.memoire_agents else "") +
          (f".\nFichiers de travail déplacés dans : {r['workspace_archive']}" if r.get("workspace_archive") else ".") +
          "\nRelance le moteur (demarrer.bat).")
 
@@ -499,7 +500,7 @@ def main(argv=None):
     s = sub.add_parser("relancer"); s.add_argument("id", type=int, nargs="?")
     s = sub.add_parser("archiver"); s.add_argument("id", type=int)
     sub.add_parser("offres")
-    s = sub.add_parser("repartir-propre"); s.add_argument("--confirmer", action="store_true"); s.add_argument("--memoire-agents", action="store_true")
+    s = sub.add_parser("repartir-propre"); s.add_argument("--confirmer", action="store_true"); s.add_argument("--memoire-agents", action="store_true"); s.add_argument("--prospects", action="store_true")
     s = sub.add_parser("client"); s.add_argument("n", type=int); s.add_argument("email")
     s = sub.add_parser("importer-offres"); s.add_argument("fichier", nargs="?")
     s = sub.add_parser("commande-test"); s.add_argument("offre"); s.add_argument("-e", "--email", required=True); s.add_argument("-i", "--infos")

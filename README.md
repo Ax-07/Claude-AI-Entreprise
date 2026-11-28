@@ -95,7 +95,7 @@ notification immédiate, sans coût d'API.
 
 Chaque offre a une fiche (prix, livrable, délai, informations à demander, agent qui produit) : `python -m ai_studio offres`.
 Le catalogue de départ est dans `catalogue/offres.json` (Diagnostic SEO local, Site vitrine) : `python -m ai_studio importer-offres` le charge ou le met à jour (les liens de paiement déjà créés sont gardés).
-Pour repartir sur une base propre (après une phase d'essais) : arrête le moteur puis `python -m ai_studio repartir-propre --confirmer` (ajoute `--memoire-agents` pour effacer aussi les souvenirs des agents). Une sauvegarde est faite avant.
+Pour repartir sur une base propre (après une phase d'essais) : arrête le moteur puis `python -m ai_studio repartir-propre --confirmer` (ajoute `--memoire-agents` pour effacer aussi les souvenirs des agents, `--prospects` pour vider le fichier prospects ; les prospects du mode test — tes adresses — sont toujours effacés, les oppositions « STOP » toujours gardées). Une sauvegarde est faite avant.
 
 Relecture juridique avant ta décision : une page publique ou un lien de paiement (`legal_review.actions`) passe d'abord par le Juridique, sans t'être montré (la colonne Validations indique « en relecture juridique »). Avis « ok » → la demande t'arrive avec l'avis. « Corrections » → elle repart à l'agent qui l'a faite, avec les corrections ; il corrige et refait la demande, qui repasse par le Juridique. Après 2 allers-retours (`max_rounds`), ou sans avis au bout de 3 h (`max_wait_hours`), elle t'arrive quand même, avec la mention, et tu tranches.
 

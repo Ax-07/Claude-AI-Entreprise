@@ -31,5 +31,16 @@ class ResetTest(Base):
         self.assertEqual(db.add_objective("Nouvelle mission"), 1)                                  # les missions repartent à 1
 
 
+    def test_test_prospects_cleared_stop_always_kept(self):
+        from ai_studio import prospects
+        self.cfg.data["company"]["test_mode"] = {"enabled": True, "recipients": ["Moi@Exemple.fr"]}
+        for e, st in (("moi@exemple.fr", "contacte"), ("autre@societe.fr", "contacte"), ("zoe@cafe.fr", "stop")):
+            prospects.save(self.db, e, "https://x.fr"); prospects.set_status(self.db, e, st)
+        self.assertEqual(reset.fresh_start(self.cfg, self.db)["prospects"], 1)
+        self.assertEqual(sorted(r[0] for r in self.db.q("SELECT email FROM prospects")), ["autre@societe.fr", "zoe@cafe.fr"])
+        self.assertEqual(reset.fresh_start(self.cfg, self.db, all_prospects=True)["prospects"], 1)
+        self.assertEqual([r[0] for r in self.db.q("SELECT email FROM prospects")], ["zoe@cafe.fr"])     # « STOP » gardé
+
+
 if __name__ == "__main__":
     unittest.main()
