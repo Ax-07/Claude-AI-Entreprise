@@ -11,6 +11,9 @@ from .tools.business import stripe_request
 
 
 def send_email(cfg, payload: dict) -> str:
+    from .outgoing import check_recipient, frozen_path
+    check_recipient(cfg, payload.get("to"))              # mode test : contrôle final, quel que soit le chemin suivi
+    attached = frozen_path(cfg, payload) if payload.get("attachment") else None   # empreinte vérifiée AVANT toute connexion
     host = os.environ.get("SMTP_HOST"); user = os.environ.get("SMTP_USER"); pwd = os.environ.get("SMTP_PASSWORD")
     if not (host and user and pwd):
         raise RuntimeError("SMTP non configuré (SMTP_HOST, SMTP_USER, SMTP_PASSWORD dans .env)")
@@ -24,14 +27,14 @@ def send_email(cfg, payload: dict) -> str:
     if payload.get("reply_message_id"):
         msg["In-Reply-To"] = payload["reply_message_id"]
         msg["References"] = payload["reply_message_id"]
-    if payload.get("attachment"):
+    if attached is not None:
+        import hashlib
         import mimetypes
-        base = cfg.workspace.resolve()
-        p = (base / payload["attachment"]).resolve()
-        if base not in p.parents or not p.is_file():
-            raise RuntimeError(f"Pièce jointe introuvable : {payload['attachment']}")
-        ctype = (mimetypes.guess_type(p.name)[0] or "application/octet-stream").split("/", 1)
-        msg.add_attachment(p.read_bytes(), maintype=ctype[0], subtype=ctype[1], filename=p.name)
+        data = attached.read_bytes()
+        if hashlib.sha256(data).hexdigest() != payload["attachment_sha256"]:   # relu en mémoire : c'est ce qui part
+            raise RuntimeError(f"Pièce jointe modifiée depuis la validation : {payload['attachment']}. Rien n'a été envoyé.")
+        ctype = (mimetypes.guess_type(attached.name)[0] or "application/octet-stream").split("/", 1)
+        msg.add_attachment(data, maintype=ctype[0], subtype=ctype[1], filename=attached.name)
     if port == 465:
         with smtplib.SMTP_SSL(host, port, timeout=30) as s:
             s.login(user, pwd); s.send_message(msg)
@@ -79,7 +82,7 @@ def missing_setup(action: str) -> str:
 EMAIL_RE = __import__("re").compile(r"^[^@\s,;<>]+@[^@\s,;<>]+\.[a-zA-Z]{2,}$")
 
 
-def apply_edits(action: str, payload: dict, edits: dict | None) -> list[str]:
+def apply_edits(action: str, payload: dict, edits: dict | None, cfg=None) -> list[str]:
     """Modifications faites par le propriétaire avant de valider (email : destinataire, objet, texte)."""
     if not edits or action != "send_email":
         return []
@@ -89,6 +92,12 @@ def apply_edits(action: str, payload: dict, edits: dict | None) -> list[str]:
             v = str(edits[k]).strip()
             if k == "to" and not EMAIL_RE.match(v):
                 raise ValueError(f"Adresse email invalide : {v}")
+            if k == "to" and cfg is not None:
+                from .outgoing import OutgoingError, check_recipient
+                try:
+                    check_recipient(cfg, v)
+                except OutgoingError as e:
+                    raise ValueError(f"Destinataire refusé : {e}") from None
             if k == "subject":
                 v = " ".join(v.split())[:200]
             payload[k] = v
@@ -103,7 +112,7 @@ def decide(cfg, db, approval_id: int, approve: bool, note: str = "", edits: dict
     if a["status"] != "pending":
         return f"Déjà traitée ({a['status']})."
     payload = json.loads(a["payload"])
-    changed = apply_edits(a["action"], payload, edits) if approve else []
+    changed = apply_edits(a["action"], payload, edits, cfg) if approve else []
     # Prise en charge atomique : un double clic (ou deux onglets) ne peut pas exécuter deux fois la même action.
     cur = db.conn.execute("UPDATE approvals SET status='processing' WHERE id=? AND status='pending'", (approval_id,))
     db.conn.commit()

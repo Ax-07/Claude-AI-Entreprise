@@ -91,6 +91,7 @@ def send(cfg, db, text: str, thread: int | None = None) -> dict:
     guard = BudgetGuard(cfg, db)
     model = models_for(cfg)["strong"]
     ctx = ToolContext(cfg, db, "pdg", None, list(ROLES))
+    ctx.allowed = frozenset(TOOLS)        # en discussion, le PDG n'a que les outils de consultation et de lancement
     from .audit import rules_text
     system = [{"type": "text", "text": system_prompt(role, cfg) + rules_text(db, "pdg") + "\n" + CHAT_RULES, "cache_control": {"type": "ephemeral"}}]
     tools = [REGISTRY[n].spec() for n in TOOLS if n in REGISTRY and REGISTRY[n].available()]

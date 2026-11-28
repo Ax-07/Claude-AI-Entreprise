@@ -222,6 +222,8 @@ class DB:
         ("sales", "info_received_at", "TEXT"),            # informations du client reçues : le délai promis démarre
         ("sales", "content_review", "TEXT"),              # relecture du fond par le chef de projet (avant livraison)
         ("sales", "content_review_at", "TEXT"),
+        ("sales", "content_review_file", "TEXT"),         # fichier relu par le chef de projet (chemin dans l'espace de travail)
+        ("sales", "content_review_sha", "TEXT"),          # son empreinte SHA-256 : la livraison doit contenir cette version exacte
         ("objectives", "owner_check", "TEXT"),            # vérification du propriétaire : ok | issue
         ("objectives", "owner_note", "TEXT"),
         ("objectives", "checked_at", "TEXT"),
@@ -234,7 +236,7 @@ class DB:
         ("sales", "checked_at", "TEXT"),
         ("tasks", "order_ref", "INTEGER"),                # commande concernée (suivi jusqu'à la livraison)
         ("sales", "offer_id", "INTEGER"),
-        ("sales", "stage", "TEXT"),                       # a_livrer | attente_client | livree | historique
+        ("sales", "stage", "TEXT"),                       # nouvelle | a_livrer | attente_client | livree | historique
         ("sales", "due_at", "TEXT"),
         ("sales", "delivered_at", "TEXT"),
         ("sales", "nudges", "INTEGER NOT NULL DEFAULT 0"),
