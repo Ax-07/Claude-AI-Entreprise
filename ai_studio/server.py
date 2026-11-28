@@ -462,6 +462,8 @@ def make_handler(cfg):
                         return self._send(200, task_detail(cfg, db, int(parts[1])))
                     if len(parts) == 3 and parts[0] == "approvals" and parts[1].isdigit() and parts[2] == "preview":
                         return self._preview(page_preview(cfg, db, int(parts[1])))
+                    if parts == ["library"]:
+                        return self._send(200, library(db, q("q"), int(q("id", "0") or 0)))
                     if parts == ["insights"]:
                         return self._send(200, insights(cfg, db, int(q("days", "7") or 7)))
                     if parts == ["events"]:
@@ -532,6 +534,20 @@ def _gzip_cached(path: Path, data: bytes) -> bytes:
     if key not in _GZ:
         _GZ[key] = gzip.compress(data, 6)
     return _GZ[key]
+
+
+def library(db, query: str = "", item: int = 0):
+    """Bibliothèque de recherches : liste (filtrée par mots-clés) ou contenu complet d'une entrée."""
+    if item:
+        r = db.one("SELECT * FROM web_cache WHERE id=?", (item,))
+        if not r:
+            raise ApiError(404, "Entrée introuvable")
+        return dict(r)
+    rows = db.cache_search(query, 60) if query.strip() else db.q("SELECT * FROM web_cache ORDER BY id DESC LIMIT 60")
+    stats = db.one("SELECT COUNT(*) AS n, COALESCE(SUM(kind='search'),0) AS s FROM web_cache")
+    return {"total": stats["n"], "searches": stats["s"],
+            "items": [{"id": r["id"], "kind": r["kind"], "key": r["key"].split("|", 1)[-1] if r["kind"] == "search" else r["key"],
+                       "agent": r["agent"], "task_id": r["task_id"], "created_at": r["created_at"], "size": len(r["content"])} for r in rows]}
 
 
 def _chat_history(db) -> list[dict]:

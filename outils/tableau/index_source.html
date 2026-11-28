@@ -22,6 +22,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #A5B4FC;outline-offset:2p
 .msg.me{align-self:flex-end;background:linear-gradient(135deg,#6366F1,#7C3AED);color:#fff;border-bottom-right-radius:4px}
 .msg.pdg{align-self:flex-start;background:rgba(129,140,248,.12);border:1px solid rgba(129,140,248,.3);color:#EEF1FF;border-bottom-left-radius:4px}
 .msg .meta{display:block;margin-top:4px;font-size:11px;opacity:.6}
+.pill{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:rgba(129,140,248,.15);border:1px solid rgba(129,140,248,.35);color:#C7D2FE}.btn.on{background:rgba(129,140,248,.25);border-color:rgba(165,180,252,.6)}
 .flow{animation:flow 1.6s linear infinite}@keyframes flow{to{stroke-dashoffset:-32}}
 .pulse,.live{animation:pulse 2.2s ease-in-out infinite}.live{animation-duration:1.4s}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 .page{min-height:100vh;background:radial-gradient(1200px 600px at 55% 25%,#1a1650 0%,rgba(7,11,26,0) 70%),radial-gradient(800px 500px at 95% 0%,#0d2a4a 0%,rgba(7,11,26,0) 70%),#070B1A;padding:18px}
@@ -471,9 +472,27 @@ async function openCosts(){
     h("div",{class:"small muted",style:{marginBottom:"14px"}},"14 derniers jours (survole une barre pour le détail)"),
     h("table",{}, h("thead",{}, h("tr",{}, ["Agent","Tokens entrée / sortie (mois)","Coût (mois)"].map(x=>h("th",{},x)))), h("tbody",{}, c.by_agent.map(a => h("tr",{}, h("td",{},a.agent), h("td",{class:"muted"}, `${Math.round((a.input_tokens||0)/1000)}k / ${Math.round((a.output_tokens||0)/1000)}k`), h("td",{}, money4(a.usd))))))));
 }
-async function openFiles(){
+async function openFiles(tab){
+  const tabs = h("div",{style:{display:"flex",gap:"8px",marginBottom:"12px"}},
+    h("button",{class:"btn"+(tab!=="lib"?" on":""),onclick:()=>openFiles("files")},"Livrables"),
+    h("button",{class:"btn"+(tab==="lib"?" on":""),onclick:()=>openFiles("lib")},"Recherches web"));
+  if (tab === "lib") return openLibrary(tabs, "");
   const list = await api("GET","/api/files");
-  modal("Connaissances — livrables des agents", h("div",{style:{overflowX:"auto"}}, h("table",{}, h("tbody",{}, list.length ? list.map(f => h("tr",{class:"click",onclick:async()=>{ try{ const d = await api("GET","/api/file?path="+encodeURIComponent(f.path)); modal(f.path, h("div",{class:"pre",style:{maxHeight:"72vh"}}, d.content)); }catch(e){ toast(e.message,false); } }}, h("td",{},f.path), h("td",{class:"muted"}, (f.size/1024).toFixed(1)+" Ko"), h("td",{class:"muted",style:{textAlign:"right"}}, ago(f.modified)))) : h("tr",{}, h("td",{class:"empty"},"Aucun livrable pour l’instant."))))));
+  modal("Connaissances", h("div",{}, tabs, h("div",{style:{overflowX:"auto"}}, h("table",{}, h("tbody",{}, list.length ? list.map(f => h("tr",{class:"click",onclick:async()=>{ try{ const d = await api("GET","/api/file?path="+encodeURIComponent(f.path)); modal(f.path, h("div",{class:"pre",style:{maxHeight:"72vh"}}, d.content)); }catch(e){ toast(e.message,false); } }}, h("td",{},f.path), h("td",{class:"muted"}, (f.size/1024).toFixed(1)+" Ko"), h("td",{class:"muted",style:{textAlign:"right"}}, ago(f.modified)))) : h("tr",{}, h("td",{class:"empty"},"Aucun livrable pour l’instant.")))))));
+}
+// bibliothèque de recherches : ce que les agents ont cherché ou lu sur internet (30 jours)
+async function openLibrary(tabs, query){
+  let lib; try { lib = await api("GET","/api/library?q="+encodeURIComponent(query||"")); } catch(e){ return toast(e.message,false); }
+  const search = h("input",{type:"text",placeholder:"Filtrer par mots-clés",value:query||"",style:{flex:"1"}});
+  search.addEventListener("keydown", e => { if (e.key === "Enter") openLibrary(tabs, search.value); });
+  const row = it => h("tr",{class:"click",onclick:async()=>{ try{ const d = await api("GET","/api/library?id="+it.id);
+      modal((it.kind==="search"?"Recherche : ":"Page : ")+it.key, h("div",{}, h("div",{class:"small muted",style:{marginBottom:"8px"}}, `${it.agent} · ${new Date(it.created_at).toLocaleString("fr-FR")}${it.task_id?" · tâche #"+it.task_id:""}`), h("div",{class:"pre",style:{maxHeight:"68vh"}}, d.content))); }catch(e){ toast(e.message,false); } }},
+    h("td",{}, h("span",{class:"pill",style:{marginRight:"8px"}}, it.kind==="search"?"Recherche":"Page"), it.key),
+    h("td",{class:"muted"}, it.agent), h("td",{class:"muted",style:{textAlign:"right",whiteSpace:"nowrap"}}, ago(it.created_at)));
+  modal("Connaissances", h("div",{}, tabs,
+    h("div",{class:"small muted",style:{marginBottom:"10px"}}, `${lib.total} entrée(s) dont ${lib.searches} recherche(s). Une recherche identique de moins de 7 jours (3 jours pour une page) est resservie sans coût ; conservation 30 jours.`),
+    h("div",{style:{display:"flex",gap:"8px",marginBottom:"10px"}}, search, h("button",{class:"btn",onclick:()=>openLibrary(tabs, search.value)},"Chercher")),
+    h("div",{style:{overflowX:"auto"}}, h("table",{}, h("tbody",{}, lib.items.length ? lib.items.map(row) : h("tr",{}, h("td",{class:"empty"}, query ? "Rien pour ces mots-clés." : "Aucune recherche enregistrée pour l’instant.")))))));
 }
 async function openIntegrations(){
   const list = await api("GET","/api/integrations");

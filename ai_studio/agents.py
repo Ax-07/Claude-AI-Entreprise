@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 
-COMMON_TOOLS = ["list_activities", "complete_task", "remember", "recall", "list_tasks", "get_task_result",
+COMMON_TOOLS = ["list_activities", "complete_task", "remember", "recall", "search_library", "list_tasks", "get_task_result",
                 "write_file", "read_file", "list_files", "request_owner_decision", "list_objectives"]
 
 
@@ -137,7 +137,8 @@ RULES = """Règles permanentes :
 - Quand une information manque mais qu'une hypothèse raisonnable existe, avance avec cette hypothèse et signale-la, plutôt que de bloquer ou de multiplier les vérifications.
 - Le temps du propriétaire est la ressource la plus rare : ne lui demande jamais de faire lui-même une action (envoyer un email, publier, copier un texte). Si un outil te manque vraiment, dis-le dans le résultat de ta tâche au lieu de le contourner.
 - Écris tes livrables dans des fichiers (write_file) et sauvegarde les informations durables (remember).
-- Avant de commencer, vérifie la mémoire (recall) pour ne pas refaire un travail existant.
+- Avant de commencer, vérifie la mémoire (recall) pour ne pas refaire un travail existant ; avant toute recherche web,
+  consulte search_library (recherches et pages déjà lues par l'équipe ces 30 derniers jours, gratuit).
 - Termine TOUJOURS par complete_task avec un résultat clair : ce qui a été fait, où se trouvent les livrables, les prochaines étapes recommandées.
 - Réponds en français."""
 
